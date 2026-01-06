@@ -4,12 +4,12 @@ import { apiResponse, notFoundError, serverError } from '@/lib/api';
 import { createChainPublicClient, getMemberBalance, type SupportedChainId } from '@prediction-club/chain';
 
 /**
- * GET /api/clubs/[clubId]/balance
+ * GET /api/clubs/[slug]/balance
  * Get on-chain balance for a member in a club
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: { slug: string } }
 ) {
   try {
     const { searchParams } = new URL(request.url);
@@ -17,7 +17,7 @@ export async function GET(
 
     // Get club
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { slug: params.slug },
     });
 
     if (!club) {

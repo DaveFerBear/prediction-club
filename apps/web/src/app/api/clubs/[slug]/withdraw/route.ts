@@ -15,7 +15,7 @@ const withdrawSchema = z.object({
 });
 
 /**
- * POST /api/clubs/[clubId]/withdraw
+ * POST /api/clubs/[slug]/withdraw
  * Request a withdrawal from the club vault
  *
  * Note: This creates a Safe transaction proposal. Actual execution
@@ -23,7 +23,7 @@ const withdrawSchema = z.object({
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: { slug: string } }
 ) {
   try {
     const body = await request.json();
@@ -33,23 +33,23 @@ export async function POST(
       return validationError(parsed.error.errors[0].message);
     }
 
-    // TODO: Get authenticated user from session
-    const currentUserId = 'placeholder-user-id';
-
-    // Get club and verify membership
+    // Get club and verify it exists
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { slug: params.slug },
     });
 
     if (!club) {
       return notFoundError('Club');
     }
 
+    // TODO: Get authenticated user from session
+    const currentUserId = 'placeholder-user-id';
+
     // Check if user is a member
     const membership = await prisma.clubMember.findUnique({
       where: {
         clubId_userId: {
-          clubId: params.clubId,
+          clubId: club.id,
           userId: currentUserId,
         },
       },

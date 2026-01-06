@@ -3,14 +3,23 @@ import { prisma } from '@prediction-club/db';
 import { apiResponse, apiError, notFoundError, forbiddenError, serverError } from '@/lib/api';
 
 /**
- * POST /api/clubs/[clubId]/applications/[appId]/approve
+ * POST /api/clubs/[slug]/applications/[appId]/approve
  * Approve a membership application
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { clubId: string; appId: string } }
+  { params }: { params: { slug: string; appId: string } }
 ) {
   try {
+    // Get club first
+    const club = await prisma.club.findUnique({
+      where: { slug: params.slug },
+    });
+
+    if (!club) {
+      return notFoundError('Club');
+    }
+
     // TODO: Get authenticated user from session
     const currentUserId = 'placeholder-user-id';
 
@@ -18,7 +27,7 @@ export async function POST(
     const currentMember = await prisma.clubMember.findUnique({
       where: {
         clubId_userId: {
-          clubId: params.clubId,
+          clubId: club.id,
           userId: currentUserId,
         },
       },
@@ -38,7 +47,7 @@ export async function POST(
       return notFoundError('Application');
     }
 
-    if (application.clubId !== params.clubId) {
+    if (application.clubId !== club.id) {
       return notFoundError('Application');
     }
 
@@ -54,7 +63,7 @@ export async function POST(
       }),
       prisma.clubMember.create({
         data: {
-          clubId: params.clubId,
+          clubId: club.id,
           userId: application.userId,
           role: 'MEMBER',
           status: 'ACTIVE',

@@ -8,12 +8,12 @@ const applySchema = z.object({
 });
 
 /**
- * POST /api/clubs/[clubId]/apply
+ * POST /api/clubs/[slug]/apply
  * Apply to join a club
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: { slug: string } }
 ) {
   try {
     const body = await request.json();
@@ -28,7 +28,7 @@ export async function POST(
 
     // Check if club exists
     const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
+      where: { slug: params.slug },
     });
 
     if (!club) {
@@ -39,7 +39,7 @@ export async function POST(
     const existingMember = await prisma.clubMember.findUnique({
       where: {
         clubId_userId: {
-          clubId: params.clubId,
+          clubId: club.id,
           userId,
         },
       },
@@ -53,7 +53,7 @@ export async function POST(
     const existingApplication = await prisma.application.findUnique({
       where: {
         clubId_userId: {
-          clubId: params.clubId,
+          clubId: club.id,
           userId,
         },
       },
@@ -79,7 +79,7 @@ export async function POST(
     // Create application
     const application = await prisma.application.create({
       data: {
-        clubId: params.clubId,
+        clubId: club.id,
         userId,
         message: parsed.data.message,
         status: 'PENDING',

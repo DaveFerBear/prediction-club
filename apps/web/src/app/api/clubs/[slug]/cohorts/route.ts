@@ -17,12 +17,12 @@ const createCohortSchema = z.object({
 });
 
 /**
- * POST /api/clubs/[clubId]/cohorts
+ * POST /api/clubs/[slug]/cohorts
  * Create a new cohort
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: { slug: string } }
 ) {
   try {
     const body = await request.json();
@@ -32,6 +32,15 @@ export async function POST(
       return validationError(parsed.error.errors[0].message);
     }
 
+    // Check if club exists first
+    const club = await prisma.club.findUnique({
+      where: { slug: params.slug },
+    });
+
+    if (!club) {
+      return notFoundError('Club');
+    }
+
     // TODO: Get authenticated user from session
     const currentUserId = 'placeholder-user-id';
 
@@ -39,7 +48,7 @@ export async function POST(
     const currentMember = await prisma.clubMember.findUnique({
       where: {
         clubId_userId: {
-          clubId: params.clubId,
+          clubId: club.id,
           userId: currentUserId,
         },
       },
@@ -47,15 +56,6 @@ export async function POST(
 
     if (!currentMember || currentMember.role !== 'ADMIN') {
       return forbiddenError('Only club admins can create cohorts');
-    }
-
-    // Check if club exists
-    const club = await prisma.club.findUnique({
-      where: { id: params.clubId },
-    });
-
-    if (!club) {
-      return notFoundError('Club');
     }
 
     const { cohortId, marketRef, marketTitle, members } = parsed.data;
@@ -68,7 +68,7 @@ export async function POST(
     // Create cohort with members
     const cohort = await prisma.cohort.create({
       data: {
-        clubId: params.clubId,
+        clubId: club.id,
         cohortId,
         marketRef,
         marketTitle,
@@ -105,20 +105,29 @@ export async function POST(
 }
 
 /**
- * GET /api/clubs/[clubId]/cohorts
+ * GET /api/clubs/[slug]/cohorts
  * List cohorts for a club
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { clubId: string } }
+  { params }: { params: { slug: string } }
 ) {
   try {
+    // Get club first
+    const club = await prisma.club.findUnique({
+      where: { slug: params.slug },
+    });
+
+    if (!club) {
+      return notFoundError('Club');
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
 
     const cohorts = await prisma.cohort.findMany({
       where: {
-        clubId: params.clubId,
+        clubId: club.id,
         ...(status ? { status: status as 'PENDING' | 'COMMITTED' | 'SETTLED' | 'CANCELLED' } : {}),
       },
       orderBy: { createdAt: 'desc' },
