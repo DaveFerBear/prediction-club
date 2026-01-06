@@ -1,0 +1,36 @@
+{
+  "name": "prediction-club",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "yarn workspace @prediction-club/web dev",
+    "build": "yarn workspace @prediction-club/web build",
+    "start": "yarn workspace @prediction-club/web start",
+    "lint": "yarn workspaces run lint",
+    "indexer": "yarn workspace @prediction-club/indexer start",
+    "indexer:dev": "yarn workspace @prediction-club/indexer dev",
+    "db:generate": "yarn workspace @prediction-club/db generate",
+    "db:migrate": "yarn workspace @prediction-club/db migrate",
+    "db:push": "yarn workspace @prediction-club/db push",
+    "db:seed": "yarn workspace @prediction-club/db seed",
+    "db:studio": "yarn workspace @prediction-club/db studio",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test",
+    "contracts:deploy": "cd contracts && forge script script/Deploy.s.sol --broadcast",
+    "typecheck": "yarn workspaces run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "yarn@1.22.22"
+}

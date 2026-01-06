@@ -1,0 +1,254 @@
+// Prisma schema for Prediction Club MVP
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User & Authentication
+// ============================================================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String?  @unique
+  walletAddress String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  managedClubs    Club[]         @relation("ClubManager")
+  memberships     ClubMember[]
+  applications    Application[]
+  cohortMembers   CohortMember[]
+  verifications   Verification[]
+
+  @@index([walletAddress])
+  @@index([email])
+}
+
+// ============================================================================
+// Club
+// ============================================================================
+
+model Club {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+
+  // Manager (off-chain role)
+  managerUserId String
+  manager       User     @relation("ClubManager", fields: [managerUserId], references: [id])
+
+  // On-chain references
+  safeAddress   String   // Gnosis Safe address
+  vaultAddress  String   // ClubVaultV1 contract address
+  chainId       Int      // e.g., 137 for Polygon, 80002 for Amoy
+
+  // Visibility
+  isPublic      Boolean  @default(false)
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  members       ClubMember[]
+  applications  Application[]
+  cohorts       Cohort[]
+  vaultEvents   VaultEvent[]
+
+  @@unique([chainId, vaultAddress])
+  @@unique([chainId, safeAddress])
+  @@index([slug])
+  @@index([managerUserId])
+}
+
+// ============================================================================
+// Club Membership
+// ============================================================================
+
+enum MemberRole {
+  MEMBER
+  ADMIN
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
+}
+
+model ClubMember {
+  id        String       @id @default(cuid())
+  clubId    String
+  club      Club         @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role      MemberRole   @default(MEMBER)
+  status    MemberStatus @default(ACTIVE)
+
+  joinedAt  DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([clubId, userId])
+  @@index([clubId])
+  @@index([userId])
+}
+
+// ============================================================================
+// Application (to join a club)
+// ============================================================================
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Application {
+  id        String            @id @default(cuid())
+  clubId    String
+  club      Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status    ApplicationStatus @default(PENDING)
+  message   String?           // Optional message from applicant
+
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([clubId, userId])
+  @@index([clubId, status])
+  @@index([userId])
+}
+
+// ============================================================================
+// Cohort (prediction round / trade)
+// ============================================================================
+
+enum CohortStatus {
+  PENDING     // Created, not yet committed on-chain
+  COMMITTED   // Funds locked via commitToCohort
+  SETTLED     // Funds released via settleCohort
+  CANCELLED   // Cancelled before execution
+}
+
+model Cohort {
+  id              String       @id @default(cuid())
+  clubId          String
+  club            Club         @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  // On-chain cohort identifier (bytes32)
+  cohortId        String       // Hex string of bytes32
+
+  // Market reference (e.g., Polymarket condition ID or URL)
+  marketRef       String?
+  marketTitle     String?
+
+  // Aggregated stake
+  stakeTotal      String       @default("0") // BigInt as string (wei)
+
+  status          CohortStatus @default(PENDING)
+
+  // Transaction references
+  commitTxHash    String?
+  settleTxHash    String?
+  executedTxHash  String?      // Legacy field for backwards compat
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  members         CohortMember[]
+
+  @@unique([clubId, cohortId])
+  @@index([clubId])
+  @@index([status])
+}
+
+// ============================================================================
+// Cohort Member (individual participation in a cohort)
+// ============================================================================
+
+model CohortMember {
+  id            String   @id @default(cuid())
+  cohortId      String
+  cohort        Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Amounts in wei as strings
+  commitAmount  String   @default("0") // Amount committed
+  payoutAmount  String   @default("0") // Amount received after settlement
+  pnlAmount     String   @default("0") // Profit/loss (payout - commit)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([cohortId, userId])
+  @@index([cohortId])
+  @@index([userId])
+}
+
+// ============================================================================
+// Vault Events (indexed from chain)
+// ============================================================================
+
+model VaultEvent {
+  id          String   @id @default(cuid())
+  clubId      String
+  club        Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  // Transaction identification
+  txHash      String
+  logIndex    Int
+
+  // Event data
+  eventName   String   // e.g., "Deposited", "CohortCommitted", "Withdrawn"
+  payloadJson Json     // Raw event args as JSON
+
+  // Block data
+  blockNumber BigInt
+  blockTime   DateTime
+
+  createdAt   DateTime @default(now())
+
+  @@unique([txHash, logIndex])
+  @@index([clubId])
+  @@index([eventName])
+  @@index([blockNumber])
+}
+
+// ============================================================================
+// Verification (off-chain manager verification)
+// ============================================================================
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model Verification {
+  id         String             @id @default(cuid())
+  userId     String
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status     VerificationStatus @default(PENDING)
+  verifiedAt DateTime?
+  notes      String?            // Admin notes
+
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@prediction-club/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node --transpile-only src/index.ts",
+    "start": "node dist/index.js",
+    "backfill": "ts-node --transpile-only src/backfill.ts",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prediction-club/chain": "*",
+    "@prediction-club/db": "*",
+    "@prediction-club/shared": "*",
+    "viem": "^2.21.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
