@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Badge } from '@prediction-club/ui';
+import { Header } from '@/components/header';
 
 // Mock data for the dashboard
 const mockClubs = [
@@ -32,23 +33,7 @@ const mockStats = {
 export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="text-xl font-bold">
-            Prediction Club
-          </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost">Dashboard</Button>
-            </Link>
-            <Link href="/clubs">
-              <Button variant="ghost">Clubs</Button>
-            </Link>
-            <Button>0x1234...5678</Button>
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       <main className="container py-8">
         <div className="mb-8">

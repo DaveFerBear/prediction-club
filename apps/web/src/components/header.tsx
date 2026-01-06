@@ -1,0 +1,26 @@
+'use client';
+
+import Link from 'next/link';
+import { Button } from '@prediction-club/ui';
+import { ConnectButton } from './connect-button';
+
+export function Header() {
+  return (
+    <header className="border-b">
+      <div className="container flex h-16 items-center justify-between">
+        <Link href="/" className="text-xl font-bold">
+          Prediction Club
+        </Link>
+        <nav className="flex items-center gap-4">
+          <Link href="/dashboard">
+            <Button variant="ghost">Dashboard</Button>
+          </Link>
+          <Link href="/clubs">
+            <Button variant="ghost">Clubs</Button>
+          </Link>
+          <ConnectButton />
+        </nav>
+      </div>
+    </header>
+  );
+}

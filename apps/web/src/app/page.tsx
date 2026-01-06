@@ -1,23 +1,11 @@
 import Link from 'next/link';
 import { Button } from '@prediction-club/ui';
+import { Header } from '@/components/header';
 
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold">Prediction Club</span>
-          </div>
-          <nav className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost">Dashboard</Button>
-            </Link>
-            <Button>Connect Wallet</Button>
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* Hero */}
       <main className="flex-1">
