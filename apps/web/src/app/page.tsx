@@ -16,7 +16,7 @@ export default function HomePage() {
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
               Form prediction clubs, pool capital, and trade on Polymarket as a single on-chain
-              actor. Powered by Gnosis Safe on Polygon.
+              actor. Built on Polygon.
             </p>
             <div className="mt-10 flex items-center justify-center gap-4">
               <Link href="/dashboard">
@@ -50,9 +50,10 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-6">
-                <h3 className="text-lg font-semibold">Safe Multisig</h3>
+                <h3 className="text-lg font-semibold">On-Chain Vaults</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Each club is backed by a Gnosis Safe. Start 1-of-1, upgrade to 2-of-3 as you grow.
+                  Each club has its own smart contract vault. Deposits, withdrawals, and PnL are
+                  fully transparent on Polygon.
                 </p>
               </div>
             </div>
