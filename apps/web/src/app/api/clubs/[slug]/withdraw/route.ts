@@ -7,7 +7,7 @@ import { buildWithdrawTx, SafeClient } from '@prediction-club/chain';
 const withdrawSchema = z.object({
   amount: z.string().refine((val) => {
     try {
-      return BigInt(val) > 0n;
+      return BigInt(val) > BigInt(0);
     } catch {
       return false;
     }

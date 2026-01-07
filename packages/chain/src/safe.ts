@@ -143,9 +143,9 @@ export function generateCohortId(identifier: string): Hex {
   const data = encoder.encode(identifier);
 
   // Simple hash for demo - in production use keccak256
-  let hash = 0n;
+  let hash = BigInt(0);
   for (const byte of data) {
-    hash = (hash * 31n + BigInt(byte)) % 2n ** 256n;
+    hash = (hash * BigInt(31) + BigInt(byte)) % BigInt(2) ** BigInt(256);
   }
 
   return `0x${hash.toString(16).padStart(64, '0')}` as Hex;

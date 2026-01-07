@@ -33,7 +33,7 @@ export function formatBigInt(value: bigint | string, decimals = 0): string {
 
   const wholeStr = wholePart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
-  if (decimals === 0 || fractionalPart === 0n) {
+  if (decimals === 0 || fractionalPart === BigInt(0)) {
     return wholeStr;
   }
 
@@ -109,11 +109,11 @@ export function calculatePnlPercent(commit: bigint | string, payout: bigint | st
   const c = typeof commit === 'string' ? BigInt(commit) : commit;
   const p = typeof payout === 'string' ? BigInt(payout) : payout;
 
-  if (c === 0n) return 0;
+  if (c === BigInt(0)) return 0;
 
   // Calculate as (payout - commit) / commit * 100
   const pnl = p - c;
-  return Number((pnl * 10000n) / c) / 100;
+  return Number((pnl * BigInt(10000)) / c) / 100;
 }
 
 /**
