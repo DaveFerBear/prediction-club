@@ -62,7 +62,7 @@ export async function POST(
 
     // Calculate total stake
     const stakeTotal = members
-      .reduce((sum, m) => sum + BigInt(m.commitAmount), 0n)
+      .reduce((sum, m) => sum + BigInt(m.commitAmount), BigInt(0))
       .toString();
 
     // Create cohort with members
