@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@prediction-club/db';
+import { ApplicationController, ApplicationError } from '@/controllers';
 import { apiResponse, apiError, validationError, notFoundError, serverError } from '@/lib/api';
 
 const applySchema = z.object({
@@ -26,68 +26,20 @@ export async function POST(
     // TODO: Get authenticated user from session
     const userId = 'placeholder-user-id';
 
-    // Check if club exists
-    const club = await prisma.club.findUnique({
-      where: { slug: params.slug },
-    });
-
-    if (!club) {
-      return notFoundError('Club');
-    }
-
-    // Check if already a member
-    const existingMember = await prisma.clubMember.findUnique({
-      where: {
-        clubId_userId: {
-          clubId: club.id,
-          userId,
-        },
-      },
-    });
-
-    if (existingMember) {
-      return apiError('ALREADY_MEMBER', 'You are already a member of this club', 409);
-    }
-
-    // Check if application already exists
-    const existingApplication = await prisma.application.findUnique({
-      where: {
-        clubId_userId: {
-          clubId: club.id,
-          userId,
-        },
-      },
-    });
-
-    if (existingApplication) {
-      if (existingApplication.status === 'PENDING') {
-        return apiError('APPLICATION_PENDING', 'You already have a pending application', 409);
-      }
-      if (existingApplication.status === 'REJECTED') {
-        // Update existing rejected application
-        const application = await prisma.application.update({
-          where: { id: existingApplication.id },
-          data: {
-            status: 'PENDING',
-            message: parsed.data.message,
-          },
-        });
-        return apiResponse(application);
-      }
-    }
-
-    // Create application
-    const application = await prisma.application.create({
-      data: {
-        clubId: club.id,
-        userId,
-        message: parsed.data.message,
-        status: 'PENDING',
-      },
+    const application = await ApplicationController.apply({
+      clubSlug: params.slug,
+      userId,
+      message: parsed.data.message,
     });
 
     return apiResponse(application, 201);
   } catch (error) {
+    if (error instanceof ApplicationError) {
+      if (error.code === 'CLUB_NOT_FOUND') {
+        return notFoundError('Club');
+      }
+      return apiError(error.code, error.message, 409);
+    }
     console.error('Error creating application:', error);
     return serverError();
   }

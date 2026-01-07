@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@prediction-club/db';
-import { apiResponse, validationError, notFoundError, forbiddenError, serverError } from '@/lib/api';
+import { VaultController, VaultError } from '@/controllers';
+import { apiResponse, apiError, validationError, notFoundError, forbiddenError, serverError } from '@/lib/api';
 import { isValidBytes32 } from '@prediction-club/shared';
 
 const createCohortSchema = z.object({
@@ -11,7 +11,7 @@ const createCohortSchema = z.object({
   members: z.array(
     z.object({
       userId: z.string(),
-      commitAmount: z.string(), // BigInt as string
+      commitAmount: z.string(),
     })
   ),
 });
@@ -32,73 +32,26 @@ export async function POST(
       return validationError(parsed.error.errors[0].message);
     }
 
-    // Check if club exists first
-    const club = await prisma.club.findUnique({
-      where: { slug: params.slug },
-    });
-
-    if (!club) {
-      return notFoundError('Club');
-    }
-
     // TODO: Get authenticated user from session
-    const currentUserId = 'placeholder-user-id';
+    const adminUserId = 'placeholder-user-id';
 
-    // Check if current user is admin of the club
-    const currentMember = await prisma.clubMember.findUnique({
-      where: {
-        clubId_userId: {
-          clubId: club.id,
-          userId: currentUserId,
-        },
-      },
-    });
-
-    if (!currentMember || currentMember.role !== 'ADMIN') {
-      return forbiddenError('Only club admins can create cohorts');
-    }
-
-    const { cohortId, marketRef, marketTitle, members } = parsed.data;
-
-    // Calculate total stake
-    const stakeTotal = members
-      .reduce((sum, m) => sum + BigInt(m.commitAmount), BigInt(0))
-      .toString();
-
-    // Create cohort with members
-    const cohort = await prisma.cohort.create({
-      data: {
-        clubId: club.id,
-        cohortId,
-        marketRef,
-        marketTitle,
-        stakeTotal,
-        status: 'PENDING',
-        members: {
-          create: members.map((m) => ({
-            userId: m.userId,
-            commitAmount: m.commitAmount,
-            payoutAmount: '0',
-            pnlAmount: '0',
-          })),
-        },
-      },
-      include: {
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                walletAddress: true,
-              },
-            },
-          },
-        },
-      },
+    const cohort = await VaultController.createCohort({
+      clubSlug: params.slug,
+      adminUserId,
+      ...parsed.data,
     });
 
     return apiResponse(cohort, 201);
   } catch (error) {
+    if (error instanceof VaultError) {
+      if (error.code === 'CLUB_NOT_FOUND') {
+        return notFoundError('Club');
+      }
+      if (error.code === 'FORBIDDEN') {
+        return forbiddenError(error.message);
+      }
+      return apiError(error.code, error.message, 400);
+    }
     console.error('Error creating cohort:', error);
     return serverError();
   }
@@ -113,33 +66,23 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   try {
-    // Get club first
-    const club = await prisma.club.findUnique({
-      where: { slug: params.slug },
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = parseInt(searchParams.get('pageSize') || '20');
+    const status = searchParams.get('status') || undefined;
+
+    const result = await VaultController.listCohorts({
+      clubSlug: params.slug,
+      page,
+      pageSize,
+      status,
     });
 
-    if (!club) {
+    return apiResponse(result);
+  } catch (error) {
+    if (error instanceof VaultError && error.code === 'CLUB_NOT_FOUND') {
       return notFoundError('Club');
     }
-
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
-
-    const cohorts = await prisma.cohort.findMany({
-      where: {
-        clubId: club.id,
-        ...(status ? { status: status as 'PENDING' | 'COMMITTED' | 'SETTLED' | 'CANCELLED' } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: { members: true },
-        },
-      },
-    });
-
-    return apiResponse(cohorts);
-  } catch (error) {
     console.error('Error listing cohorts:', error);
     return serverError();
   }

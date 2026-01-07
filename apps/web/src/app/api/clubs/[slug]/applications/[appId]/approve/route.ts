@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { prisma } from '@prediction-club/db';
+import { ApplicationController, ApplicationError } from '@/controllers';
 import { apiResponse, apiError, notFoundError, forbiddenError, serverError } from '@/lib/api';
 
 /**
@@ -11,71 +11,28 @@ export async function POST(
   { params }: { params: { slug: string; appId: string } }
 ) {
   try {
-    // Get club first
-    const club = await prisma.club.findUnique({
-      where: { slug: params.slug },
-    });
-
-    if (!club) {
-      return notFoundError('Club');
-    }
-
     // TODO: Get authenticated user from session
-    const currentUserId = 'placeholder-user-id';
+    const adminUserId = 'placeholder-user-id';
 
-    // Check if current user is admin of the club
-    const currentMember = await prisma.clubMember.findUnique({
-      where: {
-        clubId_userId: {
-          clubId: club.id,
-          userId: currentUserId,
-        },
-      },
+    const result = await ApplicationController.approve({
+      clubSlug: params.slug,
+      applicationId: params.appId,
+      adminUserId,
     });
 
-    if (!currentMember || currentMember.role !== 'ADMIN') {
-      return forbiddenError('Only club admins can approve applications');
-    }
-
-    // Get the application
-    const application = await prisma.application.findUnique({
-      where: { id: params.appId },
-      include: { user: true },
-    });
-
-    if (!application) {
-      return notFoundError('Application');
-    }
-
-    if (application.clubId !== club.id) {
-      return notFoundError('Application');
-    }
-
-    if (application.status !== 'PENDING') {
-      return apiError('INVALID_STATUS', 'Application is not pending', 400);
-    }
-
-    // Approve application and create membership
-    const [updatedApplication, membership] = await prisma.$transaction([
-      prisma.application.update({
-        where: { id: params.appId },
-        data: { status: 'APPROVED' },
-      }),
-      prisma.clubMember.create({
-        data: {
-          clubId: club.id,
-          userId: application.userId,
-          role: 'MEMBER',
-          status: 'ACTIVE',
-        },
-      }),
-    ]);
-
-    return apiResponse({
-      application: updatedApplication,
-      membership,
-    });
+    return apiResponse(result);
   } catch (error) {
+    if (error instanceof ApplicationError) {
+      switch (error.code) {
+        case 'CLUB_NOT_FOUND':
+        case 'APPLICATION_NOT_FOUND':
+          return notFoundError(error.code === 'CLUB_NOT_FOUND' ? 'Club' : 'Application');
+        case 'FORBIDDEN':
+          return forbiddenError(error.message);
+        default:
+          return apiError(error.code, error.message, 400);
+      }
+    }
     console.error('Error approving application:', error);
     return serverError();
   }
