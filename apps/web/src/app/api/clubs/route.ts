@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { ClubController, ClubError } from '@/controllers';
-import { apiResponse, apiError, validationError, serverError } from '@/lib/api';
+import { apiResponse, apiError, validationError, unauthorizedError, serverError } from '@/lib/api';
+import { requireAuth, AuthError } from '@/lib/auth';
 import { isValidAddress } from '@prediction-club/shared';
 
 const createClubSchema = z.object({
@@ -20,6 +21,8 @@ const createClubSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
+
     const body = await request.json();
     const parsed = createClubSchema.safeParse(body);
 
@@ -27,12 +30,12 @@ export async function POST(request: NextRequest) {
       return validationError(parsed.error.errors[0].message);
     }
 
-    // TODO: Get authenticated user from session
-    const userId = 'placeholder-user-id';
-
-    const club = await ClubController.create(parsed.data, userId);
+    const club = await ClubController.create(parsed.data, user.id);
     return apiResponse(club, 201);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return unauthorizedError(error.message);
+    }
     if (error instanceof ClubError) {
       return apiError(error.code, error.message, 409);
     }

@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { VaultController, VaultError } from '@/controllers';
-import { apiResponse, apiError, validationError, notFoundError, forbiddenError, serverError } from '@/lib/api';
+import { apiResponse, apiError, validationError, notFoundError, forbiddenError, unauthorizedError, serverError } from '@/lib/api';
+import { requireAuth, AuthError } from '@/lib/auth';
 
 const withdrawSchema = z.object({
   amount: z.string().refine((val) => {
@@ -22,6 +23,8 @@ export async function POST(
   { params }: { params: { slug: string } }
 ) {
   try {
+    const user = await requireAuth(request);
+
     const body = await request.json();
     const parsed = withdrawSchema.safeParse(body);
 
@@ -29,17 +32,17 @@ export async function POST(
       return validationError(parsed.error.errors[0].message);
     }
 
-    // TODO: Get authenticated user from session
-    const userId = 'placeholder-user-id';
-
     const result = await VaultController.requestWithdraw({
       clubSlug: params.slug,
-      userId,
+      userId: user.id,
       amount: parsed.data.amount,
     });
 
     return apiResponse(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return unauthorizedError(error.message);
+    }
     if (error instanceof VaultError) {
       if (error.code === 'CLUB_NOT_FOUND') {
         return notFoundError('Club');

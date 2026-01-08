@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { VaultController, VaultError } from '@/controllers';
-import { apiResponse, apiError, validationError, notFoundError, forbiddenError, serverError } from '@/lib/api';
+import { apiResponse, apiError, validationError, notFoundError, forbiddenError, unauthorizedError, serverError } from '@/lib/api';
+import { requireAuth, AuthError } from '@/lib/auth';
 import { isValidBytes32 } from '@prediction-club/shared';
 
 const createCohortSchema = z.object({
@@ -25,6 +26,8 @@ export async function POST(
   { params }: { params: { slug: string } }
 ) {
   try {
+    const user = await requireAuth(request);
+
     const body = await request.json();
     const parsed = createCohortSchema.safeParse(body);
 
@@ -32,17 +35,17 @@ export async function POST(
       return validationError(parsed.error.errors[0].message);
     }
 
-    // TODO: Get authenticated user from session
-    const adminUserId = 'placeholder-user-id';
-
     const cohort = await VaultController.createCohort({
       clubSlug: params.slug,
-      adminUserId,
+      adminUserId: user.id,
       ...parsed.data,
     });
 
     return apiResponse(cohort, 201);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return unauthorizedError(error.message);
+    }
     if (error instanceof VaultError) {
       if (error.code === 'CLUB_NOT_FOUND') {
         return notFoundError('Club');

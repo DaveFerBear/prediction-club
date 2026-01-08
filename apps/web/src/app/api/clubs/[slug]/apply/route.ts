@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { ApplicationController, ApplicationError } from '@/controllers';
-import { apiResponse, apiError, validationError, notFoundError, serverError } from '@/lib/api';
+import { apiResponse, apiError, validationError, notFoundError, unauthorizedError, serverError } from '@/lib/api';
+import { requireAuth, AuthError } from '@/lib/auth';
 
 const applySchema = z.object({
   message: z.string().max(500).optional(),
@@ -16,6 +17,8 @@ export async function POST(
   { params }: { params: { slug: string } }
 ) {
   try {
+    const user = await requireAuth(request);
+
     const body = await request.json();
     const parsed = applySchema.safeParse(body);
 
@@ -23,17 +26,17 @@ export async function POST(
       return validationError(parsed.error.errors[0].message);
     }
 
-    // TODO: Get authenticated user from session
-    const userId = 'placeholder-user-id';
-
     const application = await ApplicationController.apply({
       clubSlug: params.slug,
-      userId,
+      userId: user.id,
       message: parsed.data.message,
     });
 
     return apiResponse(application, 201);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return unauthorizedError(error.message);
+    }
     if (error instanceof ApplicationError) {
       if (error.code === 'CLUB_NOT_FOUND') {
         return notFoundError('Club');

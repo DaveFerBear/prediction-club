@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { ApplicationController, ApplicationError } from '@/controllers';
-import { apiResponse, apiError, notFoundError, forbiddenError, serverError } from '@/lib/api';
+import { apiResponse, apiError, notFoundError, forbiddenError, unauthorizedError, serverError } from '@/lib/api';
+import { requireAuth, AuthError } from '@/lib/auth';
 
 /**
  * POST /api/clubs/[slug]/applications/[appId]/approve
@@ -11,17 +12,19 @@ export async function POST(
   { params }: { params: { slug: string; appId: string } }
 ) {
   try {
-    // TODO: Get authenticated user from session
-    const adminUserId = 'placeholder-user-id';
+    const user = await requireAuth(request);
 
     const result = await ApplicationController.approve({
       clubSlug: params.slug,
       applicationId: params.appId,
-      adminUserId,
+      adminUserId: user.id,
     });
 
     return apiResponse(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return unauthorizedError(error.message);
+    }
     if (error instanceof ApplicationError) {
       switch (error.code) {
         case 'CLUB_NOT_FOUND':
