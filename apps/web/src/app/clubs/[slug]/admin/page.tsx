@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Card,
@@ -11,51 +14,170 @@ import {
   Avatar,
   AvatarFallback,
 } from '@prediction-club/ui';
+import { Header } from '@/components/header';
 
-// Mock data
-const mockClub = {
-  name: 'Alpha Traders',
-  slug: 'alpha-traders',
-  tvl: '45,000',
-  available: '30,000',
-  committed: '15,000',
-};
+interface Club {
+  id: string;
+  name: string;
+  slug: string;
+  safeAddress: string;
+  vaultAddress: string;
+  members: Array<{
+    role: string;
+    user: {
+      id: string;
+      walletAddress: string;
+      email: string | null;
+    };
+  }>;
+  _count: {
+    members: number;
+    cohorts: number;
+  };
+}
 
-const mockApplications = [
-  { id: '1', address: '0x7777...8888', name: 'trader.eth', message: 'Experienced trader, 5y+ in markets', createdAt: '2 hours ago' },
-  { id: '2', address: '0x9999...AAAA', name: '0x9999...AAAA', message: 'Looking to join a professional group', createdAt: '1 day ago' },
-];
+interface Application {
+  id: string;
+  status: string;
+  message: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    walletAddress: string;
+    email: string | null;
+  };
+}
 
-const mockMembers = [
-  { id: '1', name: 'alice.eth', address: '0x1111...2222', role: 'ADMIN', available: '15,000', committed: '5,000' },
-  { id: '2', name: '0x3333...4444', address: '0x3333...4444', role: 'MEMBER', available: '8,000', committed: '4,000' },
-  { id: '3', name: 'bob.eth', address: '0x5555...6666', role: 'MEMBER', available: '7,000', committed: '6,000' },
-];
+interface ClubResponse {
+  success: boolean;
+  data: Club;
+}
+
+interface ApplicationsResponse {
+  success: boolean;
+  data: {
+    items: Application[];
+    total: number;
+  };
+}
+
+function truncateAddress(address: string) {
+  if (address.length <= 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours < 1) return 'Just now';
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  return date.toLocaleDateString();
+}
 
 export default function ClubAdminPage({ params }: { params: { slug: string } }) {
+  const [club, setClub] = useState<Club | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [clubRes, appsRes] = await Promise.all([
+          fetch(`/api/clubs/${params.slug}`),
+          fetch(`/api/clubs/${params.slug}/applications?status=PENDING`),
+        ]);
+
+        const clubData: ClubResponse = await clubRes.json();
+        const appsData: ApplicationsResponse = await appsRes.json();
+
+        if (clubData.success) {
+          setClub(clubData.data);
+        } else {
+          setError('Club not found');
+        }
+
+        if (appsData.success) {
+          setApplications(appsData.data.items);
+        }
+      } catch (err) {
+        console.error('Failed to fetch data:', err);
+        setError('Failed to load club');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [params.slug]);
+
+  async function handleApprove(applicationId: string) {
+    setApprovingId(applicationId);
+    try {
+      const res = await fetch(`/api/clubs/${params.slug}/applications/${applicationId}/approve`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setApplications((prev) => prev.filter((app) => app.id !== applicationId));
+        // Refresh club data to update member count
+        const clubRes = await fetch(`/api/clubs/${params.slug}`);
+        const clubData: ClubResponse = await clubRes.json();
+        if (clubData.success) {
+          setClub(clubData.data);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to approve:', err);
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-8">
+          <div className="text-muted-foreground">Loading...</div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !club) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-8">
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground">{error || 'Club not found'}</p>
+              <Link href="/dashboard" className="mt-4 inline-block">
+                <Button variant="outline">Back to Dashboard</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="text-xl font-bold">
-            Prediction Club
-          </Link>
-          <nav className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost">Dashboard</Button>
-            </Link>
-            <Button>0x1234...5678</Button>
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       <main className="container py-8">
         {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2">
             <Link href={`/clubs/${params.slug}`} className="text-muted-foreground hover:text-foreground">
-              {mockClub.name}
+              {club.name}
             </Link>
             <span className="text-muted-foreground">/</span>
             <span>Admin</span>
@@ -67,20 +189,20 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
         <div className="mb-8 grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Value Locked</CardDescription>
-              <CardTitle className="text-2xl">${mockClub.tvl}</CardTitle>
+              <CardDescription>Members</CardDescription>
+              <CardTitle className="text-2xl">{club._count.members}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Available</CardDescription>
-              <CardTitle className="text-2xl text-green-600">${mockClub.available}</CardTitle>
+              <CardDescription>Cohorts</CardDescription>
+              <CardTitle className="text-2xl">{club._count.cohorts}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Committed</CardDescription>
-              <CardTitle className="text-2xl text-yellow-600">${mockClub.committed}</CardTitle>
+              <CardDescription>Pending Applications</CardDescription>
+              <CardTitle className="text-2xl">{applications.length}</CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -93,24 +215,34 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
               <CardDescription>Review and approve membership requests</CardDescription>
             </CardHeader>
             <CardContent>
-              {mockApplications.length === 0 ? (
+              {applications.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No pending applications</p>
               ) : (
                 <div className="space-y-4">
-                  {mockApplications.map((app) => (
+                  {applications.map((app) => (
                     <div key={app.id} className="rounded-lg border p-4">
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="font-medium">{app.name}</p>
-                          <p className="text-xs text-muted-foreground">{app.address}</p>
+                          <p className="font-medium">
+                            {app.user.email || truncateAddress(app.user.walletAddress)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {truncateAddress(app.user.walletAddress)}
+                          </p>
                         </div>
-                        <span className="text-xs text-muted-foreground">{app.createdAt}</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(app.createdAt)}</span>
                       </div>
                       {app.message && (
                         <p className="mt-2 text-sm text-muted-foreground">&ldquo;{app.message}&rdquo;</p>
                       )}
                       <div className="mt-3 flex gap-2">
-                        <Button size="sm">Approve</Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleApprove(app.id)}
+                          disabled={approvingId === app.id}
+                        >
+                          {approvingId === app.id ? 'Approving...' : 'Approve'}
+                        </Button>
                         <Button size="sm" variant="outline">
                           Reject
                         </Button>
@@ -156,7 +288,7 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
         <Card className="mt-8">
           <CardHeader>
             <CardTitle>Members</CardTitle>
-            <CardDescription>Manage club membership and process withdrawals</CardDescription>
+            <CardDescription>Manage club membership</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -165,22 +297,26 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
                   <tr className="border-b text-left text-sm text-muted-foreground">
                     <th className="pb-3 font-medium">Member</th>
                     <th className="pb-3 font-medium">Role</th>
-                    <th className="pb-3 font-medium text-right">Available</th>
-                    <th className="pb-3 font-medium text-right">Committed</th>
                     <th className="pb-3 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mockMembers.map((member) => (
-                    <tr key={member.id} className="border-b">
+                  {club.members.map((member) => (
+                    <tr key={member.user.id} className="border-b">
                       <td className="py-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback>{member.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                            <AvatarFallback>
+                              {member.user.walletAddress.slice(2, 4).toUpperCase()}
+                            </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium">{member.name}</p>
-                            <p className="text-xs text-muted-foreground">{member.address}</p>
+                            <p className="font-medium">
+                              {member.user.email || truncateAddress(member.user.walletAddress)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {truncateAddress(member.user.walletAddress)}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -189,11 +325,9 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
                           {member.role}
                         </Badge>
                       </td>
-                      <td className="py-4 text-right">${member.available}</td>
-                      <td className="py-4 text-right">${member.committed}</td>
                       <td className="py-4 text-right">
                         <Button size="sm" variant="outline">
-                          Withdraw
+                          View
                         </Button>
                       </td>
                     </tr>
@@ -204,22 +338,23 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
           </CardContent>
         </Card>
 
-        {/* Safe Actions */}
+        {/* Contract Info */}
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle>Safe Actions</CardTitle>
-            <CardDescription>Execute transactions via Gnosis Safe</CardDescription>
+            <CardTitle>Contract Addresses</CardTitle>
+            <CardDescription>On-chain deployment info</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-4">
-              <Button variant="outline">View Pending Transactions</Button>
-              <Button variant="outline">Upgrade Threshold</Button>
-              <Button variant="outline">Add Signer</Button>
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Safe Address</span>
+                <span className="font-mono text-sm">{club.safeAddress}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Vault Address</span>
+                <span className="font-mono text-sm">{club.vaultAddress}</span>
+              </div>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Note: All vault operations (commit, settle, withdraw) are executed via the Safe
-              multisig. Currently operating as 1-of-1.
-            </p>
           </CardContent>
         </Card>
       </main>

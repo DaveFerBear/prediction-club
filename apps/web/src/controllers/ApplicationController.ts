@@ -12,7 +12,63 @@ export interface ApproveInput {
   adminUserId: string;
 }
 
+export interface ListApplicationsInput {
+  clubSlug: string;
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  page?: number;
+  pageSize?: number;
+}
+
 export class ApplicationController {
+  /**
+   * List applications for a club
+   */
+  static async list(input: ListApplicationsInput) {
+    const { clubSlug, status, page = 1, pageSize = 20 } = input;
+
+    const club = await prisma.club.findUnique({
+      where: { slug: clubSlug },
+    });
+
+    if (!club) {
+      throw new ApplicationError('CLUB_NOT_FOUND', 'Club not found');
+    }
+
+    const skip = (page - 1) * pageSize;
+    const where: Record<string, unknown> = { clubId: club.id };
+
+    if (status) {
+      where.status = status;
+    }
+
+    const [applications, total] = await Promise.all([
+      prisma.application.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              walletAddress: true,
+              email: true,
+            },
+          },
+        },
+      }),
+      prisma.application.count({ where }),
+    ]);
+
+    return {
+      items: applications,
+      total,
+      page,
+      pageSize,
+      hasMore: skip + applications.length < total,
+    };
+  }
+
   /**
    * Apply to join a club
    */
