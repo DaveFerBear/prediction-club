@@ -2,9 +2,19 @@
 export {
   ClubVaultV1Abi,
   ClubVaultV1Events,
+  ClubVaultV1Bytecode,
   ERC20Abi,
   type ClubVaultV1EventName,
 } from './abi';
+
+// Deployment utilities
+export {
+  deployClub,
+  deploySafe,
+  deployClubVault,
+  type DeployClubParams,
+  type DeployClubResult,
+} from './deploy';
 
 // Client utilities
 export {

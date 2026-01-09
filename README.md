@@ -134,19 +134,58 @@ The web app will be available at http://localhost:3000
 
 ### 6. Smart Contract Development
 
+#### Install Foundry
+
+If you don't have Foundry installed:
+
+```bash
+# Install foundryup
+curl -L https://foundry.paradigm.xyz | bash
+
+# Reload shell or run:
+source ~/.zshenv  # or ~/.bashrc
+
+# Install Foundry toolchain
+foundryup
+```
+
+#### Compile Contracts
+
 ```bash
 cd contracts
 
-# Install Foundry dependencies
-forge install
+# Install dependencies (OpenZeppelin, forge-std)
+forge install OpenZeppelin/openzeppelin-contracts@v5.0.0 foundry-rs/forge-std --no-git
+
+# Build contracts
+forge build
 
 # Run tests
 forge test
 
 # Run tests with verbosity
 forge test -vvv
+```
 
-# Deploy to Amoy testnet
+#### Update TypeScript Bytecode
+
+After modifying contracts, update the bytecode in the `chain` package:
+
+```bash
+# From contracts directory, extract bytecode
+cat out/ClubVaultV1.sol/ClubVaultV1.json | jq -r '.bytecode.object'
+
+# Copy the output to packages/chain/src/abi/ClubVaultV1.ts
+# Update the ClubVaultV1Bytecode constant
+
+# Rebuild chain package
+cd .. && yarn workspace @prediction-club/chain build
+```
+
+#### Deploy to Amoy Testnet
+
+```bash
+cd contracts
 forge script script/Deploy.s.sol --rpc-url amoy --broadcast
 ```
 

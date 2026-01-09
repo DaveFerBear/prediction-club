@@ -1,4 +1,4 @@
-export { ClubVaultV1Abi, ClubVaultV1Events } from './ClubVaultV1';
+export { ClubVaultV1Abi, ClubVaultV1Events, ClubVaultV1Bytecode } from './ClubVaultV1';
 export type { ClubVaultV1EventName } from './ClubVaultV1';
 
 // ERC20 ABI (minimal for approvals and balances)
