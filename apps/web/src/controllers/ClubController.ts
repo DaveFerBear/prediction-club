@@ -1,5 +1,5 @@
 import { prisma } from '@prediction-club/db';
-import { slugify, isValidAddress } from '@prediction-club/shared';
+import { slugify } from '@prediction-club/shared';
 
 export interface CreateClubInput {
   name: string;

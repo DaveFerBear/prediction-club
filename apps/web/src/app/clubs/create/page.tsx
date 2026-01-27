@@ -48,7 +48,7 @@ const getDeployStatusMessage = (status: DeployStatus) => {
 
 export default function CreateClubPage() {
   const router = useRouter();
-  const { fetch: apiFetch, isAuthenticated } = useApi();
+  const { isAuthenticated } = useApi();
   const { connect, isPending: isConnecting } = useConnect();
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
@@ -67,7 +67,6 @@ export default function CreateClubPage() {
     deploy,
     retrySafe,
     retryVault,
-    reset: resetDeploy,
     status,
     isDeploying,
     result: deployResult,
@@ -135,12 +134,6 @@ export default function CreateClubPage() {
     }
     const nextSlug = slugifyName(value);
     setFormData({ ...formData, name: value, slug: nextSlug });
-  };
-
-  const handleRetryDeploy = () => {
-    setError(null);
-    resetDeploy();
-    deploy();
   };
 
   useEffect(() => {

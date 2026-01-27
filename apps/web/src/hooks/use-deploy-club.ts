@@ -105,7 +105,7 @@ export function useDeployClub(options: UseDeployClubOptions) {
               });
               // After adding, the wallet should auto-switch, but try switching again just in case
               await switchChainAsync({ chainId });
-            } catch (addErr) {
+            } catch {
               const error = new Error(
                 `Failed to add ${getChainConfig(chainId).name} network to wallet`
               );
