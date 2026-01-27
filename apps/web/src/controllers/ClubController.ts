@@ -17,7 +17,26 @@ export interface ListClubsInput {
   publicOnly?: boolean;
 }
 
+export interface UpdateClubInput {
+  name: string;
+  description?: string | null;
+  isPublic: boolean;
+}
+
 export class ClubController {
+  static async isAdmin(clubId: string, userId: string) {
+    const member = await prisma.clubMember.findFirst({
+      where: {
+        clubId,
+        userId,
+        status: 'ACTIVE',
+        role: 'ADMIN',
+      },
+    });
+
+    return !!member;
+  }
+
   /**
    * Create a new club
    */
@@ -146,6 +165,36 @@ export class ClubController {
     }
 
     return club;
+  }
+
+  /**
+   * Update club details (admin only)
+   */
+  static async updateDetails(slug: string, input: UpdateClubInput, userId: string) {
+    const club = await prisma.club.findUnique({
+      where: { slug },
+    });
+
+    if (!club) {
+      throw new ClubError('NOT_FOUND', 'Club not found');
+    }
+
+    const isAdmin = await ClubController.isAdmin(club.id, userId);
+
+    if (!isAdmin) {
+      throw new ClubError('FORBIDDEN', 'Only club admins can update club details');
+    }
+
+    const updatedClub = await prisma.club.update({
+      where: { id: club.id },
+      data: {
+        name: input.name,
+        description: input.description ?? null,
+        isPublic: input.isPublic,
+      },
+    });
+
+    return updatedClub;
   }
 }
 

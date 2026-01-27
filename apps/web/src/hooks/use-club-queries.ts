@@ -99,6 +99,12 @@ type ApplicationsPayload = {
   hasMore: boolean;
 };
 
+export interface UpdateClubInput {
+  name: string;
+  description?: string | null;
+  isPublic: boolean;
+}
+
 const clubsKey = (publicOnly: boolean) => (publicOnly ? '/api/clubs' : '/api/clubs?public=false');
 const clubKey = (slug?: string) => (slug ? `/api/clubs/${slug}` : null);
 const predictionRoundsKey = (slug?: string) => (slug ? `/api/clubs/${slug}/predictions` : null);
@@ -215,6 +221,38 @@ export function useApproveApplication(slug: string) {
     approve,
     approvingId,
     isApproving: mutation.isMutating,
+    error: mutation.error,
+  };
+}
+
+export function useUpdateClub(slug: string) {
+  const { fetch } = useApi();
+  const { mutate } = useSWRConfig();
+
+  const mutation = useSWRMutation<ApiResponse<ClubDetail>, Error, string, UpdateClubInput>(
+    `/api/clubs/${slug}`,
+    (url: string, { arg }: { arg: UpdateClubInput }) =>
+      fetch<ApiResponse<ClubDetail>>(url, {
+        method: 'PATCH',
+        body: JSON.stringify(arg),
+      })
+  );
+
+  const updateClub = async (input: UpdateClubInput) => {
+    const response = await mutation.trigger(input);
+    if (response?.success) {
+      await Promise.all([
+        mutate(clubKey(slug)),
+        mutate(clubsKey(true)),
+        mutate(clubsKey(false)),
+      ]);
+    }
+    return response;
+  };
+
+  return {
+    updateClub,
+    isUpdating: mutation.isMutating,
     error: mutation.error,
   };
 }

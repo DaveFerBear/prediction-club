@@ -1,4 +1,5 @@
 import { prisma } from '@prediction-club/db';
+import { ClubController } from './ClubController';
 
 export interface ApplyInput {
   clubSlug: string;
@@ -154,16 +155,9 @@ export class ApplicationController {
     }
 
     // Check if current user is admin of the club
-    const currentMember = await prisma.clubMember.findUnique({
-      where: {
-        clubId_userId: {
-          clubId: club.id,
-          userId: adminUserId,
-        },
-      },
-    });
+    const isAdmin = await ClubController.isAdmin(club.id, adminUserId);
 
-    if (!currentMember || currentMember.role !== 'ADMIN') {
+    if (!isAdmin) {
       throw new ApplicationError('FORBIDDEN', 'Only club admins can approve applications');
     }
 

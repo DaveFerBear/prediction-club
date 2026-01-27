@@ -1,5 +1,6 @@
 import { prisma } from '@prediction-club/db';
 import { createChainPublicClient, getMemberBalance, buildWithdrawTx, type SupportedChainId } from '@prediction-club/chain';
+import { ClubController } from './ClubController';
 
 // ============ Balance Operations ============
 
@@ -53,20 +54,11 @@ export class VaultController {
   }
 
   private static async requireAdmin(clubId: string, userId: string) {
-    const member = await prisma.clubMember.findUnique({
-      where: {
-        clubId_userId: {
-          clubId,
-          userId,
-        },
-      },
-    });
+    const isAdmin = await ClubController.isAdmin(clubId, userId);
 
-    if (!member || member.role !== 'ADMIN') {
+    if (!isAdmin) {
       throw new VaultError('FORBIDDEN', 'Only club admins can perform this action');
     }
-
-    return member;
   }
 
   // ============ Balance ============

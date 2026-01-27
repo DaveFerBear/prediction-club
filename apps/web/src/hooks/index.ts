@@ -7,8 +7,10 @@ export {
   usePredictionRounds,
   useClubApplications,
   useApproveApplication,
+  useUpdateClub,
   type ClubListItem,
   type ClubDetail,
   type PredictionRound,
   type Application,
+  type UpdateClubInput,
 } from './use-club-queries';
