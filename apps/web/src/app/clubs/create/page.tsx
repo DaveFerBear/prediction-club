@@ -19,7 +19,7 @@ import {
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
 import { ActiveCheckList, ActiveCheckListItem } from '@/components/active-check-list';
-import { useApi, useDeployClub, type DeployStatus } from '@/hooks';
+import { useApi, useDeployClub, useCreateClub, type DeployStatus } from '@/hooks';
 import { type SupportedChainId } from '@prediction-club/chain';
 import { useConnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
@@ -52,6 +52,7 @@ export default function CreateClubPage() {
   const { connect, isPending: isConnecting } = useConnect();
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
+  const { createClub, isCreating, error: createClubError } = useCreateClub();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -93,21 +94,18 @@ export default function CreateClubPage() {
 
     // Step 2: Create club in database
     try {
-      const response = await apiFetch<{ success: boolean; data: { slug: string } }>('/api/clubs', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: formData.name,
-          slug: formData.slug || undefined,
-          description: formData.description || undefined,
-          safeAddress: result.safeAddress,
-          vaultAddress: result.vaultAddress,
-          chainId: formData.chainId,
-          isPublic: formData.isPublic,
-        }),
+      const response = await createClub({
+        name: formData.name,
+        slug: formData.slug || undefined,
+        description: formData.description || undefined,
+        safeAddress: result.safeAddress,
+        vaultAddress: result.vaultAddress,
+        chainId: formData.chainId,
+        isPublic: formData.isPublic,
       });
 
       if (response.success) {
-        router.push(`/clubs/${response.data.slug}`);
+        router.push(`/clubs/${response.data?.slug}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create club');
@@ -128,6 +126,7 @@ export default function CreateClubPage() {
   const safeError =
     errorStage === 'deploying-safe' || errorStage === 'switching-chain' ? error : null;
   const vaultError = errorStage === 'deploying-vault' ? error : null;
+  const createError = createClubError ? createClubError.message : null;
 
   const handleNameChange = (value: string) => {
     if (slugTouched) {
@@ -342,6 +341,11 @@ export default function CreateClubPage() {
                               {vaultError}
                             </span>
                           )}
+                          {createError && (
+                            <span className="max-h-32 overflow-auto text-xs text-destructive break-all whitespace-break-spaces">
+                              {createError}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </ActiveCheckListItem>
@@ -414,16 +418,16 @@ export default function CreateClubPage() {
                       variant="outline"
                       className="flex-1"
                       onClick={() => setStep(1)}
-                      disabled={isDeploying}
+                      disabled={isDeploying || isCreating}
                     >
                       Back
                     </Button>
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={isDeploying || !vaultComplete}
+                      disabled={isDeploying || isCreating || !vaultComplete}
                     >
-                      {isDeploying ? 'Deploying...' : 'Create Club'}
+                      {isCreating ? 'Creating...' : isDeploying ? 'Deploying...' : 'Create Club'}
                     </Button>
                   </div>
 

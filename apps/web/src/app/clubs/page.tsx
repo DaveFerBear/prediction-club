@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Badge } from '@prediction-club/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Badge,
+} from '@prediction-club/ui';
 import { Header } from '@/components/header';
 
 interface Club {
@@ -71,7 +79,7 @@ export default function ClubsPage() {
                 Be the first to create a public club!
               </p>
               <Link href="/clubs/create" className="mt-4 inline-block">
-                <Button>Create Club</Button>
+                <Button>Create a Club</Button>
               </Link>
             </CardContent>
           </Card>

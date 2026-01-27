@@ -66,7 +66,7 @@ export default function DashboardPage() {
               <p className="text-muted-foreground">Overview of your prediction club activity</p>
             </div>
             <Link href="/clubs/create">
-              <Button className="w-full sm:w-auto">Create Club</Button>
+              <Button className="w-full sm:w-auto">Create a Club</Button>
             </Link>
           </div>
 
@@ -81,7 +81,7 @@ export default function DashboardPage() {
                 </p>
                 <div className="mt-4 flex justify-center gap-4">
                   <Link href="/clubs/create">
-                    <Button>Create Club</Button>
+                    <Button>Create a Club</Button>
                   </Link>
                   <Link href="/clubs">
                     <Button variant="outline">Find a Club</Button>
