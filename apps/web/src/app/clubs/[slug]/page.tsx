@@ -14,6 +14,7 @@ import {
   AvatarFallback,
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { useApi } from '@/hooks';
 
 interface Club {
   id: string;
@@ -85,6 +86,7 @@ function formatAmount(amount: string) {
 }
 
 export default function ClubPublicPage({ params }: { params: { slug: string } }) {
+  const { address } = useApi();
   const [club, setClub] = useState<Club | null>(null);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,6 +152,13 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   }
 
   const activeCohorts = cohorts.filter((c) => c.status === 'COMMITTED' || c.status === 'PENDING');
+  const isManager =
+    !!address && club.manager?.walletAddress?.toLowerCase() === address.toLowerCase();
+  const isMember =
+    !!address &&
+    club.members.some(
+      (member) => member.user.walletAddress.toLowerCase() === address.toLowerCase()
+    );
 
   return (
     <div className="min-h-screen bg-background">
@@ -179,7 +188,13 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                 </span>
               </div>
             </div>
-            <Button>Apply to Join</Button>
+            {isManager ? (
+              <Badge variant="outline">You are a manager</Badge>
+            ) : isMember ? (
+              <Badge variant="secondary">You are a member</Badge>
+            ) : (
+              <Button>Apply to Join</Button>
+            )}
           </div>
         </div>
 
