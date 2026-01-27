@@ -25,7 +25,7 @@ export function ConnectButton() {
             <span aria-hidden="true">≡</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-64 p-2">
+        <PopoverContent align="end" className="w-64 px-3 py-2">
           <div className="space-y-3">
             <div className="grid gap-1 sm:hidden">
               <Link href="/dashboard">
@@ -44,9 +44,9 @@ export function ConnectButton() {
                 </Button>
               </Link>
             </div>
-            <div className="rounded-md border border-border bg-muted/40 p-3 sm:border-0 sm:bg-transparent sm:p-0">
+            <div className="rounded-md border border-border bg-muted/40 p-2 sm:border-0 sm:bg-transparent sm:p-0">
               {isConnected && address ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <div>
                     <p className="text-xs text-muted-foreground">Connected wallet</p>
                     <CopyableAddress address={address} variant="block" truncate={false} />

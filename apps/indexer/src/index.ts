@@ -1,5 +1,9 @@
 import 'dotenv/config';
-import { createChainPublicClient, ClubVaultV1Abi, type SupportedChainId } from '@prediction-club/chain';
+import {
+  createChainPublicClient,
+  ClubVaultV1Abi,
+  type SupportedChainId,
+} from '@prediction-club/chain';
 import { prisma } from '@prediction-club/db';
 import { sleep } from '@prediction-club/shared';
 import { processVaultEvent } from './events';
@@ -14,14 +18,16 @@ async function main() {
   console.log('Starting indexer...');
   console.log(`Chain ID: ${INDEXER_CONFIG.chainId}`);
   console.log(`Poll interval: ${INDEXER_CONFIG.pollIntervalMs}ms`);
-  console.log(`Batch size: ${INDEXER_CONFIG.batchSize}`);
+  const effectiveBatchSize = Math.min(INDEXER_CONFIG.batchSize, 200);
+  console.log(`Batch size: ${effectiveBatchSize}`);
 
   const client = createChainPublicClient(INDEXER_CONFIG.chainId as SupportedChainId);
 
   // Track last processed block per vault
   const lastBlocks = new Map<string, bigint>();
 
-  while (true) {
+  for (;;) {
+    // hack to make the loop run forever without using while (true)
     try {
       // Get all clubs on this chain
       const clubs = await prisma.club.findMany({
@@ -67,8 +73,8 @@ async function main() {
 
         // Limit batch size
         const toBlock =
-          fromBlock + BigInt(INDEXER_CONFIG.batchSize) < currentBlock
-            ? fromBlock + BigInt(INDEXER_CONFIG.batchSize)
+          fromBlock + BigInt(effectiveBatchSize) < currentBlock
+            ? fromBlock + BigInt(effectiveBatchSize)
             : currentBlock;
 
         console.log(`[${club.slug}] Fetching events from block ${fromBlock} to ${toBlock}`);

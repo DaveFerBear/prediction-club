@@ -167,9 +167,10 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         <div className="mb-8">
           <div className="flex items-start justify-between">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-bold">{club.name}</h1>
-                {club.isPublic && <Badge variant="secondary">Public</Badge>}
+                <Badge variant="secondary">{club.isPublic ? 'Public' : 'Private'}</Badge>
+                {isManager && <Badge variant="outline">You are a manager</Badge>}
               </div>
               <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
               <div className="mt-4 flex items-center gap-4 text-sm">
@@ -187,7 +188,9 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               </div>
             </div>
             {isManager ? (
-              <Badge variant="outline">You are a manager</Badge>
+              <Link href={`/clubs/${club.slug}/admin`}>
+                <Button size="sm">Manage</Button>
+              </Link>
             ) : isMember ? (
               <Badge variant="secondary">You are a member</Badge>
             ) : (
