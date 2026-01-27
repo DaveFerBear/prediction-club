@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Button, Popover, PopoverTrigger, PopoverContent } from '@prediction-club/ui';
 import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi';
 import { injected } from 'wagmi/connectors';
@@ -11,40 +12,70 @@ export function ConnectButton() {
   const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({ address });
 
-  if (isConnected && address) {
-    return (
+  return (
+    <div className="flex items-center gap-2">
+      {isConnected && address && (
+        <span className="max-w-[120px] truncate rounded-md border border-input px-2 py-1 text-xs font-mono text-muted-foreground sm:max-w-none">
+          {address.slice(0, 6)}...{address.slice(-4)}
+        </span>
+      )}
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline">
-            {address.slice(0, 6)}...{address.slice(-4)}
+          <Button variant="outline" size="icon" aria-label="Open menu">
+            <span aria-hidden="true">≡</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-64">
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Connected Wallet</p>
-              <CopyableAddress address={address} variant="block" truncate={false} />
+        <PopoverContent align="end" className="w-64 p-2">
+          <div className="space-y-3">
+            <div className="grid gap-1 sm:hidden">
+              <Link href="/dashboard">
+                <Button variant="ghost" size="sm" className="w-full justify-start">
+                  My clubs
+                </Button>
+              </Link>
+              <Link href="/clubs">
+                <Button variant="ghost" size="sm" className="w-full justify-start">
+                  Find a club
+                </Button>
+              </Link>
+              <Link href="/clubs/create">
+                <Button variant="ghost" size="sm" className="w-full justify-start">
+                  Create a club
+                </Button>
+              </Link>
             </div>
-            {balance && (
-              <div>
-                <p className="text-sm text-muted-foreground">Balance</p>
-                <p className="font-medium">
-                  {parseFloat(balance.formatted).toFixed(4)} {balance.symbol}
-                </p>
-              </div>
-            )}
-            <Button variant="outline" className="w-full" onClick={() => disconnect()}>
-              Disconnect
-            </Button>
+            <div className="rounded-md border border-border bg-muted/40 p-3 sm:border-0 sm:bg-transparent sm:p-0">
+              {isConnected && address ? (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Connected wallet</p>
+                    <CopyableAddress address={address} variant="block" truncate={false} />
+                  </div>
+                  {balance && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Balance</p>
+                      <p className="text-sm font-medium">
+                        {parseFloat(balance.formatted).toFixed(4)} {balance.symbol}
+                      </p>
+                    </div>
+                  )}
+                  <Button variant="outline" className="w-full" onClick={() => disconnect()}>
+                    Disconnect
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  className="w-full"
+                  onClick={() => connect({ connector: injected() })}
+                  disabled={isPending}
+                >
+                  {isPending ? 'Connecting...' : 'Connect Wallet'}
+                </Button>
+              )}
+            </div>
           </div>
         </PopoverContent>
       </Popover>
-    );
-  }
-
-  return (
-    <Button onClick={() => connect({ connector: injected() })} disabled={isPending}>
-      {isPending ? 'Connecting...' : 'Connect Wallet'}
-    </Button>
+    </div>
   );
 }

@@ -19,12 +19,12 @@ export default function HomePage() {
               actor. Built on Polygon.
             </p>
             <div className="mt-10 flex items-center justify-center gap-4">
-              <Link href="/dashboard">
-                <Button size="lg">Get Started</Button>
+              <Link href="/clubs/create">
+                <Button size="lg">Start a Club</Button>
               </Link>
               <Link href="/clubs">
                 <Button variant="outline" size="lg">
-                  Find a Club
+                  Explore Clubs
                 </Button>
               </Link>
             </div>

@@ -13,13 +13,15 @@ export function Header() {
           <Logo size={24} />
           Prediction Club
         </Link>
-        <nav className="flex items-center gap-4">
-          <Link href="/dashboard">
-            <Button variant="ghost">My clubs</Button>
-          </Link>
-          <Link href="/clubs">
-            <Button variant="ghost">Find a club</Button>
-          </Link>
+        <nav className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 sm:flex">
+            <Link href="/dashboard">
+              <Button variant="ghost">My clubs</Button>
+            </Link>
+            <Link href="/clubs">
+              <Button variant="ghost">Find a club</Button>
+            </Link>
+          </div>
           <ConnectButton />
         </nav>
       </div>
