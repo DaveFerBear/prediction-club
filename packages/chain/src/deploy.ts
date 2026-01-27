@@ -12,12 +12,23 @@ import {
   type PublicClient,
   encodeFunctionData,
   encodeDeployData,
+  decodeEventLog,
 } from 'viem';
 import { ClubVaultV1Abi, ClubVaultV1Bytecode } from './abi';
 import { type SupportedChainId, getChainConfig } from './config';
 
-const TX_RECEIPT_POLL_INTERVAL_MS = 5000;
+const TX_RECEIPT_POLL_INTERVAL_MS = 2500;
 const TX_RECEIPT_TIMEOUT_MS = 180_000;
+
+const getSaltNonce = () => {
+  if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return BigInt(`0x${hex}`);
+  }
+  return (BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER)) << 32n) ^ BigInt(Date.now());
+};
 
 const waitForReceipt = async (publicClient: PublicClient, hash: Hash) => {
   const start = Date.now();
@@ -54,6 +65,15 @@ const SafeProxyFactoryAbi = [
       { name: 'saltNonce', type: 'uint256' },
     ],
     outputs: [{ name: 'proxy', type: 'address' }],
+  },
+  {
+    type: 'event',
+    name: 'ProxyCreation',
+    inputs: [
+      { name: 'proxy', type: 'address', indexed: true },
+      { name: 'singleton', type: 'address', indexed: false },
+    ],
+    anonymous: false,
   },
 ] as const;
 
@@ -173,7 +193,7 @@ export async function deploySafe(params: {
   });
 
   // Generate unique salt nonce
-  const saltNonce = BigInt(Date.now());
+  const saltNonce = getSaltNonce();
 
   // Deploy via factory
   const txHash = await walletClient.writeContract({
@@ -188,18 +208,36 @@ export async function deploySafe(params: {
   // Wait for receipt to get deployed address
   const receipt = await waitForReceipt(publicClient, txHash);
 
-  // Parse Safe address from logs (ProxyCreation event)
-  // The Safe address is in the first topic of the ProxyCreation event
-  const proxyCreationLog = receipt.logs.find(
-    (log) => log.topics[0] === '0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235'
-  );
-
-  if (!proxyCreationLog) {
-    throw new Error('Failed to find ProxyCreation event');
+  // Parse Safe address from ProxyCreation event (indexed args -> topics)
+  let safeAddress: Address | null = null;
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== SAFE_ADDRESSES.safeProxyFactory.toLowerCase()) continue;
+    try {
+      const decoded = decodeEventLog({
+        abi: SafeProxyFactoryAbi,
+        data: log.data,
+        topics: log.topics,
+      });
+      if (decoded.eventName === 'ProxyCreation' && decoded.args && !Array.isArray(decoded.args)) {
+        const args = decoded.args as unknown;
+        if (args && typeof args === 'object' && 'proxy' in args) {
+          safeAddress = (args as { proxy: Address }).proxy;
+          break;
+        }
+      }
+    } catch {
+      // ignore logs that don't match
+    }
+    const proxyTopic = log.topics[1];
+    if (!safeAddress && proxyTopic) {
+      safeAddress = `0x${proxyTopic.slice(26)}` as Address;
+      break;
+    }
   }
 
-  // Address is in the data field (first 32 bytes, padded)
-  const safeAddress = `0x${proxyCreationLog.data.slice(26, 66)}` as Address;
+  if (!safeAddress) {
+    throw new Error('Failed to find ProxyCreation event');
+  }
 
   return { address: safeAddress, txHash };
 }

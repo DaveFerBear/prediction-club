@@ -132,6 +132,19 @@ yarn indexer:dev
 
 The web app will be available at http://localhost:3000
 
+### 5b. Build Chain Package (Deploy Logic)
+
+The web app consumes the compiled `@prediction-club/chain` package (`packages/chain/dist`).
+If you change deploy logic in `packages/chain/src` (e.g., Safe/Vault deployment),
+you must rebuild it:
+
+```bash
+yarn workspace @prediction-club/chain build
+
+# Or keep it updated while you work:
+yarn workspace @prediction-club/chain dev
+```
+
 ### 6. Smart Contract Development
 
 #### Install Foundry
