@@ -1,16 +1,37 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@prediction-club/ui';
 import { ConnectButton } from './connect-button';
 import { Logo } from './logo';
 
 export function Header() {
+  const logoRef = useRef<SVGSVGElement | null>(null);
+
+  const handleLogoEnter = () => {
+    const el = logoRef.current;
+    if (!el) return;
+    if (el.classList.contains('logo-spin-anim')) return;
+    el.classList.add('logo-spin-anim');
+  };
+
+  const handleLogoAnimationEnd = () => {
+    logoRef.current?.classList.remove('logo-spin-anim');
+  };
+
   return (
     <header className="border-b">
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-xl font-bold">
-          <Logo size={24} />
+        <Link href="/" className="group flex items-center gap-2 text-xl font-bold">
+          <span onMouseEnter={handleLogoEnter} className="inline-flex">
+            <Logo
+              size={24}
+              className="logo-spin"
+              ref={logoRef}
+              onAnimationEnd={handleLogoAnimationEnd}
+            />
+          </span>
           Prediction Club
         </Link>
         <nav className="flex items-center gap-2">

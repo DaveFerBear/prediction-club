@@ -74,3 +74,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  @keyframes logo-spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .logo-spin {
+    transform-origin: 50% 50%;
+  }
+
+  .logo-spin-anim {
+    animation: logo-spin 700ms ease-out forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .logo-spin-anim {
+      animation: none;
+      transform: none;
+    }
+  }
+}
