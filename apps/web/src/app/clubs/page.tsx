@@ -51,9 +51,14 @@ export default function ClubsPage() {
       <Header />
 
       <main className="container py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Public Clubs</h1>
-          <p className="text-muted-foreground">Browse and join prediction clubs</p>
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Public Clubs</h1>
+            <p className="text-muted-foreground">Browse and join prediction clubs</p>
+          </div>
+          <Link href="/clubs/create">
+            <Button>Create a Club</Button>
+          </Link>
         </div>
 
         {loading ? (
