@@ -8,7 +8,11 @@
  *   yarn indexer:backfill --club alpha-traders --from 50000000
  */
 
-import { createChainPublicClient, ClubVaultV1Abi, type SupportedChainId } from '@prediction-club/chain';
+import {
+  createChainPublicClient,
+  ClubVaultV1Abi,
+  type SupportedChainId,
+} from '@prediction-club/chain';
 import { prisma } from '@prediction-club/db';
 import { processVaultEvent } from './events';
 import { INDEXER_CONFIG } from './config';

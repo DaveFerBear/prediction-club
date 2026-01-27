@@ -20,11 +20,21 @@ export type ChainEnv = z.infer<typeof chainEnvSchema>;
 /**
  * Supported chain configurations
  */
+const POLYGON_RPC_URL =
+  process.env.NEXT_PUBLIC_POLYGON_RPC_URL ||
+  process.env.POLYGON_RPC_URL ||
+  'https://polygon-rpc.com';
+
+const AMOY_RPC_URL =
+  process.env.NEXT_PUBLIC_AMOY_RPC_URL ||
+  process.env.AMOY_RPC_URL ||
+  'https://rpc-amoy.polygon.technology';
+
 export const CHAIN_CONFIG = {
   // Polygon Mainnet
   137: {
     name: 'Polygon',
-    rpcUrl: 'https://polygon-rpc.com',
+    rpcUrl: POLYGON_RPC_URL,
     blockExplorer: 'https://polygonscan.com',
     usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', // Native USDC
     usdce: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174', // USDC.e (bridged)
@@ -37,7 +47,7 @@ export const CHAIN_CONFIG = {
   // Polygon Amoy Testnet
   80002: {
     name: 'Polygon Amoy',
-    rpcUrl: 'https://rpc-amoy.polygon.technology',
+    rpcUrl: AMOY_RPC_URL,
     blockExplorer: 'https://amoy.polygonscan.com',
     usdc: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582', // Test USDC (verify)
     nativeCurrency: {

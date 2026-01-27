@@ -32,11 +32,7 @@ export function ConnectButton() {
                 </p>
               </div>
             )}
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => disconnect()}
-            >
+            <Button variant="outline" className="w-full" onClick={() => disconnect()}>
               Disconnect
             </Button>
           </div>

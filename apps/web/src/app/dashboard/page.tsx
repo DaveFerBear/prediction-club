@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Badge } from '@prediction-club/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Badge,
+} from '@prediction-club/ui';
 import { Header } from '@/components/header';
 
 interface Club {
@@ -79,7 +87,7 @@ export default function DashboardPage() {
                     <Button>Create Club</Button>
                   </Link>
                   <Link href="/clubs">
-                    <Button variant="outline">Explore Clubs</Button>
+                    <Button variant="outline">Find a Club</Button>
                   </Link>
                 </div>
               </CardContent>

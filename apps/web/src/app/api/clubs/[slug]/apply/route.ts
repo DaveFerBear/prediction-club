@@ -1,7 +1,14 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { ApplicationController, ApplicationError } from '@/controllers';
-import { apiResponse, apiError, validationError, notFoundError, unauthorizedError, serverError } from '@/lib/api';
+import {
+  apiResponse,
+  apiError,
+  validationError,
+  notFoundError,
+  unauthorizedError,
+  serverError,
+} from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
 
 const applySchema = z.object({
@@ -12,10 +19,7 @@ const applySchema = z.object({
  * POST /api/clubs/[slug]/apply
  * Apply to join a club
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { slug: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: { slug: string } }) {
   try {
     const user = await requireAuth(request);
 
