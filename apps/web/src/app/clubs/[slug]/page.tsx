@@ -138,7 +138,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
             <CardContent className="py-8 text-center">
               <p className="text-muted-foreground">{error || 'Club not found'}</p>
               <Link href="/clubs" className="mt-4 inline-block">
-                <Button variant="outline">Browse Clubs</Button>
+                <Button variant="outline">Find a club</Button>
               </Link>
             </CardContent>
           </Card>

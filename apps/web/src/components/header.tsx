@@ -15,10 +15,10 @@ export function Header() {
         </Link>
         <nav className="flex items-center gap-4">
           <Link href="/dashboard">
-            <Button variant="ghost">Dashboard</Button>
+            <Button variant="ghost">My clubs</Button>
           </Link>
           <Link href="/clubs">
-            <Button variant="ghost">Clubs</Button>
+            <Button variant="ghost">Find a club</Button>
           </Link>
           <ConnectButton />
         </nav>

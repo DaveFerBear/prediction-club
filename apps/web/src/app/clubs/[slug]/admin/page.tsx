@@ -155,7 +155,7 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
             <CardContent className="py-8 text-center">
               <p className="text-muted-foreground">{error || 'Club not found'}</p>
               <Link href="/dashboard" className="mt-4 inline-block">
-                <Button variant="outline">Back to Dashboard</Button>
+                <Button variant="outline">Back to My clubs</Button>
               </Link>
             </CardContent>
           </Card>

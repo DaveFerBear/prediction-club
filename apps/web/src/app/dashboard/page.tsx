@@ -59,17 +59,14 @@ export default function DashboardPage() {
       <Header />
 
       <main className="container py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your prediction club activity</p>
-        </div>
-
-        {/* Clubs Section */}
-        <div className="mb-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Clubs</h2>
+        <div className="mb-8 flex flex-col gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">My clubs</h1>
+              <p className="text-muted-foreground">Overview of your prediction club activity</p>
+            </div>
             <Link href="/clubs/create">
-              <Button>Create Club</Button>
+              <Button className="w-full sm:w-auto">Create Club</Button>
             </Link>
           </div>
 
