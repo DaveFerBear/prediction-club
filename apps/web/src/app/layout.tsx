@@ -6,6 +6,7 @@ import { Providers } from '@/components/providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://0x1.club'),
   title: 'Prediction Club',
   description: 'Trade predictions and compete on-chain',
   openGraph: {
