@@ -15,6 +15,7 @@ import {
   AvatarFallback,
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { CopyableAddress } from '@/components/copyable-address';
 
 interface Club {
   id: string;
@@ -59,11 +60,6 @@ interface ApplicationsResponse {
     items: Application[];
     total: number;
   };
-}
-
-function truncateAddress(address: string) {
-  if (address.length <= 10) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
 function formatDate(dateString: string) {
@@ -224,11 +220,17 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
                       <div className="flex items-start justify-between">
                         <div>
                           <p className="font-medium">
-                            {app.user.email || truncateAddress(app.user.walletAddress)}
+                            {app.user.email || (
+                              <CopyableAddress address={app.user.walletAddress} variant="inline" />
+                            )}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            {truncateAddress(app.user.walletAddress)}
-                          </p>
+                          {app.user.email && (
+                            <CopyableAddress
+                              address={app.user.walletAddress}
+                              variant="compact"
+                              className="text-muted-foreground"
+                            />
+                          )}
                         </div>
                         <span className="text-xs text-muted-foreground">{formatDate(app.createdAt)}</span>
                       </div>
@@ -312,11 +314,17 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
                           </Avatar>
                           <div>
                             <p className="font-medium">
-                              {member.user.email || truncateAddress(member.user.walletAddress)}
+                              {member.user.email || (
+                                <CopyableAddress address={member.user.walletAddress} variant="inline" />
+                              )}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              {truncateAddress(member.user.walletAddress)}
-                            </p>
+                            {member.user.email && (
+                              <CopyableAddress
+                                address={member.user.walletAddress}
+                                variant="compact"
+                                className="text-muted-foreground"
+                              />
+                            )}
                           </div>
                         </div>
                       </td>
@@ -348,11 +356,11 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
             <div className="space-y-4">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Safe Address</span>
-                <span className="font-mono text-sm">{club.safeAddress}</span>
+                <CopyableAddress address={club.safeAddress} variant="compact" />
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Vault Address</span>
-                <span className="font-mono text-sm">{club.vaultAddress}</span>
+                <CopyableAddress address={club.vaultAddress} variant="compact" />
               </div>
             </div>
           </CardContent>

@@ -14,6 +14,7 @@ import {
   AvatarFallback,
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { CopyableAddress } from '@/components/copyable-address';
 import { useApi } from '@/hooks';
 
 interface Club {
@@ -73,11 +74,6 @@ interface CohortsResponse {
     items: Cohort[];
     total: number;
   };
-}
-
-function truncateAddress(address: string) {
-  if (address.length <= 10) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
 function formatAmount(amount: string) {
@@ -179,12 +175,12 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   <span className="text-muted-foreground">
                     Manager:{' '}
                     <span className="text-foreground">
-                      {truncateAddress(club.manager.walletAddress)}
+                      <CopyableAddress address={club.manager.walletAddress} variant="inline" />
                     </span>
                   </span>
                 )}
                 <span className="text-muted-foreground">
-                  Safe: <span className="font-mono text-foreground">{truncateAddress(club.safeAddress)}</span>
+                  Safe: <CopyableAddress address={club.safeAddress} variant="inline" />
                 </span>
               </div>
             </div>
@@ -221,7 +217,9 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Vault Address</CardDescription>
-              <CardTitle className="text-sm font-mono">{truncateAddress(club.vaultAddress)}</CardTitle>
+              <CardTitle>
+                <CopyableAddress address={club.vaultAddress} variant="compact" />
+              </CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -283,9 +281,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
-                          <p className="text-sm font-medium">
-                            {truncateAddress(member.user.walletAddress)}
-                          </p>
+                          <CopyableAddress address={member.user.walletAddress} variant="compact" />
                           {member.user.email && (
                             <p className="text-xs text-muted-foreground">{member.user.email}</p>
                           )}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { CopyableAddress } from '@/components/copyable-address';
 import { useApi, useDeployClub } from '@/hooks';
 import { type SupportedChainId } from '@prediction-club/chain';
 
@@ -114,8 +115,14 @@ export default function CreateClubPage() {
               {deployResult && (
                 <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-600 space-y-1">
                   <p>Contracts deployed successfully!</p>
-                  <p className="font-mono text-xs">Safe: {deployResult.safeAddress}</p>
-                  <p className="font-mono text-xs">Vault: {deployResult.vaultAddress}</p>
+                  <div className="text-xs">
+                    <span>Safe: </span>
+                    <CopyableAddress address={deployResult.safeAddress} variant="compact" />
+                  </div>
+                  <div className="text-xs">
+                    <span>Vault: </span>
+                    <CopyableAddress address={deployResult.vaultAddress} variant="compact" />
+                  </div>
                 </div>
               )}
 

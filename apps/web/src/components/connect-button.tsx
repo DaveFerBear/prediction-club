@@ -3,6 +3,7 @@
 import { Button, Popover, PopoverTrigger, PopoverContent } from '@prediction-club/ui';
 import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi';
 import { injected } from 'wagmi/connectors';
+import { CopyableAddress } from '@/components/copyable-address';
 
 export function ConnectButton() {
   const { address, isConnected } = useAccount();
@@ -22,7 +23,7 @@ export function ConnectButton() {
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Connected Wallet</p>
-              <p className="font-mono text-sm break-all">{address}</p>
+              <CopyableAddress address={address} variant="block" truncate={false} />
             </div>
             {balance && (
               <div>
