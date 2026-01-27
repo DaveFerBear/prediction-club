@@ -21,12 +21,14 @@ export function ConnectButton() {
       )}
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="icon" aria-label="Open menu">
-            <span aria-hidden="true">≡</span>
+          <Button variant="ghost" size="icon" aria-label="Open menu">
+            <span aria-hidden="true" className="text-xl leading-none">
+              ≡
+            </span>
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64 px-3 py-2">
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             <div className="grid gap-1 sm:hidden">
               <Link href="/dashboard">
                 <Button variant="ghost" size="sm" className="w-full justify-start">
@@ -49,7 +51,7 @@ export function ConnectButton() {
                 <div className="space-y-2">
                   <div>
                     <p className="text-xs text-muted-foreground">Connected wallet</p>
-                    <CopyableAddress address={address} variant="block" truncate={false} />
+                    <CopyableAddress address={address} variant="block" truncate={true} />
                   </div>
                   {balance && (
                     <div>
@@ -60,7 +62,7 @@ export function ConnectButton() {
                     </div>
                   )}
                   <Button variant="outline" className="w-full" onClick={() => disconnect()}>
-                    Disconnect
+                    Disconnect wallet
                   </Button>
                 </div>
               ) : (
