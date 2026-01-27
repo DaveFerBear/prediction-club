@@ -113,18 +113,18 @@ export async function getMemberBalance(
 }
 
 /**
- * Get cohort status from vault
+ * Get prediction round status from vault
  */
-export async function getCohortStatus(
+export async function getPredictionRoundStatus(
   client: PublicClient<Transport, Chain>,
   vaultAddress: Address,
-  cohortId: `0x${string}`
+  predictionRoundId: `0x${string}`
 ) {
   const vault = getVaultContract(client, vaultAddress);
 
   const [totalRemaining, finalized] = await Promise.all([
-    vault.read.cohortTotalRemaining([cohortId]),
-    vault.read.cohortFinalized([cohortId]),
+    vault.read.cohortTotalRemaining([predictionRoundId]),
+    vault.read.cohortFinalized([predictionRoundId]),
   ]);
 
   return {

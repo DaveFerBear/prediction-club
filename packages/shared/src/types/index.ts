@@ -40,7 +40,7 @@ export interface ClubWithManager extends Club {
 
 export interface ClubWithStats extends Club {
   memberCount: number;
-  cohortCount: number;
+  predictionRoundCount: number;
   totalValueLocked: string; // BigInt as string
 }
 
@@ -91,38 +91,38 @@ export interface ApplicationWithUser extends Application {
 }
 
 // ============================================================================
-// Cohort Types
+// Prediction Round Types
 // ============================================================================
 
-export type CohortStatus = 'PENDING' | 'COMMITTED' | 'SETTLED' | 'CANCELLED';
+export type PredictionRoundStatus = 'PENDING' | 'COMMITTED' | 'SETTLED' | 'CANCELLED';
 
-export interface Cohort {
+export interface PredictionRound {
   id: string;
   clubId: string;
   cohortId: string; // bytes32 as hex string
   marketRef: string | null;
   marketTitle: string | null;
   stakeTotal: string; // BigInt as string
-  status: CohortStatus;
+  status: PredictionRoundStatus;
   commitTxHash: string | null;
   settleTxHash: string | null;
   createdAt: Date;
 }
 
-export interface CohortMember {
+export interface PredictionRoundMember {
   id: string;
-  cohortId: string;
+  predictionRoundId: string;
   userId: string;
   commitAmount: string;
   payoutAmount: string;
   pnlAmount: string;
 }
 
-export interface CohortWithMembers extends Cohort {
-  members: CohortMemberWithUser[];
+export interface PredictionRoundWithMembers extends PredictionRound {
+  members: PredictionRoundMemberWithUser[];
 }
 
-export interface CohortMemberWithUser extends CohortMember {
+export interface PredictionRoundMemberWithUser extends PredictionRoundMember {
   user: User;
 }
 
@@ -189,7 +189,7 @@ export interface ApplyToClubRequest {
   message?: string;
 }
 
-export interface CreateCohortRequest {
+export interface CreatePredictionRoundRequest {
   cohortId: string;
   marketRef?: string;
   marketTitle?: string;
@@ -211,13 +211,13 @@ export interface DashboardStats {
   totalClubs: number;
   totalDeposited: string;
   totalCommitted: string;
-  activeCohorts: number;
+  activePredictionRounds: number;
   recentPnl: string;
 }
 
 export interface ClubDashboard {
   club: ClubWithStats;
   members: ClubMemberWithUser[];
-  activeCohorts: Cohort[];
+  activePredictionRounds: PredictionRound[];
   recentEvents: VaultEvent[];
 }

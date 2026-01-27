@@ -13,7 +13,7 @@ interface Club {
   isPublic: boolean;
   _count: {
     members: number;
-    cohorts: number;
+    predictionRounds: number;
   };
 }
 
@@ -88,8 +88,8 @@ export default function ClubsPage() {
                     </p>
                   )}
                   <div className="flex justify-between text-sm mb-4">
-                    <span className="text-muted-foreground">Cohorts</span>
-                    <span>{club._count.cohorts}</span>
+                    <span className="text-muted-foreground">Predictions</span>
+                    <span>{club._count.predictionRounds}</span>
                   </div>
                   <Link href={`/clubs/${club.slug}`}>
                     <Button className="w-full">View Club</Button>

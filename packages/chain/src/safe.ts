@@ -33,16 +33,16 @@ export interface SettleEntry {
 /**
  * Build transaction data for commitToCohort
  */
-export function buildCommitToCohortTx(
+export function buildCommitToPredictionRoundTx(
   vaultAddress: Address,
-  cohortId: Hex,
+  predictionRoundId: Hex,
   entries: CommitEntry[]
 ): SafeTransactionData {
   const data = encodeFunctionData({
     abi: ClubVaultV1Abi,
     functionName: 'commitToCohort',
     args: [
-      cohortId,
+      predictionRoundId,
       entries.map((e) => ({
         member: e.member,
         amount: e.amount,
@@ -61,16 +61,16 @@ export function buildCommitToCohortTx(
 /**
  * Build transaction data for settleCohort
  */
-export function buildSettleCohortTx(
+export function buildSettlePredictionRoundTx(
   vaultAddress: Address,
-  cohortId: Hex,
+  predictionRoundId: Hex,
   entries: SettleEntry[]
 ): SafeTransactionData {
   const data = encodeFunctionData({
     abi: ClubVaultV1Abi,
     functionName: 'settleCohort',
     args: [
-      cohortId,
+      predictionRoundId,
       entries.map((e) => ({
         member: e.member,
         commitAmount: e.commitAmount,
@@ -133,10 +133,10 @@ export function buildRescueTokenTx(
 }
 
 /**
- * Generate a cohort ID from a string identifier
+ * Generate a prediction round ID from a string identifier
  * Uses keccak256 hash for consistency
  */
-export function generateCohortId(identifier: string): Hex {
+export function generatePredictionRoundId(identifier: string): Hex {
   // In production, use viem's keccak256
   // For now, return a placeholder that shows the format
   const encoder = new TextEncoder();

@@ -21,7 +21,7 @@ interface Club {
   isPublic: boolean;
   _count: {
     members: number;
-    cohorts: number;
+    predictionRounds: number;
   };
 }
 
@@ -99,7 +99,7 @@ export default function DashboardPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>{club.name}</CardTitle>
-                      <Badge variant="secondary">{club._count.cohorts} cohorts</Badge>
+                      <Badge variant="secondary">{club._count.predictionRounds} predictions</Badge>
                     </div>
                     <CardDescription>/{club.slug}</CardDescription>
                   </CardHeader>

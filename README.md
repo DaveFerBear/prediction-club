@@ -34,7 +34,7 @@ A SaaS platform for "prediction clubs" that trade as a single on-chain actor on 
 - **Gnosis Safe**: Multisig owner of each vault (starts 1-of-1, upgradeable to 2-of-3)
 - **Web App**: Next.js app with public pages, dashboard, and club admin
 - **Indexer**: Polls vault events and syncs to Postgres
-- **Cohorts**: Prediction rounds - automatic participation for eligible members
+- **Predictions**: Prediction rounds - automatic participation for eligible members
 
 ## Repo Structure
 
@@ -191,40 +191,40 @@ forge script script/Deploy.s.sol --rpc-url amoy --broadcast
 
 ## Environment Variables
 
-### Web App (`apps/web/.env.local`)
+### Web App (`apps/web/.env`)
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `NEXTAUTH_URL` | App URL for NextAuth | Yes |
-| `NEXTAUTH_SECRET` | Secret for NextAuth (min 32 chars) | Yes |
-| `NEXT_PUBLIC_DEFAULT_CHAIN_ID` | Default chain (80002 for Amoy) | No |
-| `NEXT_PUBLIC_POLYGON_RPC_URL` | Polygon mainnet RPC | No |
-| `NEXT_PUBLIC_AMOY_RPC_URL` | Amoy testnet RPC | No |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect project ID | No |
+| Variable                               | Description                        | Required |
+| -------------------------------------- | ---------------------------------- | -------- |
+| `DATABASE_URL`                         | PostgreSQL connection string       | Yes      |
+| `NEXTAUTH_URL`                         | App URL for NextAuth               | Yes      |
+| `NEXTAUTH_SECRET`                      | Secret for NextAuth (min 32 chars) | Yes      |
+| `NEXT_PUBLIC_DEFAULT_CHAIN_ID`         | Default chain (80002 for Amoy)     | No       |
+| `NEXT_PUBLIC_POLYGON_RPC_URL`          | Polygon mainnet RPC                | No       |
+| `NEXT_PUBLIC_AMOY_RPC_URL`             | Amoy testnet RPC                   | No       |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect project ID           | No       |
 
 ### Indexer (`apps/indexer/.env`)
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `INDEXER_CHAIN_ID` | Chain to index (default: 80002) | No |
-| `INDEXER_START_BLOCK` | Block to start indexing from | No |
-| `INDEXER_POLL_INTERVAL_MS` | Poll interval (default: 5000) | No |
-| `INDEXER_BATCH_SIZE` | Blocks per batch (default: 1000) | No |
-| `POLYGON_RPC_URL` | Polygon mainnet RPC | No |
-| `AMOY_RPC_URL` | Amoy testnet RPC | No |
+| Variable                   | Description                      | Required |
+| -------------------------- | -------------------------------- | -------- |
+| `DATABASE_URL`             | PostgreSQL connection string     | Yes      |
+| `INDEXER_CHAIN_ID`         | Chain to index (default: 80002)  | No       |
+| `INDEXER_START_BLOCK`      | Block to start indexing from     | No       |
+| `INDEXER_POLL_INTERVAL_MS` | Poll interval (default: 5000)    | No       |
+| `INDEXER_BATCH_SIZE`       | Blocks per batch (default: 1000) | No       |
+| `POLYGON_RPC_URL`          | Polygon mainnet RPC              | No       |
+| `AMOY_RPC_URL`             | Amoy testnet RPC                 | No       |
 
 ### Contract Deployment
 
-| Variable | Description |
-|----------|-------------|
-| `PRIVATE_KEY` | Deployer wallet private key |
-| `SAFE_ADDRESS` | Gnosis Safe address (vault owner) |
-| `COLLATERAL_TOKEN` | USDC address on target chain |
-| `POLYGON_RPC_URL` | Polygon RPC URL |
-| `AMOY_RPC_URL` | Amoy RPC URL |
-| `POLYGONSCAN_API_KEY` | For contract verification |
+| Variable              | Description                       |
+| --------------------- | --------------------------------- |
+| `PRIVATE_KEY`         | Deployer wallet private key       |
+| `SAFE_ADDRESS`        | Gnosis Safe address (vault owner) |
+| `COLLATERAL_TOKEN`    | USDC address on target chain      |
+| `POLYGON_RPC_URL`     | Polygon RPC URL                   |
+| `AMOY_RPC_URL`        | Amoy RPC URL                      |
+| `POLYGONSCAN_API_KEY` | For contract verification         |
 
 ## Available Scripts
 
@@ -285,8 +285,8 @@ Key models:
 - **Club**: Name, Safe address, vault address, chain ID
 - **ClubMember**: Role (ADMIN/MEMBER), status
 - **Application**: Membership applications
-- **Cohort**: Prediction rounds with market reference
-- **CohortMember**: Individual participation, PnL tracking
+- **PredictionRound**: Prediction rounds with market reference
+- **PredictionRoundMember**: Individual participation, PnL tracking
 - **VaultEvent**: Indexed on-chain events
 - **Verification**: Off-chain manager verification
 
@@ -301,6 +301,7 @@ The `ClubVaultV1` contract:
 - Members can deposit and set withdrawal addresses
 
 Key functions:
+
 - `deposit(amount)` - Deposit USDC
 - `depositFor(member, amount)` - Deposit for another member
 - `commitToCohort(cohortId, entries)` - Lock funds (Safe only)

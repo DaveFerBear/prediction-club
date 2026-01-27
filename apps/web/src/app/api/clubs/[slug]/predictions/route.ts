@@ -5,8 +5,8 @@ import { apiResponse, apiError, validationError, notFoundError, forbiddenError, 
 import { requireAuth, AuthError } from '@/lib/auth';
 import { isValidBytes32 } from '@prediction-club/shared';
 
-const createCohortSchema = z.object({
-  cohortId: z.string().refine(isValidBytes32, 'Invalid cohort ID (must be bytes32)'),
+const createPredictionRoundSchema = z.object({
+  cohortId: z.string().refine(isValidBytes32, 'Invalid prediction ID (must be bytes32)'),
   marketRef: z.string().max(500).optional(),
   marketTitle: z.string().max(200).optional(),
   members: z.array(
@@ -18,8 +18,8 @@ const createCohortSchema = z.object({
 });
 
 /**
- * POST /api/clubs/[slug]/cohorts
- * Create a new cohort
+ * POST /api/clubs/[slug]/predictions
+ * Create a new prediction round
  */
 export async function POST(
   request: NextRequest,
@@ -29,19 +29,19 @@ export async function POST(
     const user = await requireAuth(request);
 
     const body = await request.json();
-    const parsed = createCohortSchema.safeParse(body);
+    const parsed = createPredictionRoundSchema.safeParse(body);
 
     if (!parsed.success) {
       return validationError(parsed.error.errors[0].message);
     }
 
-    const cohort = await VaultController.createCohort({
+    const predictionRound = await VaultController.createPredictionRound({
       clubSlug: params.slug,
       adminUserId: user.id,
       ...parsed.data,
     });
 
-    return apiResponse(cohort, 201);
+    return apiResponse(predictionRound, 201);
   } catch (error) {
     if (error instanceof AuthError) {
       return unauthorizedError(error.message);
@@ -55,14 +55,14 @@ export async function POST(
       }
       return apiError(error.code, error.message, 400);
     }
-    console.error('Error creating cohort:', error);
+    console.error('Error creating prediction round:', error);
     return serverError();
   }
 }
 
 /**
- * GET /api/clubs/[slug]/cohorts
- * List cohorts for a club
+ * GET /api/clubs/[slug]/predictions
+ * List predictions for a club
  */
 export async function GET(
   request: NextRequest,
@@ -74,7 +74,7 @@ export async function GET(
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
     const status = searchParams.get('status') || undefined;
 
-    const result = await VaultController.listCohorts({
+    const result = await VaultController.listPredictionRounds({
       clubSlug: params.slug,
       page,
       pageSize,
@@ -86,7 +86,7 @@ export async function GET(
     if (error instanceof VaultError && error.code === 'CLUB_NOT_FOUND') {
       return notFoundError('Club');
     }
-    console.error('Error listing cohorts:', error);
+    console.error('Error listing prediction rounds:', error);
     return serverError();
   }
 }

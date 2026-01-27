@@ -16,9 +16,9 @@ export interface RequestWithdrawInput {
   amount: string;
 }
 
-// ============ Cohort Operations ============
+// ============ Prediction Round Operations ============
 
-export interface CreateCohortInput {
+export interface CreatePredictionRoundInput {
   clubSlug: string;
   cohortId: string;
   marketRef?: string;
@@ -30,7 +30,7 @@ export interface CreateCohortInput {
   adminUserId: string;
 }
 
-export interface ListCohortsInput {
+export interface ListPredictionRoundsInput {
   clubSlug: string;
   page?: number;
   pageSize?: number;
@@ -162,12 +162,12 @@ export class VaultController {
     };
   }
 
-  // ============ Cohorts ============
+  // ============ Prediction Rounds ============
 
   /**
-   * Create a new cohort (commit funds to a market)
+   * Create a new prediction round (commit funds to a market)
    */
-  static async createCohort(input: CreateCohortInput) {
+  static async createPredictionRound(input: CreatePredictionRoundInput) {
     const { clubSlug, cohortId, marketRef, marketTitle, members, adminUserId } = input;
     const club = await this.getClubBySlug(clubSlug);
 
@@ -178,8 +178,8 @@ export class VaultController {
       .reduce((sum, m) => sum + BigInt(m.commitAmount), BigInt(0))
       .toString();
 
-    // Create cohort with members
-    const cohort = await prisma.cohort.create({
+    // Create prediction round with members
+    const predictionRound = await prisma.predictionRound.create({
       data: {
         clubId: club.id,
         cohortId,
@@ -199,13 +199,13 @@ export class VaultController {
       },
     });
 
-    return cohort;
+    return predictionRound;
   }
 
   /**
-   * List cohorts for a club
+   * List prediction rounds for a club
    */
-  static async listCohorts(input: ListCohortsInput) {
+  static async listPredictionRounds(input: ListPredictionRoundsInput) {
     const { clubSlug, page = 1, pageSize = 20, status } = input;
     const club = await this.getClubBySlug(clubSlug);
 
@@ -216,8 +216,8 @@ export class VaultController {
       where.status = status;
     }
 
-    const [cohorts, total] = await Promise.all([
-      prisma.cohort.findMany({
+    const [predictionRounds, total] = await Promise.all([
+      prisma.predictionRound.findMany({
         where,
         skip,
         take: pageSize,
@@ -228,15 +228,15 @@ export class VaultController {
           },
         },
       }),
-      prisma.cohort.count({ where }),
+      prisma.predictionRound.count({ where }),
     ]);
 
     return {
-      items: cohorts,
+      items: predictionRounds,
       total,
       page,
       pageSize,
-      hasMore: skip + cohorts.length < total,
+      hasMore: skip + predictionRounds.length < total,
     };
   }
 }

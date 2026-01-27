@@ -38,7 +38,7 @@ interface Club {
       email: string | null;
     };
   }>;
-  cohorts: Array<{
+  predictionRounds: Array<{
     id: string;
     cohortId: string;
     marketTitle: string | null;
@@ -47,11 +47,11 @@ interface Club {
   }>;
   _count: {
     members: number;
-    cohorts: number;
+    predictionRounds: number;
   };
 }
 
-interface Cohort {
+interface PredictionRound {
   id: string;
   cohortId: string;
   marketTitle: string | null;
@@ -68,10 +68,10 @@ interface ClubResponse {
   data: Club;
 }
 
-interface CohortsResponse {
+interface PredictionRoundsResponse {
   success: boolean;
   data: {
-    items: Cohort[];
+    items: PredictionRound[];
     total: number;
   };
 }
@@ -84,20 +84,20 @@ function formatAmount(amount: string) {
 export default function ClubPublicPage({ params }: { params: { slug: string } }) {
   const { address } = useApi();
   const [club, setClub] = useState<Club | null>(null);
-  const [cohorts, setCohorts] = useState<Cohort[]>([]);
+  const [predictionRounds, setPredictionRounds] = useState<PredictionRound[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [clubRes, cohortsRes] = await Promise.all([
+        const [clubRes, predictionRoundsRes] = await Promise.all([
           fetch(`/api/clubs/${params.slug}`),
-          fetch(`/api/clubs/${params.slug}/cohorts`),
+          fetch(`/api/clubs/${params.slug}/predictions`),
         ]);
 
         const clubData: ClubResponse = await clubRes.json();
-        const cohortsData: CohortsResponse = await cohortsRes.json();
+        const predictionRoundsData: PredictionRoundsResponse = await predictionRoundsRes.json();
 
         if (clubData.success) {
           setClub(clubData.data);
@@ -105,8 +105,8 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           setError('Club not found');
         }
 
-        if (cohortsData.success) {
-          setCohorts(cohortsData.data.items);
+        if (predictionRoundsData.success) {
+          setPredictionRounds(predictionRoundsData.data.items);
         }
       } catch (err) {
         console.error('Failed to fetch club:', err);
@@ -147,7 +147,9 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     );
   }
 
-  const activeCohorts = cohorts.filter((c) => c.status === 'COMMITTED' || c.status === 'PENDING');
+  const activePredictionRounds = predictionRounds.filter(
+    (round) => round.status === 'COMMITTED' || round.status === 'PENDING'
+  );
   const isManager =
     !!address && club.manager?.walletAddress?.toLowerCase() === address.toLowerCase();
   const isMember =
@@ -204,14 +206,14 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Active Cohorts</CardDescription>
-              <CardTitle className="text-2xl">{activeCohorts.length}</CardTitle>
+              <CardDescription>Active Predictions</CardDescription>
+              <CardTitle className="text-2xl">{activePredictionRounds.length}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Cohorts</CardDescription>
-              <CardTitle className="text-2xl">{club._count.cohorts}</CardTitle>
+              <CardDescription>Total Predictions</CardDescription>
+              <CardTitle className="text-2xl">{club._count.predictionRounds}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
@@ -225,37 +227,44 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Cohorts */}
+          {/* Predictions */}
           <div className="lg:col-span-2">
-            <h2 className="mb-4 text-xl font-semibold">Cohorts</h2>
-            {cohorts.length === 0 ? (
+            <h2 className="mb-4 text-xl font-semibold">Predictions</h2>
+            {predictionRounds.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">No cohorts yet</p>
+                  <p className="text-muted-foreground">No predictions yet</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-4">
-                {cohorts.map((cohort) => (
-                  <Card key={cohort.id}>
+                {predictionRounds.map((predictionRound) => (
+                  <Card key={predictionRound.id}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{cohort.marketTitle || 'Untitled Market'}</CardTitle>
+                        <CardTitle className="text-lg">
+                          {predictionRound.marketTitle || 'Untitled Market'}
+                        </CardTitle>
                         <Badge
-                          variant={cohort.status === 'COMMITTED' || cohort.status === 'PENDING' ? 'default' : 'secondary'}
+                          variant={
+                            predictionRound.status === 'COMMITTED' ||
+                            predictionRound.status === 'PENDING'
+                              ? 'default'
+                              : 'secondary'
+                          }
                         >
-                          {cohort.status}
+                          {predictionRound.status}
                         </Badge>
                       </div>
                     </CardHeader>
                     <CardContent>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Total Stake</span>
-                        <span>${formatAmount(cohort.stakeTotal)} USDC</span>
+                        <span>${formatAmount(predictionRound.stakeTotal)} USDC</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Participants</span>
-                        <span>{cohort._count.members}</span>
+                        <span>{predictionRound._count.members}</span>
                       </div>
                     </CardContent>
                   </Card>

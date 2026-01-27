@@ -86,7 +86,7 @@ export class ClubController {
         orderBy: { createdAt: 'desc' },
         include: {
           _count: {
-            select: { members: true, cohorts: true },
+            select: { members: true, predictionRounds: true },
           },
         },
       }),
@@ -128,14 +128,14 @@ export class ClubController {
             },
           },
         },
-        cohorts: {
+        predictionRounds: {
           orderBy: { createdAt: 'desc' },
           take: 10,
         },
         _count: {
           select: {
             members: { where: { status: 'ACTIVE' } },
-            cohorts: true,
+            predictionRounds: true,
           },
         },
       },

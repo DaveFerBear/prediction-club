@@ -6,7 +6,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ============================================================================
@@ -24,7 +23,7 @@ model User {
   managedClubs    Club[]         @relation("ClubManager")
   memberships     ClubMember[]
   applications    Application[]
-  cohortMembers   CohortMember[]
+  predictionRoundMembers   PredictionRoundMember[]
   verifications   Verification[]
 
   @@index([walletAddress])
@@ -60,7 +59,7 @@ model Club {
   // Relations
   members       ClubMember[]
   applications  Application[]
-  cohorts       Cohort[]
+  predictionRounds       PredictionRound[]
   vaultEvents   VaultEvent[]
 
   @@unique([chainId, vaultAddress])
@@ -131,17 +130,17 @@ model Application {
 }
 
 // ============================================================================
-// Cohort (prediction round / trade)
+// Prediction Round (prediction round / trade)
 // ============================================================================
 
-enum CohortStatus {
+enum PredictionRoundStatus {
   PENDING     // Created, not yet committed on-chain
   COMMITTED   // Funds locked via commitToCohort
   SETTLED     // Funds released via settleCohort
   CANCELLED   // Cancelled before execution
 }
 
-model Cohort {
+model PredictionRound {
   id              String       @id @default(cuid())
   clubId          String
   club            Club         @relation(fields: [clubId], references: [id], onDelete: Cascade)
@@ -156,7 +155,7 @@ model Cohort {
   // Aggregated stake
   stakeTotal      String       @default("0") // BigInt as string (wei)
 
-  status          CohortStatus @default(PENDING)
+  status          PredictionRoundStatus @default(PENDING)
 
   // Transaction references
   commitTxHash    String?
@@ -167,7 +166,7 @@ model Cohort {
   updatedAt       DateTime     @updatedAt
 
   // Relations
-  members         CohortMember[]
+  members         PredictionRoundMember[]
 
   @@unique([clubId, cohortId])
   @@index([clubId])
@@ -175,13 +174,13 @@ model Cohort {
 }
 
 // ============================================================================
-// Cohort Member (individual participation in a cohort)
+// Prediction Round Member (individual participation in a prediction round)
 // ============================================================================
 
-model CohortMember {
+model PredictionRoundMember {
   id            String   @id @default(cuid())
-  cohortId      String
-  cohort        Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  predictionRoundId      String
+  predictionRound        PredictionRound   @relation(fields: [predictionRoundId], references: [id], onDelete: Cascade)
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -193,8 +192,8 @@ model CohortMember {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([cohortId, userId])
-  @@index([cohortId])
+  @@unique([predictionRoundId, userId])
+  @@index([predictionRoundId])
   @@index([userId])
 }
 

@@ -1,6 +1,6 @@
 import { type Log, decodeEventLog } from 'viem';
 import { ClubVaultV1Abi, type ClubVaultV1EventName } from '@prediction-club/chain';
-import { prisma } from '@prediction-club/db';
+import { prisma, Prisma } from '@prediction-club/db';
 
 /**
  * Parse and store a vault event
@@ -58,7 +58,7 @@ export async function processVaultEvent(
       txHash,
       logIndex,
       eventName,
-      payloadJson,
+      payloadJson: payloadJson as Prisma.InputJsonValue,
       blockNumber: BigInt(log.blockNumber!),
       blockTime,
     },
@@ -85,13 +85,13 @@ async function handleEventSideEffects(
       break;
 
     case 'CohortCommitted':
-      // Update cohort status in DB
-      await handleCohortCommitted(clubId, payload);
+      // Update prediction round status in DB
+      await handlePredictionRoundCommitted(clubId, payload);
       break;
 
     case 'CohortSettled':
-      // Update cohort member payouts
-      await handleCohortSettled(clubId, payload);
+      // Update prediction round member payouts
+      await handlePredictionRoundSettled(clubId, payload);
       break;
 
     case 'Withdrawn':
@@ -107,33 +107,33 @@ async function handleEventSideEffects(
 /**
  * Handle CohortCommitted event
  */
-async function handleCohortCommitted(
+async function handlePredictionRoundCommitted(
   clubId: string,
   payload: Record<string, unknown>
 ): Promise<void> {
   const cohortId = payload.cohortId as string;
 
-  // Find the cohort by on-chain ID
-  const cohort = await prisma.cohort.findFirst({
+  // Find the prediction round by on-chain ID
+  const predictionRound = await prisma.predictionRound.findFirst({
     where: {
       clubId,
       cohortId,
     },
   });
 
-  if (cohort && cohort.status === 'PENDING') {
-    await prisma.cohort.update({
-      where: { id: cohort.id },
+  if (predictionRound && predictionRound.status === 'PENDING') {
+    await prisma.predictionRound.update({
+      where: { id: predictionRound.id },
       data: { status: 'COMMITTED' },
     });
-    console.log(`Updated cohort ${cohort.id} to COMMITTED`);
+    console.log(`Updated prediction round ${predictionRound.id} to COMMITTED`);
   }
 }
 
 /**
  * Handle CohortSettled event
  */
-async function handleCohortSettled(
+async function handlePredictionRoundSettled(
   clubId: string,
   payload: Record<string, unknown>
 ): Promise<void> {
@@ -142,8 +142,8 @@ async function handleCohortSettled(
   const commitAmount = payload.commitAmount as string;
   const payoutAmount = payload.payoutAmount as string;
 
-  // Find the cohort
-  const cohort = await prisma.cohort.findFirst({
+  // Find the prediction round
+  const predictionRound = await prisma.predictionRound.findFirst({
     where: {
       clubId,
       cohortId,
@@ -157,43 +157,43 @@ async function handleCohortSettled(
     },
   });
 
-  if (!cohort) {
-    console.log(`Cohort not found for settlement: ${cohortId}`);
+  if (!predictionRound) {
+    console.log(`Prediction round not found for settlement: ${cohortId}`);
     return;
   }
 
   // Find the member by wallet address
-  const cohortMember = cohort.members.find(
+  const predictionRoundMember = predictionRound.members.find(
     (m) => m.user.walletAddress.toLowerCase() === member.toLowerCase()
   );
 
-  if (cohortMember) {
+  if (predictionRoundMember) {
     const pnl = BigInt(payoutAmount) - BigInt(commitAmount);
-    await prisma.cohortMember.update({
-      where: { id: cohortMember.id },
+    await prisma.predictionRoundMember.update({
+      where: { id: predictionRoundMember.id },
       data: {
         payoutAmount,
         pnlAmount: pnl.toString(),
       },
     });
-    console.log(`Updated cohort member ${cohortMember.id} payout`);
+    console.log(`Updated prediction round member ${predictionRoundMember.id} payout`);
   }
 
   // Check if all members are settled
   // This is a simplified check - in production, query the chain for cohortTotalRemaining
-  const unsettledMembers = await prisma.cohortMember.count({
+  const unsettledMembers = await prisma.predictionRoundMember.count({
     where: {
-      cohortId: cohort.id,
+      predictionRoundId: predictionRound.id,
       payoutAmount: '0',
       commitAmount: { not: '0' },
     },
   });
 
   if (unsettledMembers === 0) {
-    await prisma.cohort.update({
-      where: { id: cohort.id },
+    await prisma.predictionRound.update({
+      where: { id: predictionRound.id },
       data: { status: 'SETTLED' },
     });
-    console.log(`Cohort ${cohort.id} fully settled`);
+    console.log(`Prediction round ${predictionRound.id} fully settled`);
   }
 }

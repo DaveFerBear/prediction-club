@@ -24,7 +24,7 @@ export {
   getVaultContract,
   getERC20Contract,
   getMemberBalance,
-  getCohortStatus,
+  getPredictionRoundStatus,
   getTokenBalance,
   getTokenAllowance,
 } from './client';
@@ -45,11 +45,11 @@ export {
 // Safe integration
 export {
   SafeClient,
-  buildCommitToCohortTx,
-  buildSettleCohortTx,
+  buildCommitToPredictionRoundTx,
+  buildSettlePredictionRoundTx,
   buildWithdrawTx,
   buildRescueTokenTx,
-  generateCohortId,
+  generatePredictionRoundId,
   type SafeTransactionData,
   type CommitEntry,
   type SettleEntry,

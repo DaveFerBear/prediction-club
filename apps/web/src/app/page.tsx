@@ -24,7 +24,7 @@ export default function HomePage() {
               </Link>
               <Link href="/clubs">
                 <Button variant="outline" size="lg">
-                  Explore Clubs
+                  Find a Club
                 </Button>
               </Link>
             </div>
@@ -43,9 +43,9 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-6">
-                <h3 className="text-lg font-semibold">Cohort Trading</h3>
+                <h3 className="text-lg font-semibold">Predictions</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Create cohorts for each prediction. Automatic participation for eligible members.
+                  Create predictions for each market. Automatic participation for eligible members.
                   Transparent PnL tracking.
                 </p>
               </div>

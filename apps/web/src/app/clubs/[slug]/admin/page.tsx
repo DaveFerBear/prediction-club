@@ -33,7 +33,7 @@ interface Club {
   }>;
   _count: {
     members: number;
-    cohorts: number;
+    predictionRounds: number;
   };
 }
 
@@ -191,8 +191,8 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Cohorts</CardDescription>
-              <CardTitle className="text-2xl">{club._count.cohorts}</CardTitle>
+              <CardDescription>Predictions</CardDescription>
+              <CardTitle className="text-2xl">{club._count.predictionRounds}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
@@ -256,11 +256,11 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
             </CardContent>
           </Card>
 
-          {/* Create Cohort */}
+          {/* Create Prediction */}
           <Card>
             <CardHeader>
-              <CardTitle>Create New Cohort</CardTitle>
-              <CardDescription>Start a new prediction round</CardDescription>
+              <CardTitle>Create New Prediction</CardTitle>
+              <CardDescription>Start a new prediction</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4">
@@ -280,7 +280,7 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
                   All eligible members will be automatically included based on their available
                   balance.
                 </p>
-                <Button className="w-full">Create Cohort</Button>
+                <Button className="w-full">Create Prediction</Button>
               </form>
             </CardContent>
           </Card>

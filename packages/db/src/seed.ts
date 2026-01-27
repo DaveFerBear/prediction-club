@@ -85,7 +85,7 @@ async function main() {
 
   // Create a sample cohort
   const cohortId = '0x' + '1'.repeat(64); // Sample bytes32
-  const cohort = await prisma.cohort.upsert({
+  const predictionRound = await prisma.predictionRound.upsert({
     where: {
       clubId_cohortId: {
         clubId: club.id,
@@ -103,19 +103,19 @@ async function main() {
     },
   });
 
-  console.log('Created cohort:', cohort.id);
+  console.log('Created prediction round:', predictionRound.id);
 
   // Add cohort members
-  await prisma.cohortMember.upsert({
+  await prisma.predictionRoundMember.upsert({
     where: {
-      cohortId_userId: {
-        cohortId: cohort.id,
+      predictionRoundId_userId: {
+        predictionRoundId: predictionRound.id,
         userId: manager.id,
       },
     },
     update: {},
     create: {
-      cohortId: cohort.id,
+      predictionRoundId: predictionRound.id,
       userId: manager.id,
       commitAmount: '500000000', // 500 USDC
       payoutAmount: '0',
@@ -123,16 +123,16 @@ async function main() {
     },
   });
 
-  await prisma.cohortMember.upsert({
+  await prisma.predictionRoundMember.upsert({
     where: {
-      cohortId_userId: {
-        cohortId: cohort.id,
+      predictionRoundId_userId: {
+        predictionRoundId: predictionRound.id,
         userId: member.id,
       },
     },
     update: {},
     create: {
-      cohortId: cohort.id,
+      predictionRoundId: predictionRound.id,
       userId: member.id,
       commitAmount: '500000000', // 500 USDC
       payoutAmount: '0',
