@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   Button,
   Card,
@@ -10,16 +9,38 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Badge,
   Input,
   Progress,
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
-import { useApi, useDeployClub } from '@/hooks';
+import { ActiveCheckList, ActiveCheckListItem } from '@/components/active-check-list';
+import { useApi, useDeployClub, type DeployStatus } from '@/hooks';
 import { type SupportedChainId } from '@prediction-club/chain';
 import { useConnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
+
+const slugifyName = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const getDeployStatusMessage = (status: DeployStatus) => {
+  switch (status) {
+    case 'switching-chain':
+      return 'Switching network... Please approve in your wallet.';
+    case 'deploying-safe':
+      return 'Deploying Safe... Please confirm the transaction in your wallet.';
+    case 'deploying-vault':
+      return 'Deploying ClubVault... Please confirm the transaction in your wallet.';
+    default:
+      return null;
+  }
+};
 
 export default function CreateClubPage() {
   const router = useRouter();
@@ -42,7 +63,6 @@ export default function CreateClubPage() {
     status,
     isDeploying,
     result: deployResult,
-    needsChainSwitch,
     errorStage,
   } = useDeployClub({
     chainId: formData.chainId,
@@ -86,31 +106,15 @@ export default function CreateClubPage() {
     }
   };
 
-  const getStatusMessage = () => {
-    switch (status) {
-      case 'switching-chain':
-        return 'Switching network... Please approve in your wallet.';
-      case 'deploying-safe':
-        return 'Deploying Safe... Please confirm the transaction in your wallet.';
-      case 'deploying-vault':
-        return 'Deploying ClubVault... Please confirm the transaction in your wallet.';
-      default:
-        return null;
-    }
-  };
+  const statusMessage = getDeployStatusMessage(status);
 
   const safeComplete = status === 'deploying-vault' || status === 'success' || !!deployResult;
   const vaultComplete = status === 'success' || !!deployResult;
   const progressValue = step === 1 ? 0 : deployResult ? 100 : 50;
   const connectComplete = isAuthenticated;
   const slugPreview = useMemo(() => formData.slug || 'your-slug', [formData.slug]);
-  const safeActive =
-    step === 2 &&
-    connectComplete &&
-    !safeComplete &&
-    (status === 'deploying-safe' || status === 'idle');
-  const vaultActive =
-    step === 2 && connectComplete && safeComplete && !vaultComplete && status === 'deploying-vault';
+  const safeActive = step === 2 && connectComplete && !safeComplete;
+  const vaultActive = step === 2 && connectComplete && safeComplete && !vaultComplete;
   const connectError = errorStage === 'connect' ? error : null;
   const safeError =
     errorStage === 'deploying-safe' || errorStage === 'switching-chain' ? error : null;
@@ -121,13 +125,7 @@ export default function CreateClubPage() {
       setFormData({ ...formData, name: value });
       return;
     }
-    const nextSlug = value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    const nextSlug = slugifyName(value);
     setFormData({ ...formData, name: value, slug: nextSlug });
   };
 
@@ -220,14 +218,17 @@ export default function CreateClubPage() {
                 </>
               ) : (
                 <>
-                  {getStatusMessage() && (
+                  {statusMessage && (
                     <div className="rounded-md bg-blue-500/10 p-3 text-sm text-blue-600">
-                      {getStatusMessage()}
+                      {statusMessage}
                     </div>
                   )}
 
-                  <div className="rounded-md border border-border bg-muted/30 text-sm divide-y">
-                    <div className="flex items-center justify-between px-3 py-2">
+                  <ActiveCheckList>
+                    <ActiveCheckListItem
+                      active
+                      status={connectComplete ? 'complete' : isConnecting ? 'in-progress' : 'idle'}
+                    >
                       <div className="flex items-center gap-3">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
                           1
@@ -253,76 +254,83 @@ export default function CreateClubPage() {
                             {isConnecting ? 'Connecting...' : 'Connect'}
                           </Button>
                         )}
-                        <span
-                          className={connectComplete ? 'text-green-600' : 'text-muted-foreground'}
-                        >
-                          {connectComplete ? '✓' : isConnecting ? 'In progress' : ''}
-                        </span>
                       </div>
-                    </div>
-                    <div
-                      className={`flex items-center justify-between px-3 py-2 ${
-                        safeComplete || safeActive ? '' : 'opacity-60'
-                      }`}
+                    </ActiveCheckListItem>
+                    <ActiveCheckListItem
+                      active={safeComplete || safeActive}
+                      status={
+                        safeComplete
+                          ? 'complete'
+                          : status === 'deploying-safe'
+                            ? 'in-progress'
+                            : 'idle'
+                      }
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
                           2
                         </span>
                         <div className="flex flex-col">
-                          <span className="font-medium">Deploy Safe</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">Deploy Safe</span>
+                            {safeError && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deploy()}
+                                disabled={isDeploying}
+                              >
+                                Retry
+                              </Button>
+                            )}
+                          </div>
                           {safeError && (
-                            <span className="text-xs text-destructive break-all whitespace-break-spaces">
+                            <span className="max-h-32 overflow-auto text-xs text-destructive break-all whitespace-break-spaces">
                               {safeError}
                             </span>
                           )}
                         </div>
                       </div>
-                      <span className={safeComplete ? 'text-green-600' : 'text-muted-foreground'}>
-                        {safeComplete ? (
-                          '✓'
-                        ) : status === 'deploying-safe' ? (
-                          <span className="inline-flex items-center gap-2">
-                            <span className="h-3 w-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
-                            In progress
-                          </span>
-                        ) : (
-                          ''
-                        )}
-                      </span>
-                    </div>
-                    <div
-                      className={`flex items-center justify-between px-3 py-2 ${
-                        vaultComplete || vaultActive ? '' : 'opacity-60'
-                      }`}
+                    </ActiveCheckListItem>
+                    <ActiveCheckListItem
+                      active={vaultComplete || vaultActive}
+                      status={
+                        vaultComplete
+                          ? 'complete'
+                          : status === 'deploying-vault'
+                            ? 'in-progress'
+                            : 'idle'
+                      }
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
                           3
                         </span>
                         <div className="flex flex-col">
-                          <span className="font-medium">Deploy ClubVault</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">Deploy ClubVault</span>
+                            {vaultError && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => deploy()}
+                                disabled={isDeploying}
+                              >
+                                Retry
+                              </Button>
+                            )}
+                          </div>
                           {vaultError && (
-                            <span className="text-xs text-destructive break-all whitespace-break-spaces">
+                            <span className="max-h-32 overflow-auto text-xs text-destructive break-all whitespace-break-spaces">
                               {vaultError}
                             </span>
                           )}
                         </div>
                       </div>
-                      <span className={vaultComplete ? 'text-green-600' : 'text-muted-foreground'}>
-                        {vaultComplete ? (
-                          '✓'
-                        ) : status === 'deploying-vault' ? (
-                          <span className="inline-flex items-center gap-2">
-                            <span className="h-3 w-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
-                            In progress
-                          </span>
-                        ) : (
-                          ''
-                        )}
-                      </span>
-                    </div>
-                  </div>
+                    </ActiveCheckListItem>
+                  </ActiveCheckList>
 
                   {deployResult && (
                     <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-600 space-y-1">
