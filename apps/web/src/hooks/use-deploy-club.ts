@@ -1,8 +1,27 @@
 import { useState, useCallback } from 'react';
 import { useAccount, usePublicClient, useWalletClient, useSwitchChain } from 'wagmi';
-import { deployClub, type DeployClubResult, type SupportedChainId, getChainConfig } from '@prediction-club/chain';
+import {
+  deploySafe,
+  deployClubVault,
+  type DeployClubResult,
+  type SupportedChainId,
+  type Address,
+  getChainConfig,
+} from '@prediction-club/chain';
 
-export type DeployStatus = 'idle' | 'switching-chain' | 'deploying-safe' | 'deploying-vault' | 'success' | 'error';
+export type DeployStatus =
+  | 'idle'
+  | 'switching-chain'
+  | 'deploying-safe'
+  | 'deploying-vault'
+  | 'success'
+  | 'error';
+export type DeployErrorStage =
+  | 'connect'
+  | 'switching-chain'
+  | 'deploying-safe'
+  | 'deploying-vault'
+  | 'unknown';
 
 interface UseDeployClubOptions {
   chainId: SupportedChainId;
@@ -25,17 +44,27 @@ export function useDeployClub(options: UseDeployClubOptions) {
 
   const [status, setStatus] = useState<DeployStatus>('idle');
   const [error, setError] = useState<Error | null>(null);
+  const [errorStage, setErrorStage] = useState<DeployErrorStage | null>(null);
   const [result, setResult] = useState<DeployClubResult | null>(null);
 
   const deploy = useCallback(async () => {
+    if (status === 'switching-chain' || status === 'deploying-safe' || status === 'deploying-vault') {
+      return null;
+    }
+    if (result) {
+      return result;
+    }
     if (!address) {
       const err = new Error('Please connect your wallet');
+      setStatus('error');
       setError(err);
+      setErrorStage('connect');
       onError?.(err);
       return null;
     }
 
     setError(null);
+    setErrorStage(null);
     setResult(null);
 
     // Switch chain if needed
@@ -68,6 +97,7 @@ export function useDeployClub(options: UseDeployClubOptions) {
             const error = new Error(`Failed to add ${getChainConfig(chainId).name} network to wallet`);
             setStatus('error');
             setError(error);
+            setErrorStage('switching-chain');
             onError?.(error);
             return null;
           }
@@ -75,6 +105,7 @@ export function useDeployClub(options: UseDeployClubOptions) {
           const error = new Error(`Please switch to the correct network (chain ${chainId})`);
           setStatus('error');
           setError(error);
+          setErrorStage('switching-chain');
           onError?.(error);
           return null;
         }
@@ -86,21 +117,46 @@ export function useDeployClub(options: UseDeployClubOptions) {
       const err = new Error('Failed to connect to network. Please try again.');
       setStatus('error');
       setError(err);
+      setErrorStage('deploying-safe');
       onError?.(err);
       return null;
     }
 
-    setStatus('deploying-safe');
-
     try {
-      // Deploy Safe + Vault
-      const deployResult = await deployClub({
+      setStatus('deploying-safe');
+      const safeResult = await deploySafe({
         walletClient,
         publicClient,
-        chainId,
         owners: [address],
         threshold: 1,
       });
+
+      setStatus('deploying-vault');
+      const config = getChainConfig(chainId);
+      const usdcAddress = config.usdc as Address;
+      let vaultResult: Awaited<ReturnType<typeof deployClubVault>> | null = null;
+      try {
+        vaultResult = await deployClubVault({
+          walletClient,
+          publicClient,
+          safeAddress: safeResult.address,
+          usdcAddress,
+        });
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Deployment failed');
+        setStatus('error');
+        setError(error);
+        setErrorStage('deploying-vault');
+        onError?.(error);
+        return null;
+      }
+
+      const deployResult: DeployClubResult = {
+        safeAddress: safeResult.address,
+        vaultAddress: vaultResult.address,
+        safeTxHash: safeResult.txHash,
+        vaultTxHash: vaultResult.txHash,
+      };
 
       setStatus('success');
       setResult(deployResult);
@@ -110,6 +166,7 @@ export function useDeployClub(options: UseDeployClubOptions) {
       const error = err instanceof Error ? err : new Error('Deployment failed');
       setStatus('error');
       setError(error);
+      setErrorStage('deploying-safe');
       onError?.(error);
       return null;
     }
@@ -118,6 +175,7 @@ export function useDeployClub(options: UseDeployClubOptions) {
   const reset = useCallback(() => {
     setStatus('idle');
     setError(null);
+    setErrorStage(null);
     setResult(null);
   }, []);
 
@@ -126,6 +184,7 @@ export function useDeployClub(options: UseDeployClubOptions) {
     reset,
     status,
     error,
+    errorStage,
     result,
     isDeploying: status === 'switching-chain' || status === 'deploying-safe' || status === 'deploying-vault',
     isSuccess: status === 'success',

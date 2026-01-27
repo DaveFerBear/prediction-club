@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -10,6 +10,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Badge,
   Input,
   Progress,
 } from '@prediction-club/ui';
@@ -17,10 +18,13 @@ import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
 import { useApi, useDeployClub } from '@/hooks';
 import { type SupportedChainId } from '@prediction-club/chain';
+import { useConnect } from 'wagmi';
+import { injected } from 'wagmi/connectors';
 
 export default function CreateClubPage() {
   const router = useRouter();
   const { fetch: apiFetch, isAuthenticated } = useApi();
+  const { connect, isPending: isConnecting } = useConnect();
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -39,6 +43,7 @@ export default function CreateClubPage() {
     isDeploying,
     result: deployResult,
     needsChainSwitch,
+    errorStage,
   } = useDeployClub({
     chainId: formData.chainId,
     onError: (err) => setError(err.message),
@@ -48,7 +53,7 @@ export default function CreateClubPage() {
     e.preventDefault();
 
     if (!isAuthenticated) {
-      setError('Please connect your wallet first');
+      connect({ connector: injected() });
       return;
     }
 
@@ -97,7 +102,19 @@ export default function CreateClubPage() {
   const safeComplete = status === 'deploying-vault' || status === 'success' || !!deployResult;
   const vaultComplete = status === 'success' || !!deployResult;
   const progressValue = step === 1 ? 0 : deployResult ? 100 : 50;
+  const connectComplete = isAuthenticated;
   const slugPreview = useMemo(() => formData.slug || 'your-slug', [formData.slug]);
+  const safeActive =
+    step === 2 &&
+    connectComplete &&
+    !safeComplete &&
+    (status === 'deploying-safe' || status === 'idle');
+  const vaultActive =
+    step === 2 && connectComplete && safeComplete && !vaultComplete && status === 'deploying-vault';
+  const connectError = errorStage === 'connect' ? error : null;
+  const safeError =
+    errorStage === 'deploying-safe' || errorStage === 'switching-chain' ? error : null;
+  const vaultError = errorStage === 'deploying-vault' ? error : null;
 
   const handleNameChange = (value: string) => {
     if (slugTouched) {
@@ -113,6 +130,14 @@ export default function CreateClubPage() {
       .replace(/^-+|-+$/g, '');
     setFormData({ ...formData, name: value, slug: nextSlug });
   };
+
+  useEffect(() => {
+    if (step !== 2) return;
+    if (!connectComplete) return;
+    if (deployResult || isDeploying) return;
+    if (status !== 'idle') return;
+    deploy();
+  }, [step, connectComplete, deployResult, isDeploying, status, deploy]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -138,12 +163,6 @@ export default function CreateClubPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
               {step === 1 ? (
                 <>
                   <div className="space-y-2">
@@ -166,7 +185,9 @@ export default function CreateClubPage() {
                       }}
                       placeholder="alpha-traders"
                     />
-                    <p className="text-xs text-muted-foreground">Your club URL: /clubs/{slugPreview}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Your club URL: /clubs/{slugPreview}
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -179,7 +200,12 @@ export default function CreateClubPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => router.back()}
+                    >
                       Back
                     </Button>
                     <Button
@@ -200,25 +226,100 @@ export default function CreateClubPage() {
                     </div>
                   )}
 
-                  <div className="rounded-md border border-border bg-muted/30 p-3 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span>Deploy Safe</span>
+                  <div className="rounded-md border border-border bg-muted/30 text-sm divide-y">
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                          1
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">Connect wallet</span>
+                          {connectError && (
+                            <span className="text-xs text-destructive break-words whitespace-normal">
+                              {connectError}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!connectComplete && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => connect({ connector: injected() })}
+                            disabled={isConnecting}
+                          >
+                            {isConnecting ? 'Connecting...' : 'Connect'}
+                          </Button>
+                        )}
+                        <span
+                          className={connectComplete ? 'text-green-600' : 'text-muted-foreground'}
+                        >
+                          {connectComplete ? '✓' : isConnecting ? 'In progress' : ''}
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      className={`flex items-center justify-between px-3 py-2 ${
+                        safeComplete || safeActive ? '' : 'opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                          2
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">Deploy Safe</span>
+                          {safeError && (
+                            <span className="text-xs text-destructive break-words whitespace-normal">
+                              {safeError}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <span className={safeComplete ? 'text-green-600' : 'text-muted-foreground'}>
-                        {safeComplete
-                          ? '✓'
-                          : status === 'deploying-safe'
-                            ? 'In progress'
-                            : 'Pending'}
+                        {safeComplete ? (
+                          '✓'
+                        ) : status === 'deploying-safe' ? (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-3 w-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
+                            In progress
+                          </span>
+                        ) : (
+                          ''
+                        )}
                       </span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span>Deploy ClubVault</span>
+                    <div
+                      className={`flex items-center justify-between px-3 py-2 ${
+                        vaultComplete || vaultActive ? '' : 'opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                          3
+                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">Deploy ClubVault</span>
+                          {vaultError && (
+                            <span className="text-xs text-destructive break-words whitespace-normal">
+                              {vaultError}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <span className={vaultComplete ? 'text-green-600' : 'text-muted-foreground'}>
-                        {vaultComplete
-                          ? '✓'
-                          : status === 'deploying-vault'
-                            ? 'In progress'
-                            : 'Pending'}
+                        {vaultComplete ? (
+                          '✓'
+                        ) : status === 'deploying-vault' ? (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-3 w-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
+                            In progress
+                          </span>
+                        ) : (
+                          ''
+                        )}
                       </span>
                     </div>
                   </div>
@@ -282,13 +383,9 @@ export default function CreateClubPage() {
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={isDeploying || !isAuthenticated}
+                      disabled={isDeploying || !vaultComplete}
                     >
-                      {isDeploying
-                        ? 'Deploying...'
-                        : !isAuthenticated
-                          ? 'Connect Wallet to Create'
-                          : 'Create Club'}
+                      {isDeploying ? 'Deploying...' : 'Create Club'}
                     </Button>
                   </div>
 
