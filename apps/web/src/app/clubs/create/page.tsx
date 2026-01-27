@@ -235,7 +235,7 @@ export default function CreateClubPage() {
                         <div className="flex flex-col">
                           <span className="font-medium">Connect wallet</span>
                           {connectError && (
-                            <span className="text-xs text-destructive break-words whitespace-normal">
+                            <span className="text-xs text-destructive break-all whitespace-break-spaces">
                               {connectError}
                             </span>
                           )}
@@ -272,7 +272,7 @@ export default function CreateClubPage() {
                         <div className="flex flex-col">
                           <span className="font-medium">Deploy Safe</span>
                           {safeError && (
-                            <span className="text-xs text-destructive break-words whitespace-normal">
+                            <span className="text-xs text-destructive break-all whitespace-break-spaces">
                               {safeError}
                             </span>
                           )}
@@ -303,7 +303,7 @@ export default function CreateClubPage() {
                         <div className="flex flex-col">
                           <span className="font-medium">Deploy ClubVault</span>
                           {vaultError && (
-                            <span className="text-xs text-destructive break-words whitespace-normal">
+                            <span className="text-xs text-destructive break-all whitespace-break-spaces">
                               {vaultError}
                             </span>
                           )}
