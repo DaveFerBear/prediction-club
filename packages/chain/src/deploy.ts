@@ -5,9 +5,34 @@
  * TODO: Replace with a ClubFactory contract for single-transaction deployment.
  */
 
-import { type Address, type Hash, type WalletClient, type PublicClient, encodeFunctionData, encodeDeployData } from 'viem';
+import {
+  type Address,
+  type Hash,
+  type WalletClient,
+  type PublicClient,
+  encodeFunctionData,
+  encodeDeployData,
+} from 'viem';
 import { ClubVaultV1Abi, ClubVaultV1Bytecode } from './abi';
 import { type SupportedChainId, getChainConfig } from './config';
+
+const TX_RECEIPT_POLL_INTERVAL_MS = 5000;
+const TX_RECEIPT_TIMEOUT_MS = 180_000;
+
+const waitForReceipt = async (publicClient: PublicClient, hash: Hash) => {
+  const start = Date.now();
+  // Poll manually to avoid block polling + extra RPC calls.
+  for (;;) {
+    try {
+      return await publicClient.getTransactionReceipt({ hash });
+    } catch (error) {
+      if (Date.now() - start >= TX_RECEIPT_TIMEOUT_MS) {
+        throw error instanceof Error ? error : new Error('Transaction receipt timeout');
+      }
+      await new Promise((resolve) => setTimeout(resolve, TX_RECEIPT_POLL_INTERVAL_MS));
+    }
+  }
+};
 
 // Safe factory addresses (same on all EVM chains)
 // See: https://github.com/safe-global/safe-deployments
@@ -161,7 +186,7 @@ export async function deploySafe(params: {
   });
 
   // Wait for receipt to get deployed address
-  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+  const receipt = await waitForReceipt(publicClient, txHash);
 
   // Parse Safe address from logs (ProxyCreation event)
   // The Safe address is in the first topic of the ProxyCreation event
@@ -207,7 +232,7 @@ export async function deployClubVault(params: {
   });
 
   // Wait for receipt
-  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+  const receipt = await waitForReceipt(publicClient, txHash);
 
   if (!receipt.contractAddress) {
     throw new Error('Failed to deploy ClubVault');

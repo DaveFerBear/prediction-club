@@ -2,16 +2,18 @@ import { http, createConfig, createStorage, cookieStorage } from 'wagmi';
 import { polygon, polygonAmoy } from 'wagmi/chains';
 import { injected } from 'wagmi/connectors';
 
+const RPC_POLL_INTERVAL_MS = 5000;
+
 export const config = createConfig({
   chains: [polygon, polygonAmoy],
   connectors: [injected()],
   transports: {
     [polygon.id]: process.env.NEXT_PUBLIC_POLYGON_RPC_URL
-      ? http(process.env.NEXT_PUBLIC_POLYGON_RPC_URL)
-      : http(),
+      ? http(process.env.NEXT_PUBLIC_POLYGON_RPC_URL, { pollingInterval: RPC_POLL_INTERVAL_MS })
+      : http(undefined, { pollingInterval: RPC_POLL_INTERVAL_MS }),
     [polygonAmoy.id]: process.env.NEXT_PUBLIC_AMOY_RPC_URL
-      ? http(process.env.NEXT_PUBLIC_AMOY_RPC_URL)
-      : http(),
+      ? http(process.env.NEXT_PUBLIC_AMOY_RPC_URL, { pollingInterval: RPC_POLL_INTERVAL_MS })
+      : http(undefined, { pollingInterval: RPC_POLL_INTERVAL_MS }),
   },
   storage: createStorage({
     storage: cookieStorage,
