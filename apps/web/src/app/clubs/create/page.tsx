@@ -11,6 +11,10 @@ import {
   CardTitle,
   Input,
   Progress,
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
@@ -53,17 +57,21 @@ export default function CreateClubPage() {
     name: '',
     slug: '',
     description: '',
-    chainId: 80002 as SupportedChainId, // Default to Amoy testnet
+    chainId: 137 as SupportedChainId, // Default to Polygon mainnet
     isPublic: true,
   });
   const [slugTouched, setSlugTouched] = useState(false);
 
   const {
     deploy,
+    retrySafe,
+    retryVault,
+    reset: resetDeploy,
     status,
     isDeploying,
     result: deployResult,
     errorStage,
+    safeResult,
   } = useDeployClub({
     chainId: formData.chainId,
     onError: (err) => setError(err.message),
@@ -109,12 +117,13 @@ export default function CreateClubPage() {
   const statusMessage = getDeployStatusMessage(status);
 
   const safeComplete = status === 'deploying-vault' || status === 'success' || !!deployResult;
+  const safeReady = safeComplete || !!safeResult;
   const vaultComplete = status === 'success' || !!deployResult;
   const progressValue = step === 1 ? 0 : deployResult ? 100 : 50;
   const connectComplete = isAuthenticated;
   const slugPreview = useMemo(() => formData.slug || 'your-slug', [formData.slug]);
   const safeActive = step === 2 && connectComplete && !safeComplete;
-  const vaultActive = step === 2 && connectComplete && safeComplete && !vaultComplete;
+  const vaultActive = step === 2 && connectComplete && safeReady && !vaultComplete;
   const connectError = errorStage === 'connect' ? error : null;
   const safeError =
     errorStage === 'deploying-safe' || errorStage === 'switching-chain' ? error : null;
@@ -127,6 +136,12 @@ export default function CreateClubPage() {
     }
     const nextSlug = slugifyName(value);
     setFormData({ ...formData, name: value, slug: nextSlug });
+  };
+
+  const handleRetryDeploy = () => {
+    setError(null);
+    resetDeploy();
+    deploy();
   };
 
   useEffect(() => {
@@ -278,7 +293,7 @@ export default function CreateClubPage() {
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                onClick={() => deploy()}
+                                onClick={retrySafe}
                                 disabled={isDeploying}
                               >
                                 Retry
@@ -315,7 +330,7 @@ export default function CreateClubPage() {
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                onClick={() => deploy()}
+                                onClick={retryVault}
                                 disabled={isDeploying}
                               >
                                 Retry
@@ -346,37 +361,52 @@ export default function CreateClubPage() {
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Network</label>
-                    <select
-                      value={formData.chainId}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          chainId: parseInt(e.target.value) as SupportedChainId,
-                        })
-                      }
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      disabled={isDeploying}
-                    >
-                      <option value={80002}>Polygon Amoy (Testnet)</option>
-                      <option value={137}>Polygon Mainnet</option>
-                    </select>
-                  </div>
+                  <Accordion
+                    type="single"
+                    collapsible
+                    className="rounded-md border border-border bg-muted/30"
+                  >
+                    <AccordionItem value="advanced" className="border-none">
+                      <AccordionTrigger className="px-3">Advanced</AccordionTrigger>
+                      <AccordionContent className="px-3">
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Network</label>
+                            <select
+                              value={formData.chainId}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  chainId: parseInt(e.target.value) as SupportedChainId,
+                                })
+                              }
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              disabled={isDeploying}
+                            >
+                              <option value={137}>Polygon Mainnet</option>
+                              <option value={80002}>Polygon Amoy (Testnet)</option>
+                            </select>
+                          </div>
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="isPublic"
-                      checked={formData.isPublic}
-                      onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300"
-                      disabled={isDeploying}
-                    />
-                    <label htmlFor="isPublic" className="text-sm">
-                      Make this club public (visible to everyone)
-                    </label>
-                  </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="isPublic"
+                              checked={formData.isPublic}
+                              onChange={(e) =>
+                                setFormData({ ...formData, isPublic: e.target.checked })
+                              }
+                              className="h-4 w-4 rounded border-gray-300"
+                              disabled={isDeploying}
+                            />
+                            <label htmlFor="isPublic" className="text-sm">
+                              Make this club public (visible to everyone)
+                            </label>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
 
                   <div className="flex items-center gap-2">
                     <Button

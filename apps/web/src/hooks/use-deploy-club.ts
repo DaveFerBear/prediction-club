@@ -46,8 +46,11 @@ export function useDeployClub(options: UseDeployClubOptions) {
   const [error, setError] = useState<Error | null>(null);
   const [errorStage, setErrorStage] = useState<DeployErrorStage | null>(null);
   const [result, setResult] = useState<DeployClubResult | null>(null);
+  const [safeResult, setSafeResult] = useState<Pick<DeployClubResult, 'safeAddress' | 'safeTxHash'> | null>(
+    null
+  );
 
-  const deploy = useCallback(async () => {
+  const deploy = useCallback(async (options?: { skipSafe?: boolean }) => {
     if (status === 'switching-chain' || status === 'deploying-safe' || status === 'deploying-vault') {
       return null;
     }
@@ -66,6 +69,9 @@ export function useDeployClub(options: UseDeployClubOptions) {
     setError(null);
     setErrorStage(null);
     setResult(null);
+    if (!options?.skipSafe) {
+      setSafeResult(null);
+    }
 
     // Switch chain if needed
     if (connectedChain?.id !== chainId) {
@@ -123,13 +129,18 @@ export function useDeployClub(options: UseDeployClubOptions) {
     }
 
     try {
-      setStatus('deploying-safe');
-      const safeResult = await deploySafe({
-        walletClient,
-        publicClient,
-        owners: [address],
-        threshold: 1,
-      });
+      let resolvedSafe = safeResult;
+      if (!options?.skipSafe || !resolvedSafe) {
+        setStatus('deploying-safe');
+        const createdSafe = await deploySafe({
+          walletClient,
+          publicClient,
+          owners: [address],
+          threshold: 1,
+        });
+        resolvedSafe = { safeAddress: createdSafe.address, safeTxHash: createdSafe.txHash };
+        setSafeResult(resolvedSafe);
+      }
 
       setStatus('deploying-vault');
       const config = getChainConfig(chainId);
@@ -139,7 +150,7 @@ export function useDeployClub(options: UseDeployClubOptions) {
         vaultResult = await deployClubVault({
           walletClient,
           publicClient,
-          safeAddress: safeResult.address,
+          safeAddress: resolvedSafe.safeAddress,
           usdcAddress,
         });
       } catch (err) {
@@ -152,9 +163,9 @@ export function useDeployClub(options: UseDeployClubOptions) {
       }
 
       const deployResult: DeployClubResult = {
-        safeAddress: safeResult.address,
+        safeAddress: resolvedSafe.safeAddress,
         vaultAddress: vaultResult.address,
-        safeTxHash: safeResult.txHash,
+        safeTxHash: resolvedSafe.safeTxHash,
         vaultTxHash: vaultResult.txHash,
       };
 
@@ -170,22 +181,58 @@ export function useDeployClub(options: UseDeployClubOptions) {
       onError?.(error);
       return null;
     }
-  }, [address, connectedChain, walletClient, publicClient, chainId, switchChainAsync, onSuccess, onError]);
+  }, [
+    address,
+    connectedChain,
+    walletClient,
+    publicClient,
+    chainId,
+    switchChainAsync,
+    onSuccess,
+    onError,
+    result,
+    safeResult,
+    status,
+  ]);
 
   const reset = useCallback(() => {
     setStatus('idle');
     setError(null);
     setErrorStage(null);
     setResult(null);
+    setSafeResult(null);
   }, []);
+
+  const retrySafe = useCallback(() => {
+    setStatus('idle');
+    setError(null);
+    setErrorStage(null);
+    setResult(null);
+    setSafeResult(null);
+    return deploy();
+  }, [deploy]);
+
+  const retryVault = useCallback(() => {
+    if (!safeResult) {
+      return deploy();
+    }
+    setStatus('idle');
+    setError(null);
+    setErrorStage(null);
+    setResult(null);
+    return deploy({ skipSafe: true });
+  }, [deploy, safeResult]);
 
   return {
     deploy,
+    retrySafe,
+    retryVault,
     reset,
     status,
     error,
     errorStage,
     result,
+    safeResult,
     isDeploying: status === 'switching-chain' || status === 'deploying-safe' || status === 'deploying-vault',
     isSuccess: status === 'success',
     isError: status === 'error',
