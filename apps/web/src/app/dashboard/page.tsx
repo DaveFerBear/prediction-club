@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useClubs } from '@/hooks';
 import {
   Button,
   Card,
@@ -13,46 +13,8 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 
-interface Club {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  isPublic: boolean;
-  _count: {
-    members: number;
-    predictionRounds: number;
-  };
-}
-
-interface ClubsResponse {
-  success: boolean;
-  data: {
-    items: Club[];
-    total: number;
-  };
-}
-
 export default function DashboardPage() {
-  const [clubs, setClubs] = useState<Club[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchClubs() {
-      try {
-        const res = await fetch('/api/clubs?public=false');
-        const data: ClubsResponse = await res.json();
-        if (data.success) {
-          setClubs(data.data.items);
-        }
-      } catch (error) {
-        console.error('Failed to fetch clubs:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchClubs();
-  }, []);
+  const { clubs, isLoading } = useClubs({ publicOnly: false });
 
   return (
     <div className="min-h-screen bg-background">
@@ -70,7 +32,7 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {loading ? (
+          {isLoading ? (
             <div className="text-muted-foreground">Loading clubs...</div>
           ) : clubs.length === 0 ? (
             <Card>

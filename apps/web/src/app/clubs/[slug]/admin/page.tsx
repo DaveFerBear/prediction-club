@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useClub, useClubApplications, useApproveApplication } from '@/hooks';
 import {
   Button,
   Card,
@@ -17,51 +17,6 @@ import {
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
 
-interface Club {
-  id: string;
-  name: string;
-  slug: string;
-  safeAddress: string;
-  vaultAddress: string;
-  members: Array<{
-    role: string;
-    user: {
-      id: string;
-      walletAddress: string;
-      email: string | null;
-    };
-  }>;
-  _count: {
-    members: number;
-    predictionRounds: number;
-  };
-}
-
-interface Application {
-  id: string;
-  status: string;
-  message: string | null;
-  createdAt: string;
-  user: {
-    id: string;
-    walletAddress: string;
-    email: string | null;
-  };
-}
-
-interface ClubResponse {
-  success: boolean;
-  data: Club;
-}
-
-interface ApplicationsResponse {
-  success: boolean;
-  data: {
-    items: Application[];
-    total: number;
-  };
-}
-
 function formatDate(dateString: string) {
   const date = new Date(dateString);
   const now = new Date();
@@ -76,64 +31,15 @@ function formatDate(dateString: string) {
 }
 
 export default function ClubAdminPage({ params }: { params: { slug: string } }) {
-  const [club, setClub] = useState<Club | null>(null);
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [approvingId, setApprovingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [clubRes, appsRes] = await Promise.all([
-          fetch(`/api/clubs/${params.slug}`),
-          fetch(`/api/clubs/${params.slug}/applications?status=PENDING`),
-        ]);
-
-        const clubData: ClubResponse = await clubRes.json();
-        const appsData: ApplicationsResponse = await appsRes.json();
-
-        if (clubData.success) {
-          setClub(clubData.data);
-        } else {
-          setError('Club not found');
-        }
-
-        if (appsData.success) {
-          setApplications(appsData.data.items);
-        }
-      } catch (err) {
-        console.error('Failed to fetch data:', err);
-        setError('Failed to load club');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [params.slug]);
-
-  async function handleApprove(applicationId: string) {
-    setApprovingId(applicationId);
-    try {
-      const res = await fetch(`/api/clubs/${params.slug}/applications/${applicationId}/approve`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (data.success) {
-        setApplications((prev) => prev.filter((app) => app.id !== applicationId));
-        // Refresh club data to update member count
-        const clubRes = await fetch(`/api/clubs/${params.slug}`);
-        const clubData: ClubResponse = await clubRes.json();
-        if (clubData.success) {
-          setClub(clubData.data);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to approve:', err);
-    } finally {
-      setApprovingId(null);
-    }
-  }
+  const { club, isLoading: clubLoading, error: clubError } = useClub(params.slug);
+  const {
+    applications,
+    isLoading: appsLoading,
+    error: appsError,
+  } = useClubApplications(params.slug, 'PENDING');
+  const { approve, approvingId, error: approveError } = useApproveApplication(params.slug);
+  const loading = clubLoading || appsLoading;
+  const error = clubError || appsError || approveError;
 
   if (loading) {
     return (
@@ -153,7 +59,7 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
         <main className="container py-8">
           <Card>
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">{error || 'Club not found'}</p>
+              <p className="text-muted-foreground">{error?.message || 'Club not found'}</p>
               <Link href="/dashboard" className="mt-4 inline-block">
                 <Button variant="outline">Back to My clubs</Button>
               </Link>
@@ -240,7 +146,7 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
                       <div className="mt-3 flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => handleApprove(app.id)}
+                          onClick={() => approve(app.id)}
                           disabled={approvingId === app.id}
                         >
                           {approvingId === app.id ? 'Approving...' : 'Approve'}

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useApi, useClub, usePredictionRounds } from '@/hooks';
 import {
   Button,
   Card,
@@ -15,66 +15,6 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
-import { useApi } from '@/hooks';
-
-interface Club {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  isPublic: boolean;
-  safeAddress: string;
-  vaultAddress: string;
-  manager: {
-    id: string;
-    walletAddress: string;
-    email: string | null;
-  } | null;
-  members: Array<{
-    role: string;
-    user: {
-      id: string;
-      walletAddress: string;
-      email: string | null;
-    };
-  }>;
-  predictionRounds: Array<{
-    id: string;
-    cohortId: string;
-    marketTitle: string | null;
-    status: string;
-    stakeTotal: string;
-  }>;
-  _count: {
-    members: number;
-    predictionRounds: number;
-  };
-}
-
-interface PredictionRound {
-  id: string;
-  cohortId: string;
-  marketTitle: string | null;
-  marketRef: string | null;
-  status: string;
-  stakeTotal: string;
-  _count: {
-    members: number;
-  };
-}
-
-interface ClubResponse {
-  success: boolean;
-  data: Club;
-}
-
-interface PredictionRoundsResponse {
-  success: boolean;
-  data: {
-    items: PredictionRound[];
-    total: number;
-  };
-}
 
 function formatAmount(amount: string) {
   const num = Number(amount) / 1e6; // Assuming USDC with 6 decimals
@@ -83,40 +23,18 @@ function formatAmount(amount: string) {
 
 export default function ClubPublicPage({ params }: { params: { slug: string } }) {
   const { address } = useApi();
-  const [club, setClub] = useState<Club | null>(null);
-  const [predictionRounds, setPredictionRounds] = useState<PredictionRound[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [clubRes, predictionRoundsRes] = await Promise.all([
-          fetch(`/api/clubs/${params.slug}`),
-          fetch(`/api/clubs/${params.slug}/predictions`),
-        ]);
-
-        const clubData: ClubResponse = await clubRes.json();
-        const predictionRoundsData: PredictionRoundsResponse = await predictionRoundsRes.json();
-
-        if (clubData.success) {
-          setClub(clubData.data);
-        } else {
-          setError('Club not found');
-        }
-
-        if (predictionRoundsData.success) {
-          setPredictionRounds(predictionRoundsData.data.items);
-        }
-      } catch (err) {
-        console.error('Failed to fetch club:', err);
-        setError('Failed to load club');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [params.slug]);
+  const {
+    club,
+    isLoading: clubLoading,
+    error: clubError,
+  } = useClub(params.slug);
+  const {
+    predictionRounds,
+    isLoading: roundsLoading,
+    error: roundsError,
+  } = usePredictionRounds(params.slug);
+  const loading = clubLoading || roundsLoading;
+  const error = clubError || roundsError;
 
   if (loading) {
     return (
@@ -136,7 +54,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         <main className="container py-8">
           <Card>
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">{error || 'Club not found'}</p>
+              <p className="text-muted-foreground">{error?.message || 'Club not found'}</p>
               <Link href="/clubs" className="mt-4 inline-block">
                 <Button variant="outline">Find a club</Button>
               </Link>
