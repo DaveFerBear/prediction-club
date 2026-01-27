@@ -15,6 +15,7 @@
     "@prediction-club/chain": "*",
     "@prediction-club/db": "*",
     "@prediction-club/shared": "*",
+    "dotenv": "^17.2.3",
     "viem": "^2.21.0",
     "zod": "^3.22.4"
   },

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createChainPublicClient, ClubVaultV1Abi, type SupportedChainId } from '@prediction-club/chain';
 import { prisma } from '@prediction-club/db';
 import { sleep } from '@prediction-club/shared';

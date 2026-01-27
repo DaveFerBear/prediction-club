@@ -8,6 +8,7 @@
  *   yarn indexer:backfill --club alpha-traders --from 50000000
  */
 
+import 'dotenv/config';
 import {
   createChainPublicClient,
   ClubVaultV1Abi,
