@@ -15,11 +15,13 @@ export function useCreatePrediction(clubSlug: string) {
     Error,
     string,
     CreatePredictionRoundRequest
-  >(`/api/clubs/${clubSlug}/predictions`, (url: string, { arg }) =>
-    fetch<CreatePredictionResponse>(url, {
-      method: 'POST',
-      body: JSON.stringify(arg),
-    })
+  >(
+    `/api/clubs/${clubSlug}/predictions`,
+    (url: string, { arg }: { arg: CreatePredictionRoundRequest }) =>
+      fetch<CreatePredictionResponse>(url, {
+        method: 'POST',
+        body: JSON.stringify(arg),
+      })
   );
 
   const createPrediction = async (input: CreatePredictionRoundRequest) => {

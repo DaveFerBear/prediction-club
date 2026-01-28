@@ -61,6 +61,7 @@ function walletClientToSigner(walletClient?: WalletClientWithAccount | null) {
   if (!walletClient) return null;
   const chainId = walletClient.chain?.id;
   if (!chainId) return null;
+  // TODO: Replace with a proper viem->ethers provider adapter to avoid casting transport.
   const provider = new Web3Provider(walletClient.transport as unknown as ExternalProvider, chainId);
   return provider.getSigner(walletClient.account.address);
 }
@@ -89,7 +90,8 @@ export default function ProfilePage() {
   const [approvalsReady, setApprovalsReady] = useState(false);
   const [credsSaved, setCredsSaved] = useState(false);
   const [safeFunded, setSafeFunded] = useState(false);
-  const [safeBalance, setSafeBalance] = useState<bigint | null>(null);
+  const [safeBalanceUsdcE, setSafeBalanceUsdcE] = useState<bigint | null>(null);
+  const [safeBalanceUsdc, setSafeBalanceUsdc] = useState<bigint | null>(null);
   const [credsChecked, setCredsChecked] = useState(false);
   const [safeAddressOverride, setSafeAddressOverride] = useState<string | null>(null);
   const lastChainCheckRef = useRef(0);
@@ -103,7 +105,7 @@ export default function ProfilePage() {
   const isAuthenticated = !!sessionAddress && sessionAddress === walletAddress;
   const effectiveSafeAddress = safeAddressOverride ?? safeAddress;
   const credsReady = !!creds || credsSaved;
-  const safeBalanceDisplay = formatUnits(safeBalance ?? BigInt(0), 6);
+  const safeBalanceDisplay = formatUnits(safeBalanceUsdcE ?? BigInt(0), 6);
   // TODO: Fetch market-committed balance via relayer API.
   const marketBalanceDisplay = '0';
   const completedSteps = [
@@ -149,7 +151,7 @@ export default function ProfilePage() {
   const checkSafeDeployed = useCallback(
     async (targetAddress: string) => {
       if (!publicClient) return false;
-      const code = await publicClient.getBytecode({ address: targetAddress as `0x${string}` });
+      const code = await publicClient.getBytecode({ address: toHexAddress(targetAddress) });
       return !!code && code !== '0x';
     },
     [publicClient]
@@ -237,7 +239,7 @@ export default function ProfilePage() {
         setSafeReady(deployed);
 
         if (deployed) {
-          const targetAddress = (deployedAddress ?? effectiveSafeAddress) as `0x${string}`;
+          const targetAddress = toHexAddress(deployedAddress ?? effectiveSafeAddress);
           const approvalStatus = await checkApprovals(targetAddress);
           if (cancelled) return;
           setApprovalsReady(approvalStatus.allApproved);
@@ -259,19 +261,29 @@ export default function ProfilePage() {
           }
         }
 
-        const balance = await publicClient.readContract({
-          address: POLYMARKET_CONTRACTS.usdcE as `0x${string}`,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [(deployedAddress ?? effectiveSafeAddress) as `0x${string}`],
-        });
+        const [balanceUsdcE, balanceUsdc] = await Promise.all([
+          publicClient.readContract({
+            address: POLYMARKET_CONTRACTS.usdcE as `0x${string}`,
+            abi: erc20Abi,
+            functionName: 'balanceOf',
+            args: [toHexAddress(deployedAddress ?? effectiveSafeAddress)],
+          }),
+          publicClient.readContract({
+            address: POLYMARKET_CONTRACTS.usdc as `0x${string}`,
+            abi: erc20Abi,
+            functionName: 'balanceOf',
+            args: [toHexAddress(deployedAddress ?? effectiveSafeAddress)],
+          }),
+        ]);
 
         if (cancelled) return;
-        setSafeBalance(balance);
-        setSafeFunded(balance > BigInt(0));
+        setSafeBalanceUsdcE(balanceUsdcE);
+        setSafeBalanceUsdc(balanceUsdc);
+        setSafeFunded(balanceUsdcE > BigInt(0));
         console.log('[profile] safe balance', {
           address: deployedAddress ?? effectiveSafeAddress,
-          balance: balance.toString(),
+          balanceUsdcE: balanceUsdcE.toString(),
+          balanceUsdc: balanceUsdc.toString(),
         });
         setStatus('idle');
       } catch (err) {
@@ -348,11 +360,12 @@ export default function ProfilePage() {
 
     setStatus('funding-safe');
     try {
+      const safeAddressHex = toHexAddress(effectiveSafeAddress);
       await walletClient.writeContract({
         address: POLYMARKET_CONTRACTS.usdcE,
         abi: erc20Abi,
         functionName: 'transfer',
-        args: [effectiveSafeAddress as `0x${string}`, parseUnits(trimmed, 6)],
+        args: [safeAddressHex, parseUnits(trimmed, 6)],
       });
       setStatus('idle');
     } catch (err) {
@@ -475,8 +488,14 @@ export default function ProfilePage() {
                   Safe balance (uncommitted)
                 </div>
                 <div className="mt-2 text-2xl font-semibold">
-                  {safeBalanceDisplay} <span className="text-base text-muted-foreground">USDC.e</span>
+                  {safeBalanceDisplay}{' '}
+                  <span className="text-base text-muted-foreground">USDC.e</span>
                 </div>
+                {safeBalanceUsdc !== null && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    USDC (native): {formatUnits(safeBalanceUsdc, 6)}
+                  </div>
+                )}
               </div>
               <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">In markets</div>
@@ -701,9 +720,14 @@ export default function ProfilePage() {
                           <CopyableAddress address={effectiveSafeAddress} variant="inline" />
                         </span>
                       )}
-                      {safeBalance !== null && (
+                      {safeBalanceUsdcE !== null && (
                         <span className="text-xs text-muted-foreground">
-                          Balance: {formatUnits(safeBalance, 6)} USDC.e
+                          Balance: {formatUnits(safeBalanceUsdcE, 6)} USDC.e
+                        </span>
+                      )}
+                      {safeBalanceUsdc !== null && (
+                        <span className="text-xs text-muted-foreground">
+                          USDC (native): {formatUnits(safeBalanceUsdc, 6)}
                         </span>
                       )}
                       <span className="text-xs text-muted-foreground">
@@ -734,4 +758,12 @@ export default function ProfilePage() {
       </main>
     </div>
   );
+}
+
+function toHexAddress(value: string | null | undefined): `0x${string}` {
+  if (!value || !/^0x[a-fA-F0-9]{40}$/.test(value)) {
+    throw new Error('Invalid address');
+  }
+  // TODO: Add a shared branded Address type helper so regex guards narrow automatically.
+  return value as `0x${string}`;
 }

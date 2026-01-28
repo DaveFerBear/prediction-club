@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { BuilderConfig } from '@polymarket/builder-signing-sdk';
 import { ClobClient } from '@polymarket/clob-client';
-import { VoidSigner } from '@ethersproject/abstract-signer';
 import { prisma } from '@prediction-club/db';
 import { apiResponse, apiError, validationError, unauthorizedError, serverError } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
@@ -61,11 +60,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const signer = new VoidSigner(dbUser.walletAddress);
     const clobClient = new ClobClient(
       POLYMARKET_CLOB_URL,
       POLYMARKET_CHAIN_ID,
-      signer,
+      undefined,
       {
         key: dbUser.polymarketApiKeyId,
         secret: dbUser.polymarketApiSecret,

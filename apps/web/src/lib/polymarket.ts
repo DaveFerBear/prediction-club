@@ -5,6 +5,7 @@ export const POLYMARKET_RELAYER_URL = 'https://relayer-v2.polymarket.com/';
 export const POLYMARKET_CLOB_URL = 'https://clob.polymarket.com';
 
 export const POLYMARKET_CONTRACTS = {
+  usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
   usdcE: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
   ctf: '0x4d97dcd97ec945f40cf65f87097ace5ea0476045',
   ctfExchange: '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',

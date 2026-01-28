@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@prediction-club/db';
-import { apiResponse, apiError, validationError, unauthorizedError, serverError } from '@/lib/api';
+import { apiResponse, apiError, validationError, unauthorizedError } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
 
 const credsSchema = z.object({

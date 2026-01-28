@@ -16,7 +16,7 @@
     "@prediction-club/db": "*",
     "@prediction-club/shared": "*",
     "dotenv": "^17.2.3",
-    "viem": "^2.21.0",
+    "viem": "^2.38.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

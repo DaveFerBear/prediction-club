@@ -11,10 +11,11 @@ export function usePolymarketSafe() {
   const { relayClient } = usePolymarketRelayClient();
   const [isDeploying, setIsDeploying] = useState(false);
 
-  const safeAddress = useMemo(() => {
+  const safeAddress = useMemo<`0x${string}` | null>(() => {
     if (!address) return null;
     const config = getContractConfig(POLYMARKET_CHAIN_ID);
-    return deriveSafe(address, config.SafeContracts.SafeFactory);
+    const derived = deriveSafe(address, config.SafeContracts.SafeFactory);
+    return isHexAddress(derived) ? derived : null;
   }, [address]);
 
   const isSafeDeployed = useCallback(async () => {
@@ -49,4 +50,8 @@ export function usePolymarketSafe() {
     isSafeDeployed,
     deploySafe,
   };
+}
+
+function isHexAddress(value: string): value is `0x${string}` {
+  return /^0x[a-fA-F0-9]{40}$/.test(value);
 }
