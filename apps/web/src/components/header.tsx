@@ -3,11 +3,13 @@
 import { useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@prediction-club/ui';
+import { useAccount } from 'wagmi';
 import { ConnectButton } from './connect-button';
 import { Logo } from './logo';
 
 export function Header() {
   const logoRef = useRef<SVGSVGElement | null>(null);
+  const { address, isConnected } = useAccount();
 
   const handleLogoEnter = () => {
     const el = logoRef.current;
@@ -43,6 +45,11 @@ export function Header() {
               <Button variant="ghost">Find a club</Button>
             </Link>
           </div>
+          {isConnected && address && (
+            <span className="hidden rounded-md border border-input px-2 py-1 text-xs font-mono text-muted-foreground sm:inline-flex">
+              {address.slice(0, 6)}...{address.slice(-4)}
+            </span>
+          )}
           <ConnectButton />
         </nav>
       </div>

@@ -17,7 +17,8 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { ActiveCheckList, ActiveCheckListItem } from '@/components/active-check-list';
-import { POLYMARKET_CHAIN_ID, POLYMARKET_CLOB_URL } from '@/lib/polymarket';
+import { CopyableAddress } from '@/components/copyable-address';
+import { POLYMARKET_CHAIN_ID, POLYMARKET_CLOB_URL, POLYMARKET_CONTRACTS } from '@/lib/polymarket';
 import { usePolymarketApprovals, usePolymarketCreds, usePolymarketSafe } from '@/hooks';
 
 type SetupStatus =
@@ -64,6 +65,7 @@ export default function ProfilePage() {
   const [safeReady, setSafeReady] = useState(false);
   const [approvalsReady, setApprovalsReady] = useState(false);
   const [credsSaved, setCredsSaved] = useState(false);
+  const [safeFunded, setSafeFunded] = useState(false);
 
   const connectComplete = isConnected && chainId === POLYMARKET_CHAIN_ID && !!walletClient;
   const completedSteps = [
@@ -71,9 +73,10 @@ export default function ProfilePage() {
     !!creds,
     safeReady,
     approvalsReady,
+    safeFunded,
     credsSaved,
   ].filter(Boolean).length;
-  const progressValue = step === 1 ? 0 : Math.min(100, Math.round((completedSteps / 5) * 100));
+  const progressValue = step === 1 ? 0 : Math.min(100, Math.round((completedSteps / 6) * 100));
 
   const statusMessage = (() => {
     switch (status) {
@@ -445,6 +448,39 @@ export default function ProfilePage() {
                         disabled={!approvalsComplete || credsSaved || status === 'saving-creds'}
                       >
                         {status === 'saving-creds' ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
+                  </ActiveCheckListItem>
+
+                  <ActiveCheckListItem
+                    active={safeComplete}
+                    status={safeFunded ? 'complete' : 'idle'}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                        6
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">Fund Safe (USDC.e)</span>
+                        {safeAddress && (
+                          <span className="text-xs text-muted-foreground">
+                            Send USDC.e to <CopyableAddress address={safeAddress} variant="inline" />
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          USDC.e: <CopyableAddress address={POLYMARKET_CONTRACTS.usdcE} variant="inline" />
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSafeFunded(true)}
+                        disabled={!safeComplete || safeFunded}
+                      >
+                        {safeFunded ? 'Funded' : 'Mark funded'}
                       </Button>
                     </div>
                   </ActiveCheckListItem>
