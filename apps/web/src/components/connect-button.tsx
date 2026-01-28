@@ -52,6 +52,11 @@ export function ConnectButton() {
                   Find a club
                 </Button>
               </Link>
+              <Link href="/markets">
+                <Button variant="ghost" size="sm" className="w-full justify-start">
+                  Markets
+                </Button>
+              </Link>
               <Link href="/clubs/create">
                 <Button variant="ghost" size="sm" className="w-full justify-start">
                   Create a club

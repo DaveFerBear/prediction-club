@@ -44,6 +44,9 @@ export function Header() {
             <Link href="/clubs">
               <Button variant="ghost">Find a club</Button>
             </Link>
+            <Link href="/markets">
+              <Button variant="ghost">Markets</Button>
+            </Link>
           </div>
           {isConnected && address && (
             <span className="hidden rounded-md border border-input px-2 py-1 text-xs font-mono text-muted-foreground sm:inline-flex">
