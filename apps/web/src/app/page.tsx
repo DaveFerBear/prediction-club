@@ -15,8 +15,8 @@ export default function HomePage() {
               Trade Predictions Together
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
-              Form prediction clubs, pool capital, and trade on Polymarket together. Built on
-              Polygon.
+              Create, discover, and join prediction clubs to trade on Polymarket together. Everyone
+              keeps custody in their own Safe.
             </p>
             <div className="mt-10 flex items-center justify-center gap-4">
               <Link href="/clubs/create">
@@ -36,23 +36,21 @@ export default function HomePage() {
           <div className="container py-24">
             <div className="grid gap-8 md:grid-cols-3">
               <div className="rounded-lg border bg-card p-6">
-                <h3 className="text-lg font-semibold">Pooled Capital</h3>
+                <h3 className="text-lg font-semibold">Self-Custody by Default</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Members fund their own Polymarket wallets and trade as a coordinated club.
+                  Every member funds their own Safe. Clubs coordinate without pooling funds onchain.
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-6">
-                <h3 className="text-lg font-semibold">Predictions</h3>
+                <h3 className="text-lg font-semibold">Polymarket-Native</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Create predictions for each market. Automatic participation for eligible members.
-                  Transparent PnL tracking.
+                  Built on Polymarket APIs with relayer execution.
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-6">
-                <h3 className="text-lg font-semibold">Gasless Execution</h3>
+                <h3 className="text-lg font-semibold">Clear Participation</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Trades use Polymarket’s relayer, so users avoid gas fees while still signing
-                  orders.
+                  Per-market predictions, opt-in visibility, and clean PnL tracking.
                 </p>
               </div>
             </div>
