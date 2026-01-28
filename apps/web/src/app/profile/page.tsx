@@ -11,7 +11,7 @@ import {
   useSwitchChain,
   useWalletClient,
 } from 'wagmi';
-import { erc20Abi, formatUnits, type WalletClient } from 'viem';
+import { erc20Abi, formatUnits, parseUnits, type WalletClient } from 'viem';
 import { injected } from 'wagmi/connectors';
 import { useSession } from 'next-auth/react';
 import {
@@ -43,6 +43,7 @@ type SetupStatus =
   | 'deriving-creds'
   | 'saving-creds'
   | 'deploying-safe'
+  | 'funding-safe'
   | 'checking-approvals'
   | 'approving'
   | 'success'
@@ -102,6 +103,9 @@ export default function ProfilePage() {
   const isAuthenticated = !!sessionAddress && sessionAddress === walletAddress;
   const effectiveSafeAddress = safeAddressOverride ?? safeAddress;
   const credsReady = !!creds || credsSaved;
+  const safeBalanceDisplay = formatUnits(safeBalance ?? BigInt(0), 6);
+  // TODO: Fetch market-committed balance via relayer API.
+  const marketBalanceDisplay = '0';
   const completedSteps = [
     connectComplete,
     credsReady,
@@ -126,6 +130,8 @@ export default function ProfilePage() {
         return 'Saving credentials to server...';
       case 'deploying-safe':
         return 'Deploying Safe...';
+      case 'funding-safe':
+        return 'Funding Safe...';
       case 'checking-approvals':
         return 'Checking approvals...';
       case 'approving':
@@ -323,6 +329,38 @@ export default function ProfilePage() {
     return true;
   };
 
+  const handleFundSafe = async () => {
+    const ok = await ensureConnected();
+    if (!ok) return;
+    if (!walletClient || !effectiveSafeAddress) {
+      setError('Safe address not available');
+      setStatus('error');
+      return;
+    }
+    const input = window.prompt('Amount of USDC.e to send', '5');
+    if (!input) return;
+    const trimmed = input.trim();
+    if (!/^\d+(\.\d{1,6})?$/.test(trimmed)) {
+      setError('Invalid amount');
+      setStatus('error');
+      return;
+    }
+
+    setStatus('funding-safe');
+    try {
+      await walletClient.writeContract({
+        address: POLYMARKET_CONTRACTS.usdcE,
+        abi: erc20Abi,
+        functionName: 'transfer',
+        args: [effectiveSafeAddress as `0x${string}`, parseUnits(trimmed, 6)],
+      });
+      setStatus('idle');
+    } catch (err) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'Failed to fund Safe');
+    }
+  };
+
   const handleDeriveCreds = async () => {
     const ok = await ensureConnected();
     if (!ok || !signer) return;
@@ -425,6 +463,32 @@ export default function ProfilePage() {
           <p className="text-muted-foreground">Set up Polymarket access to trade with your club.</p>
         </div>
 
+        <Card className="mb-6 max-w-2xl">
+          <CardHeader>
+            <CardTitle>Balances</CardTitle>
+            <CardDescription>Track funds held in the Safe vs markets.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Safe balance (uncommitted)
+                </div>
+                <div className="mt-2 text-2xl font-semibold">
+                  {safeBalanceDisplay} <span className="text-base text-muted-foreground">USDC.e</span>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">In markets</div>
+                <div className="mt-2 text-2xl font-semibold">
+                  {marketBalanceDisplay}{' '}
+                  <span className="text-base text-muted-foreground">USDC.e</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="max-w-2xl">
           <CardHeader>
             <Progress value={progressValue} className="mb-4" />
@@ -440,7 +504,7 @@ export default function ProfilePage() {
               )}
 
               {error && (
-                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                <div className="break-words rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
@@ -648,11 +712,25 @@ export default function ProfilePage() {
                       </span>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {!safeFunded && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleFundSafe}
+                        disabled={!safeComplete || status === 'funding-safe'}
+                      >
+                        {status === 'funding-safe' ? 'Funding...' : 'Fund'}
+                      </Button>
+                    )}
+                  </div>
                 </ActiveCheckListItem>
               </ActiveCheckList>
             </div>
           </CardContent>
         </Card>
+
       </main>
     </div>
   );
