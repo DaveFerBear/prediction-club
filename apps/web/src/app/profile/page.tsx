@@ -185,7 +185,6 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!effectiveSafeAddress || !publicClient) return;
-    if (safeReady && approvalsReady && safeBalance !== null) return;
     let cancelled = false;
 
     const runCheck = async () => {
@@ -287,15 +286,7 @@ export default function ProfilePage() {
         retryTimeoutRef.current = null;
       }
     };
-  }, [
-    checkApprovals,
-    checkSafeDeployed,
-    effectiveSafeAddress,
-    publicClient,
-    safeBalance,
-    safeReady,
-    approvalsReady,
-  ]);
+  }, [checkApprovals, checkSafeDeployed, effectiveSafeAddress, publicClient]);
   const ensureConnected = async () => {
     setError(null);
     if (!isConnected) {
