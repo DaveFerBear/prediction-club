@@ -5,6 +5,7 @@ export { usePolymarketSafe } from './use-polymarket-safe';
 export { usePolymarketApprovals } from './use-polymarket-approvals';
 export { usePolymarketCreds } from './use-polymarket-creds';
 export { usePolymarketOrders } from './use-polymarket-orders';
+export { useSiweSignIn } from './use-siwe-signin';
 export {
   useClubs,
   useClub,

@@ -2,13 +2,20 @@
 
 import Link from 'next/link';
 import { Button, Popover, PopoverTrigger, PopoverContent } from '@prediction-club/ui';
+import { useSession } from 'next-auth/react';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
+import { useSiweSignIn } from '@/hooks';
 
 export function ConnectButton() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
+  const { data: session, status: sessionStatus } = useSession();
+  const { signInWithSiwe, isSigningIn } = useSiweSignIn();
   const { connect, isPending } = useConnect();
   const { disconnect } = useDisconnect();
+  const sessionAddress = session?.address?.toLowerCase() ?? null;
+  const walletAddress = address?.toLowerCase() ?? null;
+  const isAuthenticated = !!sessionAddress && sessionAddress === walletAddress;
 
   return (
     <div className="flex items-center gap-2">
@@ -58,14 +65,27 @@ export function ConnectButton() {
                 </Button>
               </Link>
               {isConnected ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start"
-                  onClick={() => disconnect()}
-                >
-                  Disconnect wallet
-                </Button>
+                <>
+                  {!isAuthenticated && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => signInWithSiwe()}
+                      disabled={isSigningIn || sessionStatus === 'loading'}
+                    >
+                      {isSigningIn ? 'Signing in...' : 'Sign in'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => disconnect()}
+                  >
+                    Disconnect wallet
+                  </Button>
+                </>
               ) : (
                 <Button
                   variant="ghost"

@@ -1,11 +1,17 @@
 import { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { prisma } from '@prediction-club/db';
 
 /**
- * Get the wallet address from the request header
+ * Get the wallet address from the auth session
  */
-export function getWalletAddress(request: NextRequest): string | null {
-  return request.headers.get('x-wallet-address');
+export async function getWalletAddress(request: NextRequest): Promise<string | null> {
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+
+  return token?.sub ?? null;
 }
 
 /**
@@ -31,7 +37,7 @@ export async function getOrCreateUser(walletAddress: string) {
  * Get the current user from request, returns null if not authenticated
  */
 export async function getCurrentUser(request: NextRequest) {
-  const walletAddress = getWalletAddress(request);
+  const walletAddress = await getWalletAddress(request);
 
   if (!walletAddress) {
     return null;
