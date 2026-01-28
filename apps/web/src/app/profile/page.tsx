@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Web3Provider, type ExternalProvider } from '@ethersproject/providers';
 import { ClobClient } from '@polymarket/clob-client';
 import {
@@ -77,7 +77,7 @@ export default function ProfilePage() {
   const { fetch } = useApi();
 
   const { saveCreds } = usePolymarketCreds();
-  const { safeAddress, deploySafe, isSafeDeployed } = usePolymarketSafe();
+  const { safeAddress, deploySafe } = usePolymarketSafe();
   const { checkApprovals, approveAll } = usePolymarketApprovals();
 
   const [step] = useState<1 | 2>(2);
@@ -87,12 +87,13 @@ export default function ProfilePage() {
   const [safeReady, setSafeReady] = useState(false);
   const [approvalsReady, setApprovalsReady] = useState(false);
   const [credsSaved, setCredsSaved] = useState(false);
-  const [safeChecked, setSafeChecked] = useState(false);
-  const [approvalsChecked, setApprovalsChecked] = useState(false);
   const [safeFunded, setSafeFunded] = useState(false);
   const [safeBalance, setSafeBalance] = useState<bigint | null>(null);
   const [credsChecked, setCredsChecked] = useState(false);
   const [safeAddressOverride, setSafeAddressOverride] = useState<string | null>(null);
+  const lastChainCheckRef = useRef(0);
+  const chainCheckInFlightRef = useRef(false);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const chainReady = chainId === POLYMARKET_CHAIN_ID && !!walletClient;
   const connectComplete = isConnected;
@@ -139,6 +140,15 @@ export default function ProfilePage() {
   const safeComplete = safeReady;
   const approvalsComplete = approvalsReady;
 
+  const checkSafeDeployed = useCallback(
+    async (targetAddress: string) => {
+      if (!publicClient) return false;
+      const code = await publicClient.getBytecode({ address: targetAddress as `0x${string}` });
+      return !!code && code !== '0x';
+    },
+    [publicClient]
+  );
+
   useEffect(() => {
     if (!isAuthenticated || credsChecked) return;
     let cancelled = false;
@@ -174,112 +184,118 @@ export default function ProfilePage() {
   }, [credsChecked, fetch, isAuthenticated]);
 
   useEffect(() => {
-    if (!connectComplete || !effectiveSafeAddress || safeReady || safeChecked || status !== 'idle')
-      return;
+    if (!effectiveSafeAddress || !publicClient) return;
+    if (safeReady && approvalsReady && safeBalance !== null) return;
     let cancelled = false;
 
     const runCheck = async () => {
+      if (chainCheckInFlightRef.current) return;
+      if (status === 'deploying-safe') return;
+      const now = Date.now();
+      if (now - lastChainCheckRef.current < 15000) return;
+      lastChainCheckRef.current = now;
+      chainCheckInFlightRef.current = true;
       setStatus('checking-approvals');
+      console.log('[profile] safe check start', {
+        effectiveSafeAddress,
+        derivedSafeAddress: safeAddress,
+        status,
+      });
       try {
-        const deployed = await isSafeDeployed();
-        if (cancelled) return;
-        if (deployed) {
-          setSafeReady(true);
-        } else if (safeAddressOverride && safeAddressOverride !== safeAddress) {
-          const code = await publicClient?.getBytecode({
-            address: safeAddressOverride as `0x${string}`,
+        let deployed = await checkSafeDeployed(effectiveSafeAddress);
+        let deployedAddress: string | null = deployed ? effectiveSafeAddress : null;
+        console.log('[profile] effective safe deployed', {
+          deployed,
+          address: effectiveSafeAddress,
+        });
+        if (!deployed && safeAddress && safeAddress !== effectiveSafeAddress) {
+          const derivedDeployed = await checkSafeDeployed(safeAddress);
+          console.log('[profile] derived safe deployed', {
+            deployed: derivedDeployed,
+            address: safeAddress,
           });
-          if (!cancelled && code && code !== '0x') {
-            setSafeReady(true);
+          if (derivedDeployed) {
+            deployed = true;
+            deployedAddress = safeAddress;
+            setSafeAddressOverride(safeAddress);
+            try {
+              await fetch('/api/polymarket/creds', {
+                method: 'POST',
+                body: JSON.stringify({ safeAddress }),
+              });
+            } catch {
+              // best-effort persistence
+            }
           }
-        } else {
-          setSafeReady(false);
         }
-        setSafeChecked(true);
+        if (cancelled) return;
+        setSafeReady(deployed);
+
+        if (deployed) {
+          const targetAddress = (deployedAddress ?? effectiveSafeAddress) as `0x${string}`;
+          const approvalStatus = await checkApprovals(targetAddress);
+          if (cancelled) return;
+          setApprovalsReady(approvalStatus.allApproved);
+          console.log('[profile] approvals checked', {
+            address: targetAddress,
+            allApproved: approvalStatus.allApproved,
+          });
+        } else {
+          setApprovalsReady(false);
+          if (!cancelled) {
+            if (retryTimeoutRef.current) {
+              clearTimeout(retryTimeoutRef.current);
+            }
+            retryTimeoutRef.current = setTimeout(() => {
+              if (cancelled) return;
+              lastChainCheckRef.current = 0;
+              runCheck();
+            }, 20000);
+          }
+        }
+
+        const balance = await publicClient.readContract({
+          address: POLYMARKET_CONTRACTS.usdcE as `0x${string}`,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [(deployedAddress ?? effectiveSafeAddress) as `0x${string}`],
+        });
+
+        if (cancelled) return;
+        setSafeBalance(balance);
+        setSafeFunded(balance > BigInt(0));
+        console.log('[profile] safe balance', {
+          address: deployedAddress ?? effectiveSafeAddress,
+          balance: balance.toString(),
+        });
         setStatus('idle');
       } catch (err) {
         if (cancelled) return;
         setStatus('error');
         setError(err instanceof Error ? err.message : 'Failed to check Safe');
+        console.log('[profile] safe check error', err);
+      } finally {
+        chainCheckInFlightRef.current = false;
       }
     };
 
     runCheck();
     return () => {
       cancelled = true;
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
     };
   }, [
-    connectComplete,
+    checkApprovals,
+    checkSafeDeployed,
     effectiveSafeAddress,
-    safeAddress,
-    safeAddressOverride,
-    safeReady,
-    safeChecked,
-    status,
-    isSafeDeployed,
     publicClient,
+    safeBalance,
+    safeReady,
+    approvalsReady,
   ]);
-
-  useEffect(() => {
-    if (
-      !safeReady ||
-      !effectiveSafeAddress ||
-      approvalsReady ||
-      approvalsChecked ||
-      status !== 'idle'
-    )
-      return;
-    let cancelled = false;
-
-    const runCheck = async () => {
-      setStatus('checking-approvals');
-      try {
-        const approvalStatus = await checkApprovals(effectiveSafeAddress as `0x${string}`);
-        if (cancelled) return;
-        setApprovalsReady(approvalStatus.allApproved);
-        setApprovalsChecked(true);
-        setStatus('idle');
-      } catch (err) {
-        if (cancelled) return;
-        setStatus('error');
-        setError(err instanceof Error ? err.message : 'Failed to check approvals');
-      }
-    };
-
-    runCheck();
-    return () => {
-      cancelled = true;
-    };
-  }, [safeReady, effectiveSafeAddress, approvalsReady, approvalsChecked, status, checkApprovals]);
-
-  useEffect(() => {
-    if (!effectiveSafeAddress || !publicClient) return;
-    let cancelled = false;
-
-    const runCheck = async () => {
-      try {
-        const balance = await publicClient.readContract({
-          address: POLYMARKET_CONTRACTS.usdcE as `0x${string}`,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [effectiveSafeAddress as `0x${string}`],
-        });
-
-        if (cancelled) return;
-        setSafeBalance(balance);
-        if (balance > BigInt(0)) {
-          setSafeFunded(true);
-        }
-      } catch {
-        if (cancelled) return;
-      }
-    };
-
-    runCheck();
-    return () => {
-      cancelled = true;
-    };
-  }, [publicClient, effectiveSafeAddress]);
   const ensureConnected = async () => {
     setError(null);
     if (!isConnected) {
@@ -641,7 +657,6 @@ export default function ProfilePage() {
                   </div>
                 </ActiveCheckListItem>
               </ActiveCheckList>
-
             </div>
           </CardContent>
         </Card>
