@@ -15,9 +15,11 @@ const saveCredsSchema = z.union([
     creds: credsSchema,
     safeAddress: z.string().optional(),
   }),
-  z.object({
-    safeAddress: z.string().optional(),
-  }).merge(credsSchema),
+  z
+    .object({
+      safeAddress: z.string().optional(),
+    })
+    .merge(credsSchema),
 ]);
 
 /**
@@ -35,8 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { safeAddress } = parsed.data;
-    const creds =
-      'creds' in parsed.data ? parsed.data.creds : parsed.data;
+    const creds = 'creds' in parsed.data ? parsed.data.creds : parsed.data;
 
     await prisma.user.update({
       where: { id: user.id },
@@ -55,5 +56,41 @@ export async function POST(request: NextRequest) {
     }
     console.error('Error saving Polymarket creds:', error);
     return apiError('POLYMARKET_CREDS_ERROR', 'Failed to save Polymarket credentials', 500);
+  }
+}
+
+/**
+ * GET /api/polymarket/creds
+ * Check if Polymarket API credentials exist for the current user
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const user = await requireAuth(request);
+    const record = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        polymarketApiKeyId: true,
+        polymarketApiSecret: true,
+        polymarketApiPassphrase: true,
+        polymarketSafeAddress: true,
+      },
+    });
+
+    const hasCreds = !!(
+      record?.polymarketApiKeyId &&
+      record?.polymarketApiSecret &&
+      record?.polymarketApiPassphrase
+    );
+
+    return apiResponse({
+      hasCreds,
+      safeAddress: record?.polymarketSafeAddress ?? null,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return unauthorizedError(error.message);
+    }
+    console.error('Error checking Polymarket creds:', error);
+    return apiError('POLYMARKET_CREDS_ERROR', 'Failed to check Polymarket credentials', 500);
   }
 }

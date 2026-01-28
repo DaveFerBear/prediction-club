@@ -1,11 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Web3Provider, type ExternalProvider } from '@ethersproject/providers';
 import { ClobClient } from '@polymarket/clob-client';
-import { useAccount, useChainId, useConnect, useSwitchChain, useWalletClient } from 'wagmi';
-import type { WalletClient } from 'viem';
+import {
+  useAccount,
+  useChainId,
+  useConnect,
+  usePublicClient,
+  useSwitchChain,
+  useWalletClient,
+} from 'wagmi';
+import { erc20Abi, formatUnits, type WalletClient } from 'viem';
 import { injected } from 'wagmi/connectors';
 import { useSession } from 'next-auth/react';
 import {
@@ -21,7 +27,13 @@ import { Header } from '@/components/header';
 import { ActiveCheckList, ActiveCheckListItem } from '@/components/active-check-list';
 import { CopyableAddress } from '@/components/copyable-address';
 import { POLYMARKET_CHAIN_ID, POLYMARKET_CLOB_URL, POLYMARKET_CONTRACTS } from '@/lib/polymarket';
-import { usePolymarketApprovals, usePolymarketCreds, usePolymarketSafe, useSiweSignIn } from '@/hooks';
+import {
+  useApi,
+  usePolymarketApprovals,
+  usePolymarketCreds,
+  usePolymarketSafe,
+  useSiweSignIn,
+} from '@/hooks';
 
 type SetupStatus =
   | 'idle'
@@ -53,7 +65,6 @@ function walletClientToSigner(walletClient?: WalletClientWithAccount | null) {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { connect, isPending: isConnecting } = useConnect();
@@ -62,12 +73,14 @@ export default function ProfilePage() {
   const signer = useMemo(() => walletClientToSigner(walletClient), [walletClient]);
   const { data: session, status: sessionStatus } = useSession();
   const { signInWithSiwe } = useSiweSignIn();
+  const publicClient = usePublicClient({ chainId: POLYMARKET_CHAIN_ID });
+  const { fetch } = useApi();
 
-  const { saveCreds, isSaving } = usePolymarketCreds();
-  const { safeAddress, deploySafe, isDeploying, isSafeDeployed } = usePolymarketSafe();
-  const { checkApprovals, approveAll, isApproving } = usePolymarketApprovals();
+  const { saveCreds } = usePolymarketCreds();
+  const { safeAddress, deploySafe, isSafeDeployed } = usePolymarketSafe();
+  const { checkApprovals, approveAll } = usePolymarketApprovals();
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step] = useState<1 | 2>(2);
   const [status, setStatus] = useState<SetupStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [creds, setCreds] = useState<ApiCreds | null>(null);
@@ -77,15 +90,20 @@ export default function ProfilePage() {
   const [safeChecked, setSafeChecked] = useState(false);
   const [approvalsChecked, setApprovalsChecked] = useState(false);
   const [safeFunded, setSafeFunded] = useState(false);
+  const [safeBalance, setSafeBalance] = useState<bigint | null>(null);
+  const [credsChecked, setCredsChecked] = useState(false);
+  const [safeAddressOverride, setSafeAddressOverride] = useState<string | null>(null);
 
   const chainReady = chainId === POLYMARKET_CHAIN_ID && !!walletClient;
   const connectComplete = isConnected;
   const sessionAddress = session?.address?.toLowerCase() ?? null;
   const walletAddress = address?.toLowerCase() ?? null;
   const isAuthenticated = !!sessionAddress && sessionAddress === walletAddress;
+  const effectiveSafeAddress = safeAddressOverride ?? safeAddress;
+  const credsReady = !!creds || credsSaved;
   const completedSteps = [
     connectComplete,
-    !!creds,
+    credsReady,
     safeReady,
     approvalsReady,
     safeFunded,
@@ -122,7 +140,42 @@ export default function ProfilePage() {
   const approvalsComplete = approvalsReady;
 
   useEffect(() => {
-    if (!connectComplete || !safeAddress || safeReady || safeChecked || status !== 'idle') return;
+    if (!isAuthenticated || credsChecked) return;
+    let cancelled = false;
+
+    const runCheck = async () => {
+      try {
+        const response = await fetch<{
+          success: boolean;
+          data?: { hasCreds: boolean; safeAddress: string | null };
+        }>('/api/polymarket/creds');
+
+        if (cancelled) return;
+        if (response?.success && response.data?.hasCreds) {
+          setCredsSaved(true);
+          setCreds({ key: 'saved', secret: 'saved', passphrase: 'saved' });
+        }
+        if (response?.success && response.data?.safeAddress) {
+          setSafeAddressOverride(response.data.safeAddress);
+        }
+      } catch {
+        if (cancelled) return;
+      } finally {
+        if (!cancelled) {
+          setCredsChecked(true);
+        }
+      }
+    };
+
+    runCheck();
+    return () => {
+      cancelled = true;
+    };
+  }, [credsChecked, fetch, isAuthenticated]);
+
+  useEffect(() => {
+    if (!connectComplete || !effectiveSafeAddress || safeReady || safeChecked || status !== 'idle')
+      return;
     let cancelled = false;
 
     const runCheck = async () => {
@@ -130,7 +183,18 @@ export default function ProfilePage() {
       try {
         const deployed = await isSafeDeployed();
         if (cancelled) return;
-        setSafeReady(deployed);
+        if (deployed) {
+          setSafeReady(true);
+        } else if (safeAddressOverride && safeAddressOverride !== safeAddress) {
+          const code = await publicClient?.getBytecode({
+            address: safeAddressOverride as `0x${string}`,
+          });
+          if (!cancelled && code && code !== '0x') {
+            setSafeReady(true);
+          }
+        } else {
+          setSafeReady(false);
+        }
         setSafeChecked(true);
         setStatus('idle');
       } catch (err) {
@@ -144,17 +208,33 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [connectComplete, safeAddress, safeReady, safeChecked, status, isSafeDeployed]);
+  }, [
+    connectComplete,
+    effectiveSafeAddress,
+    safeAddress,
+    safeAddressOverride,
+    safeReady,
+    safeChecked,
+    status,
+    isSafeDeployed,
+    publicClient,
+  ]);
 
   useEffect(() => {
-    if (!safeReady || !safeAddress || approvalsReady || approvalsChecked || status !== 'idle')
+    if (
+      !safeReady ||
+      !effectiveSafeAddress ||
+      approvalsReady ||
+      approvalsChecked ||
+      status !== 'idle'
+    )
       return;
     let cancelled = false;
 
     const runCheck = async () => {
       setStatus('checking-approvals');
       try {
-        const approvalStatus = await checkApprovals(safeAddress as `0x${string}`);
+        const approvalStatus = await checkApprovals(effectiveSafeAddress as `0x${string}`);
         if (cancelled) return;
         setApprovalsReady(approvalStatus.allApproved);
         setApprovalsChecked(true);
@@ -170,7 +250,36 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [safeReady, safeAddress, approvalsReady, approvalsChecked, status, checkApprovals]);
+  }, [safeReady, effectiveSafeAddress, approvalsReady, approvalsChecked, status, checkApprovals]);
+
+  useEffect(() => {
+    if (!effectiveSafeAddress || !publicClient) return;
+    let cancelled = false;
+
+    const runCheck = async () => {
+      try {
+        const balance = await publicClient.readContract({
+          address: POLYMARKET_CONTRACTS.usdcE as `0x${string}`,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [effectiveSafeAddress as `0x${string}`],
+        });
+
+        if (cancelled) return;
+        setSafeBalance(balance);
+        if (balance > BigInt(0)) {
+          setSafeFunded(true);
+        }
+      } catch {
+        if (cancelled) return;
+      }
+    };
+
+    runCheck();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicClient, effectiveSafeAddress]);
   const ensureConnected = async () => {
     setError(null);
     if (!isConnected) {
@@ -237,6 +346,15 @@ export default function ProfilePage() {
         throw new Error('Safe address not available');
       }
       setSafeReady(true);
+      setSafeAddressOverride(deployedSafe);
+      try {
+        await fetch('/api/polymarket/creds', {
+          method: 'POST',
+          body: JSON.stringify({ safeAddress: deployedSafe }),
+        });
+      } catch {
+        // best-effort persistence
+      }
       setStatus('idle');
     } catch (err) {
       setStatus('error');
@@ -303,280 +421,228 @@ export default function ProfilePage() {
         <Card className="max-w-2xl">
           <CardHeader>
             <Progress value={progressValue} className="mb-4" />
-            <CardTitle>{step === 1 ? 'Get Ready' : 'Initialize Polymarket'}</CardTitle>
-            <CardDescription>
-              {step === 1
-                ? 'We will connect your wallet, derive API credentials, deploy a Safe, and set approvals.'
-                : 'Follow the steps below to finish your setup.'}
-            </CardDescription>
+            <CardTitle>Initialize Polymarket</CardTitle>
+            <CardDescription>Follow the steps below to finish your setup.</CardDescription>
           </CardHeader>
           <CardContent>
-            {step === 1 ? (
-              <div className="space-y-6">
-                <div className="text-sm text-muted-foreground">
-                  This flow uses your wallet to create Polymarket API credentials, deploys a Safe
-                  through the relayer, and approves trading contracts.
+            <div className="space-y-6">
+              {statusMessage && (
+                <div className="rounded-md bg-blue-500/10 p-3 text-sm text-blue-600">
+                  {statusMessage}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => router.back()}
-                  >
-                    Back
-                  </Button>
-                  <Button type="button" className="flex-1" onClick={() => setStep(2)}>
-                    Start setup
-                  </Button>
+              )}
+
+              {error && (
+                <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                  {error}
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {statusMessage && (
-                  <div className="rounded-md bg-blue-500/10 p-3 text-sm text-blue-600">
-                    {statusMessage}
-                  </div>
-                )}
+              )}
 
-                {error && (
-                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                    {error}
-                  </div>
-                )}
-
-                <ActiveCheckList>
-                  <ActiveCheckListItem
-                    active
-                    status={
-                      connectComplete
-                        ? 'complete'
-                        : isConnecting || isSwitching
-                          ? 'in-progress'
-                          : 'idle'
-                    }
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                        1
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="font-medium">Connect wallet</span>
-                        {address && (
-                          <span className="text-xs text-muted-foreground">{address}</span>
-                        )}
-                        {isConnected && !chainReady && (
-                          <span className="text-xs text-muted-foreground">
-                            Switch to Polygon to continue
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!isConnected && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            connect({ connector: injected(), chainId: POLYMARKET_CHAIN_ID })
-                          }
-                          disabled={isConnecting || isSwitching}
-                        >
-                          {isConnecting || isSwitching ? 'Connecting...' : 'Connect'}
-                        </Button>
-                      )}
+              <ActiveCheckList>
+                <ActiveCheckListItem
+                  active
+                  status={
+                    connectComplete
+                      ? 'complete'
+                      : isConnecting || isSwitching
+                        ? 'in-progress'
+                        : 'idle'
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                      1
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Connect wallet</span>
+                      {address && <span className="text-xs text-muted-foreground">{address}</span>}
                       {isConnected && !chainReady && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => switchChainAsync({ chainId: POLYMARKET_CHAIN_ID })}
-                          disabled={isSwitching}
-                        >
-                          {isSwitching ? 'Switching...' : 'Switch'}
-                        </Button>
-                      )}
-                    </div>
-                  </ActiveCheckListItem>
-
-                  <ActiveCheckListItem
-                    active
-                    status={
-                      creds ? 'complete' : status === 'deriving-creds' ? 'in-progress' : 'idle'
-                    }
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                        2
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="font-medium">Derive & save API credentials</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!creds && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleDeriveCreds}
-                          disabled={!connectComplete || status === 'deriving-creds'}
-                        >
-                          {status === 'deriving-creds' ? 'Deriving...' : 'Derive'}
-                        </Button>
-                      )}
-                    </div>
-                  </ActiveCheckListItem>
-
-                  <ActiveCheckListItem
-                    active
-                    status={
-                      safeComplete
-                        ? 'complete'
-                        : status === 'deploying-safe'
-                          ? 'in-progress'
-                          : 'idle'
-                    }
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                        3
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="font-medium">Deploy Safe</span>
-                        {safeAddress && (
-                          <span className="text-xs text-muted-foreground">{safeAddress}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!safeComplete && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleDeploySafe}
-                          disabled={!connectComplete || status === 'deploying-safe'}
-                        >
-                          {status === 'deploying-safe' ? 'Deploying...' : 'Deploy'}
-                        </Button>
-                      )}
-                    </div>
-                  </ActiveCheckListItem>
-
-                  <ActiveCheckListItem
-                    active={safeComplete}
-                    status={
-                      approvalsComplete
-                        ? 'complete'
-                        : status === 'approving' || status === 'checking-approvals'
-                          ? 'in-progress'
-                          : 'idle'
-                    }
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                        4
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="font-medium">Set approvals</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!approvalsComplete && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleApproveAll}
-                          disabled={!safeComplete || status === 'approving'}
-                        >
-                          {status === 'approving' ? 'Approving...' : 'Approve'}
-                        </Button>
-                      )}
-                    </div>
-                  </ActiveCheckListItem>
-
-                  <ActiveCheckListItem
-                    active={approvalsComplete}
-                    status={
-                      credsSaved ? 'complete' : status === 'saving-creds' ? 'in-progress' : 'idle'
-                    }
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                        5
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="font-medium">Save credentials</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleSaveCreds}
-                        disabled={!approvalsComplete || credsSaved || status === 'saving-creds'}
-                      >
-                        {status === 'saving-creds' ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </ActiveCheckListItem>
-
-                  <ActiveCheckListItem
-                    active={safeComplete}
-                    status={safeFunded ? 'complete' : 'idle'}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                        6
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="font-medium">Fund Safe (USDC.e)</span>
-                        {safeAddress && (
-                          <span className="text-xs text-muted-foreground">
-                            Send USDC.e to{' '}
-                            <CopyableAddress address={safeAddress} variant="inline" />
-                          </span>
-                        )}
                         <span className="text-xs text-muted-foreground">
-                          USDC.e:{' '}
-                          <CopyableAddress address={POLYMARKET_CONTRACTS.usdcE} variant="inline" />
+                          Switch to Polygon to continue
                         </span>
-                      </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!isConnected && (
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => setSafeFunded(true)}
-                        disabled={!safeComplete || safeFunded}
+                        onClick={() =>
+                          connect({ connector: injected(), chainId: POLYMARKET_CHAIN_ID })
+                        }
+                        disabled={isConnecting || isSwitching}
                       >
-                        {safeFunded ? 'Funded' : 'Mark funded'}
+                        {isConnecting || isSwitching ? 'Connecting...' : 'Connect'}
                       </Button>
-                    </div>
-                  </ActiveCheckListItem>
-                </ActiveCheckList>
+                    )}
+                    {isConnected && !chainReady && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => switchChainAsync({ chainId: POLYMARKET_CHAIN_ID })}
+                        disabled={isSwitching}
+                      >
+                        {isSwitching ? 'Switching...' : 'Switch'}
+                      </Button>
+                    )}
+                  </div>
+                </ActiveCheckListItem>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setStep(1)}
-                    disabled={isConnecting || isSwitching || isSaving || isDeploying || isApproving}
-                  >
-                    Back
-                  </Button>
-                  <Button type="button" className="flex-1" onClick={() => setStatus('idle')}>
-                    Resume
-                  </Button>
-                </div>
-              </div>
-            )}
+                <ActiveCheckListItem
+                  active
+                  status={
+                    credsReady ? 'complete' : status === 'deriving-creds' ? 'in-progress' : 'idle'
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                      2
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Derive & save API credentials</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!credsReady && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDeriveCreds}
+                        disabled={!connectComplete || status === 'deriving-creds'}
+                      >
+                        {status === 'deriving-creds' ? 'Deriving...' : 'Derive'}
+                      </Button>
+                    )}
+                  </div>
+                </ActiveCheckListItem>
+
+                <ActiveCheckListItem
+                  active
+                  status={
+                    safeComplete ? 'complete' : status === 'deploying-safe' ? 'in-progress' : 'idle'
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                      3
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Deploy Safe</span>
+                      {safeAddress && (
+                        <span className="text-xs text-muted-foreground">{safeAddress}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!safeComplete && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDeploySafe}
+                        disabled={!connectComplete || status === 'deploying-safe'}
+                      >
+                        {status === 'deploying-safe' ? 'Deploying...' : 'Deploy'}
+                      </Button>
+                    )}
+                  </div>
+                </ActiveCheckListItem>
+
+                <ActiveCheckListItem
+                  active={safeComplete}
+                  status={
+                    approvalsComplete
+                      ? 'complete'
+                      : status === 'approving' || status === 'checking-approvals'
+                        ? 'in-progress'
+                        : 'idle'
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                      4
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Set approvals</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!approvalsComplete && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleApproveAll}
+                        disabled={!safeComplete || status === 'approving'}
+                      >
+                        {status === 'approving' ? 'Approving...' : 'Approve'}
+                      </Button>
+                    )}
+                  </div>
+                </ActiveCheckListItem>
+
+                <ActiveCheckListItem
+                  active={approvalsComplete}
+                  status={
+                    credsSaved ? 'complete' : status === 'saving-creds' ? 'in-progress' : 'idle'
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                      5
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Save credentials</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSaveCreds}
+                      disabled={!approvalsComplete || credsSaved || status === 'saving-creds'}
+                    >
+                      {status === 'saving-creds' ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </ActiveCheckListItem>
+
+                <ActiveCheckListItem
+                  active={safeComplete}
+                  status={safeFunded ? 'complete' : 'idle'}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                      6
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Fund Safe (USDC.e)</span>
+                      {effectiveSafeAddress && (
+                        <span className="text-xs text-muted-foreground">
+                          Send USDC.e to your Safe address:{' '}
+                          <CopyableAddress address={effectiveSafeAddress} variant="inline" />
+                        </span>
+                      )}
+                      {safeBalance !== null && (
+                        <span className="text-xs text-muted-foreground">
+                          Balance: {formatUnits(safeBalance, 6)} USDC.e
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        USDC.e token contract (do not send funds here):{' '}
+                        <CopyableAddress address={POLYMARKET_CONTRACTS.usdcE} variant="inline" />
+                      </span>
+                    </div>
+                  </div>
+                </ActiveCheckListItem>
+              </ActiveCheckList>
+
+            </div>
           </CardContent>
         </Card>
       </main>
