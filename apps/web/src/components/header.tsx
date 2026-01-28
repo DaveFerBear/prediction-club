@@ -38,14 +38,8 @@ export function Header() {
         </Link>
         <nav className="flex items-center gap-2">
           <div className="hidden items-center gap-2 sm:flex">
-            <Link href="/dashboard">
-              <Button variant="ghost">My clubs</Button>
-            </Link>
             <Link href="/clubs">
               <Button variant="ghost">Find a club</Button>
-            </Link>
-            <Link href="/markets">
-              <Button variant="ghost">Markets</Button>
             </Link>
           </div>
           {isConnected && address && (

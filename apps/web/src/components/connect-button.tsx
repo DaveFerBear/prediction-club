@@ -36,7 +36,7 @@ export function ConnectButton() {
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64 px-3 py-2">
           <div className="flex flex-col gap-3">
-            <div className="grid gap-1 sm:hidden">
+            <div className="grid gap-1">
               <Link href="/profile">
                 <Button variant="ghost" size="sm" className="w-full justify-start">
                   Profile
@@ -63,12 +63,7 @@ export function ConnectButton() {
                 </Button>
               </Link>
             </div>
-            <div className="rounded-md border border-border bg-muted/40 p-2 sm:border-0 sm:bg-transparent sm:p-0">
-              <Link href="/profile">
-                <Button variant="ghost" size="sm" className="w-full justify-start">
-                  Profile
-                </Button>
-              </Link>
+            <div className="rounded-md border border-border bg-muted/40 p-2">
               {isConnected ? (
                 <>
                   {!isAuthenticated && (
