@@ -607,15 +607,17 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={handleSaveCreds}
-                      disabled={!approvalsComplete || credsSaved || status === 'saving-creds'}
-                    >
-                      {status === 'saving-creds' ? 'Saving...' : 'Save'}
-                    </Button>
+                    {!credsSaved && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSaveCreds}
+                        disabled={!approvalsComplete || status === 'saving-creds'}
+                      >
+                        {status === 'saving-creds' ? 'Saving...' : 'Save'}
+                      </Button>
+                    )}
                   </div>
                 </ActiveCheckListItem>
 
