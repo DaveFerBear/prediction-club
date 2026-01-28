@@ -36,11 +36,8 @@ async function main() {
     create: {
       name: 'Alpha Traders',
       slug: 'alpha-traders',
-      description: 'A prediction club for alpha traders on Polygon.',
+      description: 'A prediction club for alpha traders on Polymarket.',
       managerUserId: manager.id,
-      safeAddress: '0xSAFE000000000000000000000000000000000001',
-      vaultAddress: '0xVAULT00000000000000000000000000000000001',
-      chainId: 80002, // Polygon Amoy testnet
       isPublic: true,
     },
   });
@@ -84,24 +81,25 @@ async function main() {
   console.log('Added members to club');
 
   // Create a sample cohort
-  const cohortId = '0x' + '1'.repeat(64); // Sample bytes32
-  const predictionRound = await prisma.predictionRound.upsert({
+  const marketRef = 'polymarket:election-2024';
+  let predictionRound = await prisma.predictionRound.findFirst({
     where: {
-      clubId_cohortId: {
-        clubId: club.id,
-        cohortId: cohortId,
-      },
-    },
-    update: {},
-    create: {
       clubId: club.id,
-      cohortId: cohortId,
-      marketRef: 'polymarket:election-2024',
-      marketTitle: 'Who will win the 2024 US Presidential Election?',
-      stakeTotal: '1000000000', // 1000 USDC (6 decimals)
-      status: 'COMMITTED',
+      marketRef,
     },
   });
+
+  if (!predictionRound) {
+    predictionRound = await prisma.predictionRound.create({
+      data: {
+        clubId: club.id,
+        marketRef,
+        marketTitle: 'Who will win the 2024 US Presidential Election?',
+        stakeTotal: '1000000000', // 1000 USDC (6 decimals)
+        status: 'COMMITTED',
+      },
+    });
+  }
 
   console.log('Created prediction round:', predictionRound.id);
 

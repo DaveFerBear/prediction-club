@@ -15,8 +15,8 @@ export default function HomePage() {
               Trade Predictions Together
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
-              Form prediction clubs, pool capital, and trade on Polymarket as a single on-chain
-              actor. Built on Polygon.
+              Form prediction clubs, pool capital, and trade on Polymarket together. Built on
+              Polygon.
             </p>
             <div className="mt-10 flex items-center justify-center gap-4">
               <Link href="/clubs/create">
@@ -38,8 +38,7 @@ export default function HomePage() {
               <div className="rounded-lg border bg-card p-6">
                 <h3 className="text-lg font-semibold">Pooled Capital</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Members deposit USDC into a shared vault. Track available vs committed balances
-                  on-chain.
+                  Members fund their own Polymarket wallets and trade as a coordinated club.
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-6">
@@ -50,10 +49,10 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-6">
-                <h3 className="text-lg font-semibold">On-Chain Vaults</h3>
+                <h3 className="text-lg font-semibold">Gasless Execution</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Each club has its own smart contract vault. Deposits, withdrawals, and PnL are
-                  fully transparent on Polygon.
+                  Trades use Polymarket’s relayer, so users avoid gas fees while still signing
+                  orders.
                 </p>
               </div>
             </div>

@@ -8,10 +8,10 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   metadataBase: new URL('https://0x1.club'),
   title: 'Prediction Club',
-  description: 'Trade predictions and compete on-chain',
+  description: 'Trade predictions together on Polymarket',
   openGraph: {
     title: 'Prediction Club',
-    description: 'Trade predictions and compete on-chain',
+    description: 'Trade predictions together on Polymarket',
     images: [
       {
         url: '/og.png',
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Prediction Club',
-    description: 'Trade predictions and compete on-chain',
+    description: 'Trade predictions together on Polymarket',
     images: ['/og.png'],
   },
 };

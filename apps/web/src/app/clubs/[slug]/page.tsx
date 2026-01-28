@@ -100,9 +100,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                     </span>
                   </span>
                 )}
-                <span className="text-muted-foreground">
-                  Safe: <CopyableAddress address={club.safeAddress} variant="inline" />
-                </span>
               </div>
             </div>
             {isManager ? (
@@ -118,7 +115,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         </div>
 
         {/* Stats */}
-        <div className="mb-8 grid gap-4 md:grid-cols-4">
+        <div className="mb-8 grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Members</CardDescription>
@@ -135,14 +132,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
             <CardHeader className="pb-2">
               <CardDescription>Total Predictions</CardDescription>
               <CardTitle className="text-2xl">{club._count.predictionRounds}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Vault Address</CardDescription>
-              <CardTitle>
-                <CopyableAddress address={club.vaultAddress} variant="compact" />
-              </CardTitle>
             </CardHeader>
           </Card>
         </div>
