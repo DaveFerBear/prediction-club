@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Web3Provider } from '@ethersproject/providers';
+import { Web3Provider, type ExternalProvider } from '@ethersproject/providers';
 import { ClobClient } from '@polymarket/clob-client';
 import { useAccount, useChainId, useConnect, useSwitchChain, useWalletClient } from 'wagmi';
+import type { WalletClient } from 'viem';
 import { injected } from 'wagmi/connectors';
 import {
   Button,
@@ -39,9 +40,13 @@ type ApiCreds = {
   passphrase: string;
 };
 
-function walletClientToSigner(walletClient: ReturnType<typeof useWalletClient>['data']) {
+type WalletClientWithAccount = WalletClient & { account: { address: `0x${string}` } };
+
+function walletClientToSigner(walletClient?: WalletClientWithAccount | null) {
   if (!walletClient) return null;
-  const provider = new Web3Provider(walletClient.transport as any, walletClient.chain.id);
+  const chainId = walletClient.chain?.id;
+  if (!chainId) return null;
+  const provider = new Web3Provider(walletClient.transport as unknown as ExternalProvider, chainId);
   return provider.getSigner(walletClient.account.address);
 }
 
@@ -65,9 +70,12 @@ export default function ProfilePage() {
   const [safeReady, setSafeReady] = useState(false);
   const [approvalsReady, setApprovalsReady] = useState(false);
   const [credsSaved, setCredsSaved] = useState(false);
+  const [safeChecked, setSafeChecked] = useState(false);
+  const [approvalsChecked, setApprovalsChecked] = useState(false);
   const [safeFunded, setSafeFunded] = useState(false);
 
-  const connectComplete = isConnected && chainId === POLYMARKET_CHAIN_ID && !!walletClient;
+  const chainReady = chainId === POLYMARKET_CHAIN_ID && !!walletClient;
+  const connectComplete = isConnected;
   const completedSteps = [
     connectComplete,
     !!creds,
@@ -104,6 +112,56 @@ export default function ProfilePage() {
   const safeComplete = safeReady;
   const approvalsComplete = approvalsReady;
 
+  useEffect(() => {
+    if (!connectComplete || !safeAddress || safeReady || safeChecked || status !== 'idle') return;
+    let cancelled = false;
+
+    const runCheck = async () => {
+      setStatus('checking-approvals');
+      try {
+        const deployed = await isSafeDeployed();
+        if (cancelled) return;
+        setSafeReady(deployed);
+        setSafeChecked(true);
+        setStatus('idle');
+      } catch (err) {
+        if (cancelled) return;
+        setStatus('error');
+        setError(err instanceof Error ? err.message : 'Failed to check Safe');
+      }
+    };
+
+    runCheck();
+    return () => {
+      cancelled = true;
+    };
+  }, [connectComplete, safeAddress, safeReady, safeChecked, status, isSafeDeployed]);
+
+  useEffect(() => {
+    if (!safeReady || !safeAddress || approvalsReady || approvalsChecked || status !== 'idle')
+      return;
+    let cancelled = false;
+
+    const runCheck = async () => {
+      setStatus('checking-approvals');
+      try {
+        const approvalStatus = await checkApprovals(safeAddress as `0x${string}`);
+        if (cancelled) return;
+        setApprovalsReady(approvalStatus.allApproved);
+        setApprovalsChecked(true);
+        setStatus('idle');
+      } catch (err) {
+        if (cancelled) return;
+        setStatus('error');
+        setError(err instanceof Error ? err.message : 'Failed to check approvals');
+      }
+    };
+
+    runCheck();
+    return () => {
+      cancelled = true;
+    };
+  }, [safeReady, safeAddress, approvalsReady, approvalsChecked, status, checkApprovals]);
   const ensureConnected = async () => {
     setError(null);
     if (!isConnected) {
@@ -130,7 +188,12 @@ export default function ProfilePage() {
     setStatus('deriving-creds');
     try {
       const tmpClient = new ClobClient(POLYMARKET_CLOB_URL, POLYMARKET_CHAIN_ID, signer);
-      const derived = await tmpClient.createOrDeriveApiKey();
+      let derived: ApiCreds | null = null;
+      try {
+        derived = await tmpClient.deriveApiKey();
+      } catch {
+        derived = await tmpClient.createApiKey();
+      }
       setCreds(derived);
       setStatus('idle');
     } catch (err) {
@@ -153,44 +216,6 @@ export default function ProfilePage() {
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to deploy Safe');
-    }
-  };
-
-  const handleCheckSafe = async () => {
-    const ok = await ensureConnected();
-    if (!ok) return;
-    if (!safeAddress) {
-      setError('Safe address not available');
-      setStatus('error');
-      return;
-    }
-    setStatus('checking-approvals');
-    try {
-      const deployed = await isSafeDeployed();
-      setSafeReady(deployed);
-      setStatus('idle');
-    } catch (err) {
-      setStatus('error');
-      setError(err instanceof Error ? err.message : 'Failed to check Safe');
-    }
-  };
-
-  const handleCheckApprovals = async () => {
-    const ok = await ensureConnected();
-    if (!ok) return;
-    if (!safeAddress) {
-      setError('Safe address not available');
-      setStatus('error');
-      return;
-    }
-    setStatus('checking-approvals');
-    try {
-      const approvalStatus = await checkApprovals(safeAddress);
-      setApprovalsReady(approvalStatus.allApproved);
-      setStatus('idle');
-    } catch (err) {
-      setStatus('error');
-      setError(err instanceof Error ? err.message : 'Failed to check approvals');
     }
   };
 
@@ -247,9 +272,7 @@ export default function ProfilePage() {
       <main className="container py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Profile Setup</h1>
-          <p className="text-muted-foreground">
-            Set up Polymarket access to trade with your club.
-          </p>
+          <p className="text-muted-foreground">Set up Polymarket access to trade with your club.</p>
         </div>
 
         <Card className="max-w-2xl">
@@ -270,7 +293,12 @@ export default function ProfilePage() {
                   through the relayer, and approves trading contracts.
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => router.back()}
+                  >
                     Back
                   </Button>
                   <Button type="button" className="flex-1" onClick={() => setStep(2)}>
@@ -295,7 +323,13 @@ export default function ProfilePage() {
                 <ActiveCheckList>
                   <ActiveCheckListItem
                     active
-                    status={connectComplete ? 'complete' : isConnecting || isSwitching ? 'in-progress' : 'idle'}
+                    status={
+                      connectComplete
+                        ? 'complete'
+                        : isConnecting || isSwitching
+                          ? 'in-progress'
+                          : 'idle'
+                    }
                   >
                     <div className="flex items-center gap-3">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
@@ -303,19 +337,39 @@ export default function ProfilePage() {
                       </span>
                       <div className="flex flex-col">
                         <span className="font-medium">Connect wallet</span>
-                        {address && <span className="text-xs text-muted-foreground">{address}</span>}
+                        {address && (
+                          <span className="text-xs text-muted-foreground">{address}</span>
+                        )}
+                        {isConnected && !chainReady && (
+                          <span className="text-xs text-muted-foreground">
+                            Switch to Polygon to continue
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {!connectComplete && (
+                      {!isConnected && (
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={() => connect({ connector: injected(), chainId: POLYMARKET_CHAIN_ID })}
+                          onClick={() =>
+                            connect({ connector: injected(), chainId: POLYMARKET_CHAIN_ID })
+                          }
                           disabled={isConnecting || isSwitching}
                         >
                           {isConnecting || isSwitching ? 'Connecting...' : 'Connect'}
+                        </Button>
+                      )}
+                      {isConnected && !chainReady && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => switchChainAsync({ chainId: POLYMARKET_CHAIN_ID })}
+                          disabled={isSwitching}
+                        >
+                          {isSwitching ? 'Switching...' : 'Switch'}
                         </Button>
                       )}
                     </div>
@@ -324,11 +378,7 @@ export default function ProfilePage() {
                   <ActiveCheckListItem
                     active
                     status={
-                      creds
-                        ? 'complete'
-                        : status === 'deriving-creds'
-                          ? 'in-progress'
-                          : 'idle'
+                      creds ? 'complete' : status === 'deriving-creds' ? 'in-progress' : 'idle'
                     }
                   >
                     <div className="flex items-center gap-3">
@@ -340,21 +390,29 @@ export default function ProfilePage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleDeriveCreds}
-                        disabled={!connectComplete || status === 'deriving-creds'}
-                      >
-                        {status === 'deriving-creds' ? 'Deriving...' : 'Derive'}
-                      </Button>
+                      {!creds && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleDeriveCreds}
+                          disabled={!connectComplete || status === 'deriving-creds'}
+                        >
+                          {status === 'deriving-creds' ? 'Deriving...' : 'Derive'}
+                        </Button>
+                      )}
                     </div>
                   </ActiveCheckListItem>
 
                   <ActiveCheckListItem
                     active
-                    status={safeComplete ? 'complete' : status === 'deploying-safe' ? 'in-progress' : 'idle'}
+                    status={
+                      safeComplete
+                        ? 'complete'
+                        : status === 'deploying-safe'
+                          ? 'in-progress'
+                          : 'idle'
+                    }
                   >
                     <div className="flex items-center gap-3">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
@@ -362,28 +420,23 @@ export default function ProfilePage() {
                       </span>
                       <div className="flex flex-col">
                         <span className="font-medium">Deploy Safe</span>
-                        {safeAddress && <span className="text-xs text-muted-foreground">{safeAddress}</span>}
+                        {safeAddress && (
+                          <span className="text-xs text-muted-foreground">{safeAddress}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCheckSafe}
-                        disabled={!connectComplete || status === 'deploying-safe'}
-                      >
-                        Check
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleDeploySafe}
-                        disabled={!connectComplete || status === 'deploying-safe' || safeComplete}
-                      >
-                        {status === 'deploying-safe' ? 'Deploying...' : 'Deploy'}
-                      </Button>
+                      {!safeComplete && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleDeploySafe}
+                          disabled={!connectComplete || status === 'deploying-safe'}
+                        >
+                          {status === 'deploying-safe' ? 'Deploying...' : 'Deploy'}
+                        </Button>
+                      )}
                     </div>
                   </ActiveCheckListItem>
 
@@ -406,30 +459,25 @@ export default function ProfilePage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCheckApprovals}
-                        disabled={!safeComplete || status === 'checking-approvals'}
-                      >
-                        Check
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleApproveAll}
-                        disabled={!safeComplete || status === 'approving' || approvalsComplete}
-                      >
-                        {status === 'approving' ? 'Approving...' : 'Approve'}
-                      </Button>
+                      {!approvalsComplete && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleApproveAll}
+                          disabled={!safeComplete || status === 'approving'}
+                        >
+                          {status === 'approving' ? 'Approving...' : 'Approve'}
+                        </Button>
+                      )}
                     </div>
                   </ActiveCheckListItem>
 
                   <ActiveCheckListItem
                     active={approvalsComplete}
-                    status={credsSaved ? 'complete' : status === 'saving-creds' ? 'in-progress' : 'idle'}
+                    status={
+                      credsSaved ? 'complete' : status === 'saving-creds' ? 'in-progress' : 'idle'
+                    }
                   >
                     <div className="flex items-center gap-3">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
@@ -464,11 +512,13 @@ export default function ProfilePage() {
                         <span className="font-medium">Fund Safe (USDC.e)</span>
                         {safeAddress && (
                           <span className="text-xs text-muted-foreground">
-                            Send USDC.e to <CopyableAddress address={safeAddress} variant="inline" />
+                            Send USDC.e to{' '}
+                            <CopyableAddress address={safeAddress} variant="inline" />
                           </span>
                         )}
                         <span className="text-xs text-muted-foreground">
-                          USDC.e: <CopyableAddress address={POLYMARKET_CONTRACTS.usdcE} variant="inline" />
+                          USDC.e:{' '}
+                          <CopyableAddress address={POLYMARKET_CONTRACTS.usdcE} variant="inline" />
                         </span>
                       </div>
                     </div>
