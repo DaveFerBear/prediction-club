@@ -1,5 +1,5 @@
-import { useAccount } from 'wagmi';
 import { useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 
 interface FetchOptions extends Omit<RequestInit, 'headers'> {
   headers?: Record<string, string>;
@@ -7,10 +7,11 @@ interface FetchOptions extends Omit<RequestInit, 'headers'> {
 
 /**
  * Hook that provides an authenticated fetch function
- * Automatically includes the wallet address in requests
+ * Uses the NextAuth session cookie for auth
  */
 export function useApi() {
-  const { address } = useAccount();
+  const { data: session } = useSession();
+  const address = session?.address ?? null;
 
   const fetchWithAuth = useCallback(
     async <T>(url: string, options: FetchOptions = {}): Promise<T> => {
@@ -19,13 +20,10 @@ export function useApi() {
         ...options.headers,
       };
 
-      if (address) {
-        headers['x-wallet-address'] = address;
-      }
-
       const response = await fetch(url, {
         ...options,
         headers,
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -40,7 +38,7 @@ export function useApi() {
 
       return data;
     },
-    [address]
+    []
   );
 
   return {

@@ -7,6 +7,7 @@ import { ClobClient } from '@polymarket/clob-client';
 import { useAccount, useChainId, useConnect, useSwitchChain, useWalletClient } from 'wagmi';
 import type { WalletClient } from 'viem';
 import { injected } from 'wagmi/connectors';
+import { useSession } from 'next-auth/react';
 import {
   Button,
   Card,
@@ -20,12 +21,13 @@ import { Header } from '@/components/header';
 import { ActiveCheckList, ActiveCheckListItem } from '@/components/active-check-list';
 import { CopyableAddress } from '@/components/copyable-address';
 import { POLYMARKET_CHAIN_ID, POLYMARKET_CLOB_URL, POLYMARKET_CONTRACTS } from '@/lib/polymarket';
-import { usePolymarketApprovals, usePolymarketCreds, usePolymarketSafe } from '@/hooks';
+import { usePolymarketApprovals, usePolymarketCreds, usePolymarketSafe, useSiweSignIn } from '@/hooks';
 
 type SetupStatus =
   | 'idle'
   | 'connecting'
   | 'switching-chain'
+  | 'signing-in'
   | 'deriving-creds'
   | 'saving-creds'
   | 'deploying-safe'
@@ -58,6 +60,8 @@ export default function ProfilePage() {
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const { data: walletClient } = useWalletClient({ chainId: POLYMARKET_CHAIN_ID });
   const signer = useMemo(() => walletClientToSigner(walletClient), [walletClient]);
+  const { data: session, status: sessionStatus } = useSession();
+  const { signInWithSiwe } = useSiweSignIn();
 
   const { saveCreds, isSaving } = usePolymarketCreds();
   const { safeAddress, deploySafe, isDeploying, isSafeDeployed } = usePolymarketSafe();
@@ -76,6 +80,9 @@ export default function ProfilePage() {
 
   const chainReady = chainId === POLYMARKET_CHAIN_ID && !!walletClient;
   const connectComplete = isConnected;
+  const sessionAddress = session?.address?.toLowerCase() ?? null;
+  const walletAddress = address?.toLowerCase() ?? null;
+  const isAuthenticated = !!sessionAddress && sessionAddress === walletAddress;
   const completedSteps = [
     connectComplete,
     !!creds,
@@ -92,6 +99,8 @@ export default function ProfilePage() {
         return 'Connecting wallet...';
       case 'switching-chain':
         return 'Switching to Polygon...';
+      case 'signing-in':
+        return 'Signing in...';
       case 'deriving-creds':
         return 'Deriving Polymarket API credentials...';
       case 'saving-creds':
@@ -178,6 +187,22 @@ export default function ProfilePage() {
       setStatus('connecting');
       connect({ connector: injected(), chainId: POLYMARKET_CHAIN_ID });
       return false;
+    }
+    if (sessionStatus === 'loading') {
+      setStatus('signing-in');
+      return false;
+    }
+    if (!isAuthenticated) {
+      setStatus('signing-in');
+      try {
+        await signInWithSiwe();
+        setStatus('idle');
+        return true;
+      } catch (err) {
+        setStatus('error');
+        setError(err instanceof Error ? err.message : 'Failed to sign in');
+        return false;
+      }
     }
     return true;
   };
