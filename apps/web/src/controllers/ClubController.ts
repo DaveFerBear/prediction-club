@@ -5,9 +5,6 @@ export interface CreateClubInput {
   name: string;
   slug?: string;
   description?: string;
-  safeAddress: string;
-  vaultAddress: string;
-  chainId: number;
   isPublic?: boolean;
 }
 
@@ -41,7 +38,7 @@ export class ClubController {
    * Create a new club
    */
   static async create(input: CreateClubInput, userId: string) {
-    const { name, description, safeAddress, vaultAddress, chainId, isPublic = false } = input;
+    const { name, description, isPublic = false } = input;
     const slug = input.slug || slugify(name);
 
     // Check if slug is already taken
@@ -53,27 +50,12 @@ export class ClubController {
       throw new ClubError('SLUG_TAKEN', 'This club slug is already taken');
     }
 
-    // Check if vault/safe already registered
-    const existingVault = await prisma.club.findFirst({
-      where: {
-        chainId,
-        OR: [{ vaultAddress }, { safeAddress }],
-      },
-    });
-
-    if (existingVault) {
-      throw new ClubError('ADDRESS_REGISTERED', 'Vault or Safe address already registered');
-    }
-
     // Create the club
     const club = await prisma.club.create({
       data: {
         name,
         slug,
         description,
-        safeAddress,
-        vaultAddress,
-        chainId,
         isPublic,
         managerUserId: userId,
         members: {

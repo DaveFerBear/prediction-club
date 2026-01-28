@@ -3,15 +3,10 @@ import { z } from 'zod';
 import { ClubController, ClubError } from '@/controllers';
 import { apiResponse, apiError, validationError, unauthorizedError, serverError } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
-import { isValidAddress } from '@prediction-club/shared';
-
 const createClubSchema = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(50).optional(),
   description: z.string().max(500).optional(),
-  safeAddress: z.string().refine(isValidAddress, 'Invalid Safe address'),
-  vaultAddress: z.string().refine(isValidAddress, 'Invalid Vault address'),
-  chainId: z.number().int().positive(),
   isPublic: z.boolean().optional().default(false),
 });
 

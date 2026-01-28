@@ -1,27 +1,10 @@
 import { prisma } from '@prediction-club/db';
-import { createChainPublicClient, getMemberBalance, buildWithdrawTx, type SupportedChainId } from '@prediction-club/chain';
 import { ClubController } from './ClubController';
-
-// ============ Balance Operations ============
-
-export interface GetBalanceInput {
-  clubSlug: string;
-  memberAddress?: string;
-}
-
-// ============ Withdraw Operations ============
-
-export interface RequestWithdrawInput {
-  clubSlug: string;
-  userId: string;
-  amount: string;
-}
 
 // ============ Prediction Round Operations ============
 
 export interface CreatePredictionRoundInput {
   clubSlug: string;
-  cohortId: string;
   marketRef?: string;
   marketTitle?: string;
   members: Array<{
@@ -39,8 +22,6 @@ export interface ListPredictionRoundsInput {
 }
 
 export class VaultController {
-  // ============ Helper ============
-
   private static async getClubBySlug(slug: string) {
     const club = await prisma.club.findUnique({
       where: { slug },
@@ -61,106 +42,11 @@ export class VaultController {
     }
   }
 
-  // ============ Balance ============
-
-  /**
-   * Get balance for a member in a club
-   */
-  static async getBalance(input: GetBalanceInput) {
-    const { clubSlug, memberAddress } = input;
-    const club = await this.getClubBySlug(clubSlug);
-
-    // If no member specified, return vault contract info
-    if (!memberAddress) {
-      return {
-        clubId: club.id,
-        vaultAddress: club.vaultAddress,
-        safeAddress: club.safeAddress,
-        chainId: club.chainId,
-      };
-    }
-
-    // Get on-chain balance
-    try {
-      const client = createChainPublicClient(club.chainId as SupportedChainId);
-      const balance = await getMemberBalance(
-        client,
-        club.vaultAddress as `0x${string}`,
-        memberAddress as `0x${string}`
-      );
-
-      return {
-        clubId: club.id,
-        member: memberAddress,
-        available: balance.available.toString(),
-        committed: balance.committed.toString(),
-        total: balance.total.toString(),
-        withdrawAddress: balance.withdrawAddress,
-      };
-    } catch (chainError) {
-      console.error('Chain call failed:', chainError);
-      return {
-        clubId: club.id,
-        member: memberAddress,
-        available: '0',
-        committed: '0',
-        total: '0',
-        withdrawAddress: memberAddress,
-        error: 'Failed to fetch on-chain balance',
-      };
-    }
-  }
-
-  // ============ Withdraw ============
-
-  /**
-   * Request a withdrawal from the club vault
-   */
-  static async requestWithdraw(input: RequestWithdrawInput) {
-    const { clubSlug, userId, amount } = input;
-    const club = await this.getClubBySlug(clubSlug);
-
-    // Check if user is a member
-    const member = await prisma.clubMember.findUnique({
-      where: {
-        clubId_userId: {
-          clubId: club.id,
-          userId,
-        },
-      },
-      include: {
-        user: true,
-      },
-    });
-
-    if (!member || member.status !== 'ACTIVE') {
-      throw new VaultError('NOT_A_MEMBER', 'You are not an active member of this club');
-    }
-
-    // Build the withdraw transaction
-    const withdrawTx = buildWithdrawTx(
-      club.vaultAddress as `0x${string}`,
-      member.user.walletAddress as `0x${string}`,
-      BigInt(amount)
-    );
-
-    return {
-      clubId: club.id,
-      member: member.user.walletAddress,
-      amount,
-      transaction: withdrawTx,
-      status: 'PENDING_SIGNATURE',
-      message: 'Withdrawal request created. Awaiting Safe signature.',
-    };
-  }
-
-  // ============ Prediction Rounds ============
-
   /**
    * Create a new prediction round (commit funds to a market)
    */
   static async createPredictionRound(input: CreatePredictionRoundInput) {
-    const { clubSlug, cohortId, marketRef, marketTitle, members, adminUserId } = input;
+    const { clubSlug, marketRef, marketTitle, members, adminUserId } = input;
     const club = await this.getClubBySlug(clubSlug);
 
     await this.requireAdmin(club.id, adminUserId);
@@ -174,7 +60,6 @@ export class VaultController {
     const predictionRound = await prisma.predictionRound.create({
       data: {
         clubId: club.id,
-        cohortId,
         marketRef,
         marketTitle,
         stakeTotal,

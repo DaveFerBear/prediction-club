@@ -3,10 +3,7 @@ import { z } from 'zod';
 import { VaultController, VaultError } from '@/controllers';
 import { apiResponse, apiError, validationError, notFoundError, forbiddenError, unauthorizedError, serverError } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
-import { isValidBytes32 } from '@prediction-club/shared';
-
 const createPredictionRoundSchema = z.object({
-  cohortId: z.string().refine(isValidBytes32, 'Invalid prediction ID (must be bytes32)'),
   marketRef: z.string().max(500).optional(),
   marketTitle: z.string().max(200).optional(),
   members: z.array(

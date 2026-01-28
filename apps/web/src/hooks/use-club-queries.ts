@@ -23,8 +23,6 @@ export interface ClubDetail {
   slug: string;
   description: string | null;
   isPublic: boolean;
-  safeAddress: string;
-  vaultAddress: string;
   manager: {
     id: string;
     walletAddress: string;
@@ -40,7 +38,6 @@ export interface ClubDetail {
   }>;
   predictionRounds: Array<{
     id: string;
-    cohortId: string;
     marketTitle: string | null;
     status: string;
     stakeTotal: string;
@@ -53,7 +50,6 @@ export interface ClubDetail {
 
 export interface PredictionRound {
   id: string;
-  cohortId: string;
   marketTitle: string | null;
   marketRef: string | null;
   status: string;

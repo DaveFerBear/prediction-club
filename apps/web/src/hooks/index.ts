@@ -1,6 +1,10 @@
 export { useApi, ApiError } from './use-api';
-export { useDeployClub, type DeployStatus } from './use-deploy-club';
 export { useCreateClub } from './use-create-club';
+export { usePolymarketRelayClient } from './use-polymarket-relay-client';
+export { usePolymarketSafe } from './use-polymarket-safe';
+export { usePolymarketApprovals } from './use-polymarket-approvals';
+export { usePolymarketCreds } from './use-polymarket-creds';
+export { usePolymarketOrders } from './use-polymarket-orders';
 export {
   useClubs,
   useClub,

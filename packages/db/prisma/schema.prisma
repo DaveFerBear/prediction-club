@@ -13,11 +13,15 @@ datasource db {
 // ============================================================================
 
 model User {
-  id            String   @id @default(cuid())
-  email         String?  @unique
-  walletAddress String   @unique
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  email                     String?  @unique
+  walletAddress             String   @unique
+  polymarketSafeAddress     String?  @unique
+  polymarketApiKeyId        String?
+  polymarketApiSecret       String?
+  polymarketApiPassphrase   String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   // Relations
   managedClubs    Club[]         @relation("ClubManager")
@@ -44,11 +48,6 @@ model Club {
   managerUserId String
   manager       User     @relation("ClubManager", fields: [managerUserId], references: [id])
 
-  // On-chain references
-  safeAddress   String   // Gnosis Safe address
-  vaultAddress  String   // ClubVaultV1 contract address
-  chainId       Int      // e.g., 137 for Polygon, 80002 for Amoy
-
   // Visibility
   isPublic      Boolean  @default(false)
 
@@ -60,10 +59,7 @@ model Club {
   members       ClubMember[]
   applications  Application[]
   predictionRounds       PredictionRound[]
-  vaultEvents   VaultEvent[]
 
-  @@unique([chainId, vaultAddress])
-  @@unique([chainId, safeAddress])
   @@index([slug])
   @@index([managerUserId])
 }
@@ -134,9 +130,9 @@ model Application {
 // ============================================================================
 
 enum PredictionRoundStatus {
-  PENDING     // Created, not yet committed on-chain
-  COMMITTED   // Funds locked via commitToCohort
-  SETTLED     // Funds released via settleCohort
+  PENDING     // Created, not yet executed
+  COMMITTED   // Orders placed
+  SETTLED     // Market resolved and settled
   CANCELLED   // Cancelled before execution
 }
 
@@ -145,22 +141,22 @@ model PredictionRound {
   clubId          String
   club            Club         @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
-  // On-chain cohort identifier (bytes32)
-  cohortId        String       // Hex string of bytes32
-
   // Market reference (e.g., Polymarket condition ID or URL)
   marketRef       String?
   marketTitle     String?
+  polymarketConditionId  String?
+  polymarketMarketUrl    String?
+  polymarketOutcomeYesToken  String?
+  polymarketOutcomeNoToken   String?
+  polymarketResolvedAt   DateTime?
+  polymarketWinningOutcome String?
+  polymarketInitialYesPrice String?
+  polymarketSettlementYesPrice String?
 
   // Aggregated stake
   stakeTotal      String       @default("0") // BigInt as string (wei)
 
   status          PredictionRoundStatus @default(PENDING)
-
-  // Transaction references
-  commitTxHash    String?
-  settleTxHash    String?
-  executedTxHash  String?      // Legacy field for backwards compat
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -168,9 +164,9 @@ model PredictionRound {
   // Relations
   members         PredictionRoundMember[]
 
-  @@unique([clubId, cohortId])
   @@index([clubId])
   @@index([status])
+  @@index([polymarketConditionId])
 }
 
 // ============================================================================
@@ -195,35 +191,6 @@ model PredictionRoundMember {
   @@unique([predictionRoundId, userId])
   @@index([predictionRoundId])
   @@index([userId])
-}
-
-// ============================================================================
-// Vault Events (indexed from chain)
-// ============================================================================
-
-model VaultEvent {
-  id          String   @id @default(cuid())
-  clubId      String
-  club        Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
-
-  // Transaction identification
-  txHash      String
-  logIndex    Int
-
-  // Event data
-  eventName   String   // e.g., "Deposited", "CohortCommitted", "Withdrawn"
-  payloadJson Json     // Raw event args as JSON
-
-  // Block data
-  blockNumber BigInt
-  blockTime   DateTime
-
-  createdAt   DateTime @default(now())
-
-  @@unique([txHash, logIndex])
-  @@index([clubId])
-  @@index([eventName])
-  @@index([blockNumber])
 }
 
 // ============================================================================

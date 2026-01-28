@@ -104,8 +104,8 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
           <h1 className="mt-1 text-2xl font-bold">Club Administration</h1>
         </div>
 
-        {/* Vault Stats */}
-        <div className="mb-6 grid gap-3 md:grid-cols-4">
+        {/* Club Stats */}
+        <div className="mb-6 grid gap-3 md:grid-cols-3">
           <Card>
             <CardHeader className="py-3">
               <CardDescription>Members</CardDescription>
@@ -123,21 +123,6 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
               <CardDescription>Pending Applications</CardDescription>
               <CardTitle className="text-2xl">{applications.length}</CardTitle>
             </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="py-3">
-              <CardDescription>Contract Addresses</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 pb-3 pt-0 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Safe</span>
-                <CopyableAddress address={club.safeAddress} variant="compact" />
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Vault</span>
-                <CopyableAddress address={club.vaultAddress} variant="compact" />
-              </div>
-            </CardContent>
           </Card>
         </div>
 
@@ -163,8 +148,7 @@ export default function ClubAdminPage({ params }: { params: { slug: string } }) 
                   <Input type="number" placeholder="10000" className="mt-1 h-9" />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  All eligible members will be automatically included based on their available
-                  balance.
+                  Eligible members will be automatically included based on club settings.
                 </p>
                 <Button className="w-full">Create Prediction</Button>
               </form>

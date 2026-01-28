@@ -10,6 +10,7 @@ export interface User {
   id: string;
   email: string | null;
   walletAddress: string;
+  polymarketSafeAddress?: string | null;
   createdAt: Date;
 }
 
@@ -27,9 +28,6 @@ export interface Club {
   slug: string;
   description: string | null;
   managerUserId: string;
-  safeAddress: string;
-  vaultAddress: string;
-  chainId: number;
   isPublic: boolean;
   createdAt: Date;
 }
@@ -64,13 +62,6 @@ export interface ClubMemberWithUser extends ClubMember {
   user: User;
 }
 
-export interface MemberBalance {
-  available: string; // BigInt as string (wei)
-  committed: string;
-  total: string;
-  withdrawAddress: string;
-}
-
 // ============================================================================
 // Application Types
 // ============================================================================
@@ -99,13 +90,18 @@ export type PredictionRoundStatus = 'PENDING' | 'COMMITTED' | 'SETTLED' | 'CANCE
 export interface PredictionRound {
   id: string;
   clubId: string;
-  cohortId: string; // bytes32 as hex string
   marketRef: string | null;
   marketTitle: string | null;
+  polymarketConditionId?: string | null;
+  polymarketMarketUrl?: string | null;
+  polymarketOutcomeYesToken?: string | null;
+  polymarketOutcomeNoToken?: string | null;
+  polymarketResolvedAt?: Date | null;
+  polymarketWinningOutcome?: string | null;
+  polymarketInitialYesPrice?: string | null;
+  polymarketSettlementYesPrice?: string | null;
   stakeTotal: string; // BigInt as string
   status: PredictionRoundStatus;
-  commitTxHash: string | null;
-  settleTxHash: string | null;
   createdAt: Date;
 }
 
@@ -129,26 +125,6 @@ export interface PredictionRoundMemberWithUser extends PredictionRoundMember {
 // ============================================================================
 // Vault Event Types
 // ============================================================================
-
-export type VaultEventName =
-  | 'MemberRegistered'
-  | 'WithdrawAddressUpdated'
-  | 'Deposited'
-  | 'CohortCommitted'
-  | 'CohortSettled'
-  | 'Withdrawn'
-  | 'TokenRescued';
-
-export interface VaultEvent {
-  id: string;
-  clubId: string;
-  txHash: string;
-  logIndex: number;
-  eventName: VaultEventName;
-  payloadJson: Record<string, unknown>;
-  blockNumber: bigint;
-  blockTime: Date;
-}
 
 // ============================================================================
 // API Response Types
@@ -179,9 +155,6 @@ export interface CreateClubRequest {
   name: string;
   slug: string;
   description?: string;
-  safeAddress: string;
-  vaultAddress: string;
-  chainId: number;
   isPublic?: boolean;
 }
 
@@ -190,7 +163,6 @@ export interface ApplyToClubRequest {
 }
 
 export interface CreatePredictionRoundRequest {
-  cohortId: string;
   marketRef?: string;
   marketTitle?: string;
   members: {
@@ -219,5 +191,4 @@ export interface ClubDashboard {
   club: ClubWithStats;
   members: ClubMemberWithUser[];
   activePredictionRounds: PredictionRound[];
-  recentEvents: VaultEvent[];
 }
