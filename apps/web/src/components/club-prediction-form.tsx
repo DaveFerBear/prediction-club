@@ -146,9 +146,7 @@ function getEventKey(event: MarketItem) {
 }
 
 function getEventUrl(event: MarketItem) {
-  if (event.url) return event.url;
-  if (event.slug) return `https://polymarket.com/market/${event.slug}`;
-  return '';
+  return event.url || '';
 }
 
 function getEventImage(event: MarketItem) {
@@ -162,6 +160,16 @@ function formatUrl(url: string) {
 function getMarketRef(market: MarketItem | null) {
   if (!market) return '';
   return String(market.id ?? market.slug ?? market.eventId ?? '');
+}
+
+function getMarketImage(market: MarketItem) {
+  return market.image || market.image_url || market.icon || '';
+}
+
+function getMarketUrl(market: MarketItem) {
+  if (market.url) return market.url;
+  if (market.slug) return `https://polymarket.com/market/${market.slug}`;
+  return '';
 }
 
 function OutcomeDetails({ outcome, tokenId }: { outcome: string; tokenId?: string }) {
@@ -547,9 +555,15 @@ export function ClubPredictionForm({
                                       {getEventTitle(eventItem)}
                                     </div>
                                     {url ? (
-                                      <div className="mt-1 truncate text-xs text-muted-foreground">
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="mt-1 block truncate text-xs text-muted-foreground underline decoration-transparent hover:decoration-current"
+                                        onClick={(event) => event.stopPropagation()}
+                                      >
                                         {formatUrl(url)}
-                                      </div>
+                                      </a>
                                     ) : (
                                       <div className="mt-1 text-xs italic text-muted-foreground">
                                         No link
@@ -618,6 +632,8 @@ export function ClubPredictionForm({
                       const outcomesCount = Array.isArray(market.outcomes)
                         ? market.outcomes.length
                         : 0;
+                      const marketImage = getMarketImage(market);
+                      const marketUrl = getMarketUrl(market);
                       return (
                         <button
                           key={key}
@@ -631,30 +647,52 @@ export function ClubPredictionForm({
                           }`}
                           onClick={() => handleSelectMarket(market)}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold">
-                                {getMarketTitle(market)}
-                              </div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {outcomesCount} outcomes
-                              </div>
-                              {getOutcomePrices(market).length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                  {getOutcomePrices(market).map((item) => (
-                                    <span
-                                      key={item.outcome}
-                                      className="rounded-full border border-border/70 px-2 py-0.5"
-                                    >
-                                      {item.outcome}: {formatPriceValue(item.price)}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            {loadingMarketKey === key && (
-                              <span className="text-xs text-muted-foreground">Loading…</span>
+                          <div className="flex items-start gap-3">
+                            {marketImage && (
+                              <img
+                                src={marketImage}
+                                alt=""
+                                className="h-10 w-10 rounded-md object-cover"
+                              />
                             )}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold">
+                                    {getMarketTitle(market)}
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{outcomesCount} outcomes</span>
+                                    {marketUrl && (
+                                      <a
+                                        href={marketUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="truncate underline decoration-transparent hover:decoration-current"
+                                        onClick={(event) => event.stopPropagation()}
+                                      >
+                                        {formatUrl(marketUrl)}
+                                      </a>
+                                    )}
+                                  </div>
+                                  {getOutcomePrices(market).length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                      {getOutcomePrices(market).map((item) => (
+                                        <span
+                                          key={item.outcome}
+                                          className="rounded-full border border-border/70 px-2 py-0.5"
+                                        >
+                                          {item.outcome}: {formatPriceValue(item.price)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {loadingMarketKey === key && (
+                                  <span className="text-xs text-muted-foreground">Loading…</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </button>
                       );
