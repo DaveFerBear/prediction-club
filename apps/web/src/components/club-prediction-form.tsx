@@ -238,7 +238,7 @@ export function ClubPredictionForm({
   address: string | null;
 }) {
   const [state, dispatch] = useReducer(predictionFormReducer, initialState);
-  const [accordionValue, setAccordionValue] = useState<'event' | 'market' | 'winner'>('event');
+  const [accordionValue, setAccordionValue] = useState<'event' | 'market' | 'winner' | ''>('event');
   const [loadingMarketKey, setLoadingMarketKey] = useState<string | null>(null);
   const { createPrediction } = useCreatePrediction(clubSlug);
   const { fetchMarketDetails } = useMarketDetails();
@@ -295,6 +295,10 @@ export function ClubPredictionForm({
 
   const handleAccordionChange = useCallback(
     (value: string) => {
+      if (!value) {
+        setAccordionValue('');
+        return;
+      }
       if (!canOpenSection(value)) return;
       setAccordionValue(value as 'event' | 'market' | 'winner');
     },
@@ -320,7 +324,7 @@ export function ClubPredictionForm({
         setAccordionValue('winner');
       }
     },
-    []
+    [fetchMarketDetails]
   );
 
   const canSubmit =
@@ -424,7 +428,12 @@ export function ClubPredictionForm({
         {state.tag === 'success' && state.message && (
           <p className="text-sm text-green-600">{state.message}</p>
         )}
-        <Accordion type="single" value={accordionValue} onValueChange={handleAccordionChange}>
+        <Accordion
+          type="single"
+          collapsible
+          value={accordionValue}
+          onValueChange={handleAccordionChange}
+        >
           <AccordionItem value="event">
             <AccordionTrigger className="justify-start gap-3">
               <div className="flex flex-1 items-center">
@@ -526,7 +535,10 @@ export function ClubPredictionForm({
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="market">
-            <AccordionTrigger className="justify-start gap-3" disabled={!canPickMarket}>
+            <AccordionTrigger
+              className={`justify-start gap-3 ${!canPickMarket ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!canPickMarket}
+            >
               <div className="flex flex-1 items-center">
                 <span>Pick market</span>
                 <span className="ml-auto text-right text-xs text-muted-foreground">
@@ -580,7 +592,10 @@ export function ClubPredictionForm({
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="winner">
-            <AccordionTrigger className="justify-start gap-3" disabled={!canPickWinner}>
+            <AccordionTrigger
+              className={`justify-start gap-3 ${!canPickWinner ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!canPickWinner}
+            >
               <div className="flex flex-1 items-center">
                 <span>Pick winner</span>
                 <span className="ml-auto text-right text-xs text-muted-foreground">
