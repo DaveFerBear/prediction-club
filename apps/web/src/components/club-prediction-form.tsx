@@ -11,10 +11,11 @@ import {
   Card,
   CardContent,
   Input,
+  Slider,
 } from '@prediction-club/ui';
 import { useCreatePrediction } from '@/hooks/use-create-prediction';
 import { usePolymarketMarketData } from '@/hooks/use-polymarket-market-data';
-import { useMarketDetails, useMarketSearch, type ClubDetail } from '@/hooks';
+import { useMarketDetails, useMarketSearch, usePolymarketSafe, useSafeBalance, type ClubDetail } from '@/hooks';
 import type { MarketItem } from '@/hooks/use-market-search';
 
 type PredictionFormState = {
@@ -108,6 +109,31 @@ function predictionFormReducer(
 function getMarketTitle(market: MarketItem | null) {
   if (!market) return 'Market';
   return market.question || market.title || market.slug || 'Market';
+}
+
+function formatPriceValue(value: string) {
+  const num = Number(value);
+  if (Number.isNaN(num)) return value;
+  return `${(num * 100).toFixed(0)}%`;
+}
+
+function formatUsdc(value: number) {
+  if (!Number.isFinite(value)) return '0.00';
+  return value.toFixed(2);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getOutcomePrices(market: MarketItem) {
+  if (!Array.isArray(market.outcomePrices) || !Array.isArray(market.outcomes)) {
+    return [];
+  }
+  return market.outcomes.map((outcome, index) => ({
+    outcome,
+    price: market.outcomePrices?.[index] ?? '',
+  }));
 }
 
 function getEventTitle(event: MarketItem | null) {
@@ -238,11 +264,15 @@ export function ClubPredictionForm({
   address: string | null;
 }) {
   const [state, dispatch] = useReducer(predictionFormReducer, initialState);
-  const [accordionValue, setAccordionValue] = useState<'event' | 'market' | 'winner' | ''>('event');
+  const [accordionValue, setAccordionValue] = useState<
+    'event' | 'market' | 'winner' | 'bet' | ''
+  >('event');
   const [loadingMarketKey, setLoadingMarketKey] = useState<string | null>(null);
   const { createPrediction } = useCreatePrediction(clubSlug);
   const { fetchMarketDetails } = useMarketDetails();
   const { query, setQuery, searching, error, results, runSearch } = useMarketSearch();
+  const { safeAddress } = usePolymarketSafe();
+  const { balance, balanceDisplay, isLoading: isBalanceLoading } = useSafeBalance(safeAddress);
 
   const members = club.members ?? [];
   const isManager =
@@ -288,6 +318,7 @@ export function ClubPredictionForm({
       if (!value) return false;
       if (value === 'market' && !state.selectedEvent) return false;
       if (value === 'winner' && !state.selectedMarket) return false;
+      if (value === 'bet' && !state.selectedOutcome) return false;
       return true;
     },
     [state.selectedEvent, state.selectedMarket]
@@ -300,7 +331,7 @@ export function ClubPredictionForm({
         return;
       }
       if (!canOpenSection(value)) return;
-      setAccordionValue(value as 'event' | 'market' | 'winner');
+      setAccordionValue(value as 'event' | 'market' | 'winner' | 'bet');
     },
     [canOpenSection]
   );
@@ -335,6 +366,16 @@ export function ClubPredictionForm({
     !!state.betAmount.trim();
   const canPickMarket = !!state.selectedEvent;
   const canPickWinner = !!state.selectedMarket;
+  const canPickBet = !!state.selectedOutcome;
+  const maxBalance = balance ? Number(balance) / 1e6 : 0;
+  const minBet = 0.01;
+  const sliderMax = maxBalance > minBet ? maxBalance : minBet;
+  const numericBet = Number(state.betAmount);
+  const sliderValue = Number.isFinite(numericBet)
+    ? clamp(numericBet, minBet, sliderMax)
+    : minBet;
+  const commitPercent =
+    maxBalance > 0 && Number.isFinite(sliderValue) ? (sliderValue / maxBalance) * 100 : 0;
 
   const submit = useCallback(async () => {
     dispatch({ type: 'clearMessage' });
@@ -598,6 +639,18 @@ export function ClubPredictionForm({
                               <div className="mt-1 text-xs text-muted-foreground">
                                 {outcomesCount} outcomes
                               </div>
+                              {getOutcomePrices(market).length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                  {getOutcomePrices(market).map((item) => (
+                                    <span
+                                      key={item.outcome}
+                                      className="rounded-full border border-border/70 px-2 py-0.5"
+                                    >
+                                      {item.outcome}: {formatPriceValue(item.price)}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                             {loadingMarketKey === key && (
                               <span className="text-xs text-muted-foreground">Loading…</span>
@@ -637,16 +690,30 @@ export function ClubPredictionForm({
               {state.selectedMarket && outcomes.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
-                    {outcomes.map((outcome) => (
-                      <Button
-                        key={outcome}
-                        type="button"
-                        variant={state.selectedOutcome === outcome ? 'default' : 'outline'}
-                        onClick={() => dispatch({ type: 'selectOutcome', outcome })}
-                      >
-                        {outcome}
-                      </Button>
-                    ))}
+                    {outcomes.map((outcome, index) => {
+                      const displayPrice = Array.isArray(state.selectedMarket?.outcomePrices)
+                        ? state.selectedMarket?.outcomePrices?.[index]
+                        : undefined;
+                      return (
+                        <Button
+                          key={outcome}
+                          type="button"
+                          variant={state.selectedOutcome === outcome ? 'default' : 'outline'}
+                          onClick={() => {
+                            dispatch({ type: 'selectOutcome', outcome });
+                            setAccordionValue('bet');
+                          }}
+                          className="gap-2"
+                        >
+                          <span>{outcome}</span>
+                          {displayPrice && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatPriceValue(displayPrice)}
+                            </span>
+                          )}
+                        </Button>
+                      );
+                    })}
                   </div>
                   <div className="rounded-lg border border-border/50 bg-muted/20 p-2">
                     <div className="grid gap-3">
@@ -659,13 +726,75 @@ export function ClubPredictionForm({
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="bet">
+            <AccordionTrigger
+              className={`justify-start gap-3 ${!canPickBet ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={!canPickBet}
+            >
+              <div className="flex flex-1 items-center">
+                <span>Bet amount</span>
+                <span className="ml-auto text-right text-xs text-muted-foreground">
+                  {state.betAmount.trim() ? `${state.betAmount} USDC` : 'Enter amount'}
+                </span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className={!canPickBet ? 'opacity-50' : ''}>
+              {!state.selectedOutcome && (
+                <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                  Pick a winner to continue.
+                </div>
+              )}
+              {state.selectedOutcome && (
+                <div className="space-y-3">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Bet amount (USDC)</label>
-                    <Input
-                      value={state.betAmount}
-                      onChange={(e) => dispatch({ type: 'setBetAmount', amount: e.target.value })}
-                      placeholder="e.g. 250"
-                    />
+                    <div className="space-y-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div className="flex-1 space-y-2">
+                          <Slider
+                            min={minBet}
+                            max={sliderMax}
+                            step={0.01}
+                            value={[sliderValue]}
+                            disabled={maxBalance <= 0 || isBalanceLoading}
+                            onValueChange={(value) => {
+                              const nextValue = value[0] ?? minBet;
+                              dispatch({
+                                type: 'setBetAmount',
+                                amount: formatUsdc(nextValue),
+                              });
+                            }}
+                          />
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>${minBet.toFixed(2)}</span>
+                            <span>
+                              {isBalanceLoading
+                                ? 'Checking Safe...'
+                                : `Available: ${balanceDisplay} USDC`}
+                            </span>
+                            <span>${formatUsdc(sliderMax)}</span>
+                          </div>
+                          {!isBalanceLoading && maxBalance > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              Committing {commitPercent.toFixed(1)}% of Safe
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-full sm:w-36">
+                          <Input
+                            value={state.betAmount}
+                            onChange={(e) =>
+                              dispatch({ type: 'setBetAmount', amount: e.target.value })
+                            }
+                            placeholder="e.g. 250"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <Button type="submit" disabled={!canSubmit}>
                     {state.tag === 'submitting' ? 'Creating...' : 'Create Prediction'}

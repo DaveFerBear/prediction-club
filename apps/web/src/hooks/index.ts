@@ -9,6 +9,7 @@ export { useSiweSignIn } from './use-siwe-signin';
 export { useMarketSearch, useMarketDetails, type MarketItem } from './use-market-search';
 export { useCreatePrediction } from './use-create-prediction';
 export { usePolymarketMarketData } from './use-polymarket-market-data';
+export { useSafeBalance } from './use-safe-balance';
 export {
   useClubs,
   useClub,
