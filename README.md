@@ -91,7 +91,7 @@ yarn install
 
 ```bash
 # Copy environment files
-cp apps/web/.env.example apps/web/.env.local
+cp apps/web/.env.example apps/web/.env
 cp apps/indexer/.env.example apps/indexer/.env
 
 # Edit with your values (see Environment Variables section)
