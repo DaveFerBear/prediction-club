@@ -6,6 +6,7 @@ export { usePolymarketApprovals } from './use-polymarket-approvals';
 export { usePolymarketCreds } from './use-polymarket-creds';
 export { usePolymarketOrders } from './use-polymarket-orders';
 export { useSiweSignIn } from './use-siwe-signin';
+export { useMarketSearch, type MarketItem } from './use-market-search';
 export {
   useClubs,
   useClub,

@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from '@prediction-club/ui';
 import { Header } from '@/components/header';
-import { useApi, useClub } from '@/hooks';
-import { isValidBytes32 } from '@prediction-club/shared';
+import { useApi, useClub, type MarketItem } from '@/hooks';
+import { generatePredictionRoundId } from '@prediction-club/chain';
+import { parseUnits } from 'viem';
+import { MarketSearch } from '@/components/market-search';
 
 export default function ClubPredictPage({ params }: { params: { slug: string } }) {
   const { fetch: apiFetch, address } = useApi();
@@ -24,26 +26,14 @@ export default function ClubPredictPage({ params }: { params: { slug: string } }
     return member?.role === 'ADMIN' || isManager;
   }, [address, members, isManager]);
 
-  const [cohortId, setCohortId] = useState('');
-  const [marketRef, setMarketRef] = useState('');
-  const [marketTitle, setMarketTitle] = useState('');
-  const [commitAmounts, setCommitAmounts] = useState<Record<string, string>>({});
+  const [selectedMarket, setSelectedMarket] = useState<MarketItem | null>(null);
+  const [selectedOutcome, setSelectedOutcome] = useState<string | null>(null);
+  const [betAmount, setBetAmount] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    if (!club) return;
-    setCommitAmounts((prev) => {
-      const next: Record<string, string> = { ...prev };
-      club.members.forEach((member) => {
-        if (next[member.user.id] === undefined) {
-          next[member.user.id] = '';
-        }
-      });
-      return next;
-    });
-  }, [club]);
+  const outcomes = Array.isArray(selectedMarket?.outcomes) ? selectedMarket?.outcomes ?? [] : [];
 
   const handleCreatePrediction = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -55,39 +45,58 @@ export default function ClubPredictPage({ params }: { params: { slug: string } }
       return;
     }
 
-    if (!isValidBytes32(cohortId.trim())) {
-      setErrorMessage('Cohort ID must be a bytes32 hex string.');
+    if (!selectedMarket) {
+      setErrorMessage('Select a market.');
       return;
     }
 
-    const entries = members
-      .map((member) => ({
-        userId: member.user.id,
-        commitAmount: commitAmounts[member.user.id]?.trim() || '0',
-      }))
-      .filter((member) => {
-        try {
-          return BigInt(member.commitAmount) > 0n;
-        } catch {
-          return false;
-        }
-      });
+    if (!selectedOutcome) {
+      setErrorMessage('Pick a winning outcome.');
+      return;
+    }
+
+    if (!betAmount.trim()) {
+      setErrorMessage('Enter a bet amount.');
+      return;
+    }
+
+    let commitAmount: string;
+    try {
+      commitAmount = parseUnits(betAmount.trim(), 6).toString();
+    } catch {
+      setErrorMessage('Bet amount must be a valid number.');
+      return;
+    }
+
+    if (BigInt(commitAmount) <= 0n) {
+      setErrorMessage('Bet amount must be greater than 0.');
+      return;
+    }
+
+    const entries = members.map((member) => ({
+      userId: member.user.id,
+      commitAmount,
+    }));
 
     if (entries.length === 0) {
-      setErrorMessage('Set a commit amount for at least one member.');
+      setErrorMessage('No active members found.');
       return;
     }
 
     setCreating(true);
     try {
+      const cohortId = generatePredictionRoundId(
+        `${selectedMarket.id ?? selectedMarket.slug ?? 'market'}:${selectedOutcome}:${Date.now()}`
+      );
+      const marketTitle = selectedMarket.question || selectedMarket.title || selectedMarket.slug || 'Market';
       const response = await apiFetch<{ success: boolean }>(
         `/api/clubs/${params.slug}/predictions`,
         {
           method: 'POST',
           body: JSON.stringify({
-            cohortId: cohortId.trim(),
-            marketRef: marketRef.trim() || undefined,
-            marketTitle: marketTitle.trim() || undefined,
+            cohortId,
+            marketRef: String(selectedMarket.id ?? selectedMarket.slug ?? selectedMarket.eventId ?? ''),
+            marketTitle: `${marketTitle} — ${selectedOutcome}`,
             members: entries,
           }),
         }
@@ -95,10 +104,9 @@ export default function ClubPredictPage({ params }: { params: { slug: string } }
 
       if (response.success) {
         setSuccessMessage('Prediction created.');
-        setCohortId('');
-        setMarketRef('');
-        setMarketTitle('');
-        setCommitAmounts({});
+        setSelectedMarket(null);
+        setSelectedOutcome(null);
+        setBetAmount('');
         await mutate(`/api/clubs/${params.slug}/predictions`);
       }
     } catch (err) {
@@ -155,7 +163,7 @@ export default function ClubPredictPage({ params }: { params: { slug: string } }
         <Card>
           <CardHeader>
             <CardTitle>Create Prediction</CardTitle>
-            <CardDescription>Commit funds for a new prediction round.</CardDescription>
+            <CardDescription>Search for a market, pick a winner, and set your bet.</CardDescription>
           </CardHeader>
           <CardContent>
             {!isAdmin && (
@@ -163,54 +171,53 @@ export default function ClubPredictPage({ params }: { params: { slug: string } }
                 Only club admins can create predictions.
               </div>
             )}
-            <form onSubmit={handleCreatePrediction} className="space-y-4">
+            <MarketSearch
+              selectedMarket={selectedMarket}
+              onSelect={(market) => {
+                setSelectedMarket(market);
+                setSelectedOutcome(null);
+              }}
+            />
+
+            <form onSubmit={handleCreatePrediction} className="mt-6 space-y-4">
               {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
               {successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Cohort ID (bytes32)</label>
-                <Input
-                  value={cohortId}
-                  onChange={(e) => setCohortId(e.target.value)}
-                  placeholder="0x..."
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Market Reference</label>
-                <Input
-                  value={marketRef}
-                  onChange={(e) => setMarketRef(e.target.value)}
-                  placeholder="Polymarket URL or ID"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Market Title</label>
-                <Input
-                  value={marketTitle}
-                  onChange={(e) => setMarketTitle(e.target.value)}
-                  placeholder="e.g., US Election 2024"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Commit amounts (USDC, 6 decimals)</div>
-                <div className="space-y-2">
-                  {members.map((member) => (
-                    <div key={member.user.id} className="flex items-center gap-3">
-                      <div className="w-40 text-xs text-muted-foreground">
-                        {member.user.email || member.user.walletAddress.slice(0, 10) + '…'}
-                      </div>
-                      <Input
-                        value={commitAmounts[member.user.id] || ''}
-                        onChange={(e) =>
-                          setCommitAmounts((prev) => ({
-                            ...prev,
-                            [member.user.id]: e.target.value,
-                          }))
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-                  ))}
+                <label className="text-sm font-medium">Selected market</label>
+                <div className="rounded-md border border-dashed p-3 text-sm">
+                  {selectedMarket
+                    ? selectedMarket.question || selectedMarket.title || selectedMarket.slug
+                    : 'No market selected.'}
                 </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Pick winner</label>
+                {outcomes.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    Select a market with outcomes to continue.
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {outcomes.map((outcome) => (
+                      <Button
+                        key={outcome}
+                        type="button"
+                        variant={selectedOutcome === outcome ? 'default' : 'outline'}
+                        onClick={() => setSelectedOutcome(outcome)}
+                      >
+                        {outcome}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Bet amount (USDC)</label>
+                <Input
+                  value={betAmount}
+                  onChange={(e) => setBetAmount(e.target.value)}
+                  placeholder="e.g. 250"
+                />
               </div>
               <Button type="submit" disabled={creating || !isAdmin}>
                 {creating ? 'Creating...' : 'Create Prediction'}
