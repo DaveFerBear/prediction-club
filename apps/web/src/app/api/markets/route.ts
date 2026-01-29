@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
     const closed = searchParams.get('closed') === 'true';
     const activeParam = searchParams.get('active');
     const active = activeParam === 'true' ? true : activeParam === 'false' ? false : undefined;
+    const slug = searchParams.get('slug')?.trim() || undefined;
+    const id = searchParams.get('id')?.trim() || undefined;
 
     if (q) {
       const result = await GammaController.publicSearch({
@@ -31,7 +33,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const markets = await GammaController.listMarkets({ limit, offset, closed, active });
+    const markets = await GammaController.listMarkets({
+      limit,
+      offset,
+      closed,
+      active,
+      slug,
+      id,
+    });
     const filtered = q
       ? markets.filter((item) => {
           const title = (item as { question?: string; title?: string; slug?: string }).question

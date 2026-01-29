@@ -4,6 +4,7 @@ import { useCallback, useMemo, useReducer } from 'react';
 import { parseUnits } from 'viem';
 import { Button, Input } from '@prediction-club/ui';
 import { useCreatePrediction } from '@/hooks/use-create-prediction';
+import { usePolymarketMarketData } from '@/hooks/use-polymarket-market-data';
 import { MarketSearch } from '@/components/market-search';
 import type { ClubDetail } from '@/hooks';
 import type { MarketItem } from '@/hooks/use-market-search';
@@ -95,6 +96,96 @@ function getMarketRef(market: MarketItem | null) {
   return String(market.id ?? market.slug ?? market.eventId ?? '');
 }
 
+function OutcomeDetails({ outcome, tokenId }: { outcome: string; tokenId?: string }) {
+  const { data, error, isLoading } = usePolymarketMarketData(tokenId);
+
+  const formatPrice = (value: unknown) => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (typeof value === 'object' && value && 'price' in value) {
+      const priceValue = (value as { price?: string | number }).price;
+      return priceValue !== undefined ? String(priceValue) : '—';
+    }
+    return '—';
+  };
+
+  if (!tokenId) {
+    return (
+      <div className="rounded-md border p-3 text-sm text-muted-foreground">
+        Missing token id for {outcome}.
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="rounded-md border p-3 text-sm text-muted-foreground">
+        Loading {outcome} market data...
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="rounded-md border p-3 text-sm text-muted-foreground">
+        Market data unavailable for {outcome}.
+      </div>
+    );
+  }
+
+  const bids = data.orderbook.bids.slice(0, 5);
+  const asks = data.orderbook.asks.slice(0, 5);
+
+  return (
+    <div className="rounded-md border p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="font-medium">{outcome}</div>
+        <div className="text-muted-foreground">
+          Buy: {formatPrice(data.price.buy)}
+        </div>
+        <div className="text-muted-foreground">
+          Sell: {formatPrice(data.price.sell)}
+        </div>
+        <div className="text-muted-foreground">
+          Mid: {formatPrice(data.price.midpoint)}
+        </div>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div>
+          <div className="text-xs uppercase text-muted-foreground">Bids (top 5)</div>
+          <div className="mt-2 space-y-1">
+            {bids.length === 0 ? (
+              <div className="text-xs text-muted-foreground">No bids.</div>
+            ) : (
+              bids.map((bid, idx) => (
+                <div key={`bid-${idx}`} className="flex justify-between text-xs">
+                  <span>{bid.price}</span>
+                  <span className="text-muted-foreground">{bid.size}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground">Asks (top 5)</div>
+          <div className="mt-2 space-y-1">
+            {asks.length === 0 ? (
+              <div className="text-xs text-muted-foreground">No asks.</div>
+            ) : (
+              asks.map((ask, idx) => (
+                <div key={`ask-${idx}`} className="flex justify-between text-xs">
+                  <span>{ask.price}</span>
+                  <span className="text-muted-foreground">{ask.size}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ClubPredictionForm({
   club,
   clubSlug,
@@ -126,6 +217,17 @@ export function ClubPredictionForm({
         : [],
     [state.selectedMarket]
   );
+  const clobTokenIds = useMemo(
+    () =>
+      Array.isArray(state.selectedMarket?.clobTokenIds)
+        ? (state.selectedMarket?.clobTokenIds ?? [])
+        : [],
+    [state.selectedMarket]
+  );
+  const outcomeDetails = outcomes.map((outcome, index) => ({
+    outcome,
+    tokenId: clobTokenIds[index],
+  }));
 
   const canSubmit =
     isAdmin &&
@@ -246,17 +348,28 @@ export function ClubPredictionForm({
               Select a market with outcomes to continue.
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {outcomes.map((outcome) => (
-                <Button
-                  key={outcome}
-                  type="button"
-                  variant={state.selectedOutcome === outcome ? 'default' : 'outline'}
-                  onClick={() => dispatch({ type: 'selectOutcome', outcome })}
-                >
-                  {outcome}
-                </Button>
-              ))}
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {outcomes.map((outcome) => (
+                  <Button
+                    key={outcome}
+                    type="button"
+                    variant={state.selectedOutcome === outcome ? 'default' : 'outline'}
+                    onClick={() => dispatch({ type: 'selectOutcome', outcome })}
+                  >
+                    {outcome}
+                  </Button>
+                ))}
+              </div>
+              <div className="grid gap-3">
+                {outcomeDetails.map((detail) => (
+                  <OutcomeDetails
+                    key={detail.outcome}
+                    outcome={detail.outcome}
+                    tokenId={detail.tokenId}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>

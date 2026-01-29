@@ -10,7 +10,9 @@ export type MarketItem = {
   question?: string;
   title?: string;
   subtitle?: string;
-  outcomes?: string[];
+  outcomes?: string[] | string;
+  outcomePrices?: string[] | string;
+  clobTokenIds?: string[] | string;
   markets?: MarketItem[];
   url?: string;
   image?: string;
@@ -24,6 +26,37 @@ export function useMarketSearch() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<MarketItem[]>([]);
+
+  const parseStringArray = useCallback((value: string | string[] | undefined) => {
+    if (!value) return undefined;
+    if (Array.isArray(value)) return value;
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  const normalizeMarketItem = useCallback(
+    (item: MarketItem): MarketItem => {
+      const outcomes = parseStringArray(item.outcomes);
+      const outcomePrices = parseStringArray(item.outcomePrices);
+      const clobTokenIds = parseStringArray(item.clobTokenIds);
+      const markets = Array.isArray(item.markets)
+        ? item.markets.map((market) => normalizeMarketItem(market))
+        : undefined;
+
+      return {
+        ...item,
+        outcomes: outcomes ?? item.outcomes,
+        outcomePrices: outcomePrices ?? item.outcomePrices,
+        clobTokenIds: clobTokenIds ?? item.clobTokenIds,
+        markets,
+      };
+    },
+    [parseStringArray]
+  );
 
   const dedupeResults = useCallback((items: MarketItem[]) => {
     const seen = new Set<string>();
@@ -61,13 +94,40 @@ export function useMarketSearch() {
         throw new Error('Failed to fetch markets');
       }
 
-      setResults(dedupeResults(response.data.items ?? []));
+      const normalized = (response.data.items ?? []).map((item) => normalizeMarketItem(item));
+      setResults(dedupeResults(normalized));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch markets');
     } finally {
       setSearching(false);
     }
-  }, [apiFetch, dedupeResults, query]);
+  }, [apiFetch, dedupeResults, normalizeMarketItem, query]);
+
+  const fetchMarketDetails = useCallback(
+    async (market: MarketItem) => {
+      const slug = market.slug?.trim();
+      const id = market.id ? String(market.id) : undefined;
+      if (!slug && !id) return null;
+
+      const params = new URLSearchParams();
+      if (slug) params.set('slug', slug);
+      if (id) params.set('id', id);
+      params.set('limit', '1');
+
+      const response = await apiFetch<{
+        success: boolean;
+        data: { items: MarketItem[] };
+      }>(`/api/markets?${params.toString()}`);
+
+      if (!response.success) {
+        throw new Error('Failed to fetch market details');
+      }
+
+      const item = response.data.items?.[0];
+      return item ? normalizeMarketItem(item) : null;
+    },
+    [apiFetch, normalizeMarketItem]
+  );
 
   return {
     query,
@@ -76,5 +136,6 @@ export function useMarketSearch() {
     error,
     results,
     runSearch,
+    fetchMarketDetails,
   };
 }

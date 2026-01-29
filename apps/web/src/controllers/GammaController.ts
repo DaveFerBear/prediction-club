@@ -6,6 +6,8 @@ export interface ListMarketsInput {
   active?: boolean;
   closed?: boolean;
   order?: string;
+  slug?: string;
+  id?: string | number;
 }
 
 export interface PublicSearchInput {
@@ -43,7 +45,7 @@ export class GammaController {
    * List markets from Gamma API.
    */
   static async listMarkets(input: ListMarketsInput = {}) {
-    const { limit = 50, offset = 0, active, closed = false, order } = input;
+    const { limit = 50, offset = 0, active, closed = false, order, slug, id } = input;
     const params: Record<string, string | number | boolean> = {
       limit,
       offset,
@@ -54,6 +56,12 @@ export class GammaController {
     }
     if (order) {
       params.order = order;
+    }
+    if (slug) {
+      params.slug = slug;
+    }
+    if (id !== undefined) {
+      params.id = id;
     }
 
     return fetchGamma<unknown[]>('/markets', params);

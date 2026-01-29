@@ -8,6 +8,7 @@ export { usePolymarketOrders } from './use-polymarket-orders';
 export { useSiweSignIn } from './use-siwe-signin';
 export { useMarketSearch, type MarketItem } from './use-market-search';
 export { useCreatePrediction } from './use-create-prediction';
+export { usePolymarketMarketData } from './use-polymarket-market-data';
 export {
   useClubs,
   useClub,
