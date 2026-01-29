@@ -498,7 +498,9 @@ export default function ProfilePage() {
                 )}
               </div>
               <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">In markets</div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  In markets
+                </div>
                 <div className="mt-2 text-2xl font-semibold">
                   {marketBalanceDisplay}{' '}
                   <span className="text-base text-muted-foreground">USDC.e</span>
@@ -754,7 +756,6 @@ export default function ProfilePage() {
             </div>
           </CardContent>
         </Card>
-
       </main>
     </div>
   );

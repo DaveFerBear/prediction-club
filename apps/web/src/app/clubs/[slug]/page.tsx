@@ -18,7 +18,6 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
-import { isValidBytes32 } from '@prediction-club/shared';
 
 function formatAmount(amount: string) {
   const num = Number(amount) / 1e6; // Assuming USDC with 6 decimals
@@ -83,27 +82,12 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const [clubSaveError, setClubSaveError] = useState<string | null>(null);
   const [clubSaveSuccess, setClubSaveSuccess] = useState<string | null>(null);
 
-  const [predictionError, setPredictionError] = useState<string | null>(null);
-  const [creatingPrediction, setCreatingPrediction] = useState(false);
-  const [cohortId, setCohortId] = useState('');
-  const [marketRef, setMarketRef] = useState('');
-  const [marketTitle, setMarketTitle] = useState('');
-  const [commitAmounts, setCommitAmounts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!club) return;
     setClubName(club.name);
     setClubDescription(club.description ?? '');
     setClubPublic(club.isPublic);
-    setCommitAmounts((prev) => {
-      const next: Record<string, string> = { ...prev };
-      club.members.forEach((member) => {
-        if (next[member.user.id] === undefined) {
-          next[member.user.id] = '';
-        }
-      });
-      return next;
-    });
   }, [club]);
 
   useEffect(() => {
@@ -183,59 +167,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     }
   };
 
-  const handleCreatePrediction = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setPredictionError(null);
-    if (!isValidBytes32(cohortId.trim())) {
-      setPredictionError('Cohort ID must be a bytes32 hex string');
-      return;
-    }
-
-    const members = (club?.members ?? [])
-      .map((member) => ({
-        userId: member.user.id,
-        commitAmount: commitAmounts[member.user.id]?.trim() || '0',
-      }))
-      .filter((member) => {
-        try {
-          return BigInt(member.commitAmount) > 0n;
-        } catch {
-          return false;
-        }
-      });
-
-    if (members.length === 0) {
-      setPredictionError('Set a commit amount for at least one member');
-      return;
-    }
-
-    setCreatingPrediction(true);
-    try {
-      const response = await apiFetch<{ success: boolean }>(
-        `/api/clubs/${params.slug}/predictions`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            cohortId: cohortId.trim(),
-            marketRef: marketRef.trim() || undefined,
-            marketTitle: marketTitle.trim() || undefined,
-            members,
-          }),
-        }
-      );
-      if (response.success) {
-        setCohortId('');
-        setMarketRef('');
-        setMarketTitle('');
-        setCommitAmounts({});
-        await mutate(`/api/clubs/${params.slug}/predictions`);
-      }
-    } catch (err) {
-      setPredictionError(err instanceof Error ? err.message : 'Failed to create prediction');
-    } finally {
-      setCreatingPrediction(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -278,6 +209,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-bold">{club.name}</h1>
                 <Badge variant="secondary">{club.isPublic ? 'Public' : 'Private'}</Badge>
+                {isManager && <Badge variant="outline">You are a manager</Badge>}
               </div>
               <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
               <div className="mt-4 flex items-center gap-4 text-sm">
@@ -291,8 +223,10 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                 )}
               </div>
             </div>
-            {isManager ? (
-              <Badge variant="outline">You are a manager</Badge>
+            {isAdmin ? (
+              <Link href={`/clubs/${club.slug}/predict`}>
+                <Button size="sm">Make prediction</Button>
+              </Link>
             ) : isMember ? (
               <Badge variant="secondary">You are a member</Badge>
             ) : (
@@ -504,66 +438,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Create Prediction</CardTitle>
-                <CardDescription>Commit funds for a new prediction round.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreatePrediction} className="space-y-4">
-                  {predictionError && <p className="text-sm text-destructive">{predictionError}</p>}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Cohort ID (bytes32)</label>
-                    <Input
-                      value={cohortId}
-                      onChange={(e) => setCohortId(e.target.value)}
-                      placeholder="0x..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Market Reference</label>
-                    <Input
-                      value={marketRef}
-                      onChange={(e) => setMarketRef(e.target.value)}
-                      placeholder="Polymarket URL or ID"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Market Title</label>
-                    <Input
-                      value={marketTitle}
-                      onChange={(e) => setMarketTitle(e.target.value)}
-                      placeholder="e.g., US Election 2024"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">Commit amounts (USDC, 6 decimals)</div>
-                    <div className="space-y-2">
-                      {club.members.map((member) => (
-                        <div key={member.user.id} className="flex items-center gap-3">
-                          <div className="w-40 text-xs text-muted-foreground">
-                            {member.user.email || member.user.walletAddress.slice(0, 10) + '…'}
-                          </div>
-                          <Input
-                            value={commitAmounts[member.user.id] || ''}
-                            onChange={(e) =>
-                              setCommitAmounts((prev) => ({
-                                ...prev,
-                                [member.user.id]: e.target.value,
-                              }))
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <Button type="submit" disabled={creatingPrediction}>
-                    {creatingPrediction ? 'Creating...' : 'Create Prediction'}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
           </div>
         )}
       </main>
