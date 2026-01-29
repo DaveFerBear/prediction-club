@@ -20,43 +20,63 @@ export type MarketItem = {
   icon?: string;
 };
 
+function parseStringArray(value: string | string[] | undefined) {
+  if (!value) return undefined;
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeMarketItem(item: MarketItem): MarketItem {
+  const outcomes = parseStringArray(item.outcomes);
+  const outcomePrices = parseStringArray(item.outcomePrices);
+  const clobTokenIds = parseStringArray(item.clobTokenIds);
+  const markets = Array.isArray(item.markets)
+    ? item.markets.map((market) => normalizeMarketItem(market))
+    : undefined;
+
+  return {
+    ...item,
+    outcomes: outcomes ?? item.outcomes,
+    outcomePrices: outcomePrices ?? item.outcomePrices,
+    clobTokenIds: clobTokenIds ?? item.clobTokenIds,
+    markets,
+  };
+}
+
+async function fetchMarketDetailsRequest(apiFetch: <T>(url: string) => Promise<T>, market: MarketItem) {
+  const slug = market.slug?.trim();
+  const id = market.id ? String(market.id) : undefined;
+  if (!slug && !id) return null;
+
+  const params = new URLSearchParams();
+  if (slug) params.set('slug', slug);
+  if (id) params.set('id', id);
+  params.set('limit', '1');
+
+  const response = await apiFetch<{
+    success: boolean;
+    data: { items: MarketItem[] };
+  }>(`/api/markets?${params.toString()}`);
+
+  if (!response.success) {
+    throw new Error('Failed to fetch market details');
+  }
+
+  const item = response.data.items?.[0];
+  return item ? normalizeMarketItem(item) : null;
+}
+
 export function useMarketSearch() {
   const { fetch: apiFetch } = useApi();
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<MarketItem[]>([]);
-
-  const parseStringArray = useCallback((value: string | string[] | undefined) => {
-    if (!value) return undefined;
-    if (Array.isArray(value)) return value;
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : undefined;
-    } catch {
-      return undefined;
-    }
-  }, []);
-
-  const normalizeMarketItem = useCallback(
-    (item: MarketItem): MarketItem => {
-      const outcomes = parseStringArray(item.outcomes);
-      const outcomePrices = parseStringArray(item.outcomePrices);
-      const clobTokenIds = parseStringArray(item.clobTokenIds);
-      const markets = Array.isArray(item.markets)
-        ? item.markets.map((market) => normalizeMarketItem(market))
-        : undefined;
-
-      return {
-        ...item,
-        outcomes: outcomes ?? item.outcomes,
-        outcomePrices: outcomePrices ?? item.outcomePrices,
-        clobTokenIds: clobTokenIds ?? item.clobTokenIds,
-        markets,
-      };
-    },
-    [parseStringArray]
-  );
 
   const dedupeResults = useCallback((items: MarketItem[]) => {
     const seen = new Set<string>();
@@ -101,33 +121,7 @@ export function useMarketSearch() {
     } finally {
       setSearching(false);
     }
-  }, [apiFetch, dedupeResults, normalizeMarketItem, query]);
-
-  const fetchMarketDetails = useCallback(
-    async (market: MarketItem) => {
-      const slug = market.slug?.trim();
-      const id = market.id ? String(market.id) : undefined;
-      if (!slug && !id) return null;
-
-      const params = new URLSearchParams();
-      if (slug) params.set('slug', slug);
-      if (id) params.set('id', id);
-      params.set('limit', '1');
-
-      const response = await apiFetch<{
-        success: boolean;
-        data: { items: MarketItem[] };
-      }>(`/api/markets?${params.toString()}`);
-
-      if (!response.success) {
-        throw new Error('Failed to fetch market details');
-      }
-
-      const item = response.data.items?.[0];
-      return item ? normalizeMarketItem(item) : null;
-    },
-    [apiFetch, normalizeMarketItem]
-  );
+  }, [apiFetch, dedupeResults, query]);
 
   return {
     query,
@@ -136,6 +130,18 @@ export function useMarketSearch() {
     error,
     results,
     runSearch,
+  };
+}
+
+export function useMarketDetails() {
+  const { fetch: apiFetch } = useApi();
+
+  const fetchMarketDetails = useCallback(
+    async (market: MarketItem) => fetchMarketDetailsRequest(apiFetch, market),
+    [apiFetch]
+  );
+
+  return {
     fetchMarketDetails,
   };
 }
