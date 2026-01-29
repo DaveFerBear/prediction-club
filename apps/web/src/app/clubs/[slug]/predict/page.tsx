@@ -53,7 +53,9 @@ export default function ClubPredictPage({ params }: { params: { slug: string } }
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Make a Prediction</h1>
-            <p className="text-muted-foreground">Create a new prediction for {club.name}.</p>
+            <p className="text-muted-foreground">
+              Search for a market, pick a winner, and set your bet.
+            </p>
           </div>
           <Link href={`/clubs/${club.slug}`}>
             <Button variant="outline">Back to club</Button>
@@ -61,14 +63,8 @@ export default function ClubPredictPage({ params }: { params: { slug: string } }
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Create Prediction</CardTitle>
-            <CardDescription>Search for a market, pick a winner, and set your bet.</CardDescription>
-          </CardHeader>
           <CardContent>
-            {club && (
-              <ClubPredictionForm club={club} clubSlug={params.slug} address={address} />
-            )}
+            {club && <ClubPredictionForm club={club} clubSlug={params.slug} address={address} />}
           </CardContent>
         </Card>
       </main>
