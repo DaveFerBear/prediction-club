@@ -446,7 +446,7 @@ export function ClubPredictionForm({
             <AccordionContent>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="flex flex-col gap-2 sm:flex-row px-1">
                     <Input
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
@@ -472,7 +472,7 @@ export function ClubPredictionForm({
                 {error && <p className="text-sm text-destructive">{error}</p>}
 
                 {eventResults.length > 0 && (
-                  <div className="max-h-96 overflow-y-auto rounded-md border border-border/60 p-2">
+                  <div className="max-h-96 overflow-y-auto rounded-lg border border-border/50 bg-muted/20 p-2">
                     <div className="space-y-2">
                       {eventResults.map((eventItem) => {
                         const key = getEventKey(eventItem);
@@ -484,36 +484,40 @@ export function ClubPredictionForm({
                           <button
                             key={key}
                             type="button"
-                            className={`rounded-md border p-3 text-left transition ${
-                              isSelected ? 'border-primary' : 'border-border'
+                            className={`w-full rounded-md border bg-background p-4 text-left shadow-sm transition hover:bg-muted/40 ${
+                              isSelected
+                                ? 'border-primary ring-1 ring-primary/30'
+                                : 'border-border/70'
                             }`}
                             onClick={() => handleSelectEvent(eventItem)}
                           >
-                            <div className="flex items-start gap-3">
+                            <div className="flex items-start gap-4">
                               {image && (
                                 <img
                                   src={image}
                                   alt=""
-                                  className="h-10 w-10 rounded-md object-cover"
+                                  className="h-12 w-12 rounded-md object-cover"
                                 />
                               )}
                               <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  {url ? (
-                                    <span className="max-w-[220px] truncate text-xs text-muted-foreground">
-                                      {formatUrl(url)}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs italic text-muted-foreground">
-                                      No link
-                                    </span>
-                                  )}
-                                  <div className="min-w-0 text-sm font-medium truncate">
-                                    {getEventTitle(eventItem)}
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold">
+                                      {getEventTitle(eventItem)}
+                                    </div>
+                                    {url ? (
+                                      <div className="mt-1 truncate text-xs text-muted-foreground">
+                                        {formatUrl(url)}
+                                      </div>
+                                    ) : (
+                                      <div className="mt-1 text-xs italic text-muted-foreground">
+                                        No link
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                  {(eventItem.markets ?? []).length} markets
+                                  <div className="text-xs font-medium text-muted-foreground">
+                                    {(eventItem.markets ?? []).length} markets
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -548,45 +552,61 @@ export function ClubPredictionForm({
             </AccordionTrigger>
             <AccordionContent className={!canPickMarket ? 'opacity-50' : ''}>
               {!state.selectedEvent && (
-                <div className="text-sm text-muted-foreground">
+                <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
                   Select an event to see available markets.
                 </div>
               )}
               {state.selectedEvent && availableMarkets.length === 0 && (
-                <div className="text-sm text-muted-foreground">
+                <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
                   No markets found for this event.
                 </div>
               )}
               {state.selectedEvent && availableMarkets.length > 0 && (
-                <div className="grid gap-2 md:grid-cols-2">
-                  {availableMarkets.map((market) => {
-                    const key = String(market.id ?? market.slug ?? market.eventId ?? '');
-                    const isSelected =
-                      state.selectedMarket &&
-                      String(
-                        state.selectedMarket.id ??
-                          state.selectedMarket.slug ??
-                          state.selectedMarket.eventId ??
-                          ''
-                      ) === key;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        disabled={loadingMarketKey === key}
-                        aria-busy={loadingMarketKey === key}
-                        className={`rounded-md border p-3 text-left text-sm transition ${
-                          isSelected ? 'border-primary' : 'border-border'
-                        }`}
-                        onClick={() => handleSelectMarket(market)}
-                      >
-                        <div className="font-medium truncate">{getMarketTitle(market)}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {(market.outcomes ?? []).length} outcomes
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="rounded-lg border border-border/50 bg-muted/20 p-2">
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {availableMarkets.map((market) => {
+                      const key = String(market.id ?? market.slug ?? market.eventId ?? '');
+                      const isSelected =
+                        state.selectedMarket &&
+                        String(
+                          state.selectedMarket.id ??
+                            state.selectedMarket.slug ??
+                            state.selectedMarket.eventId ??
+                            ''
+                        ) === key;
+                      const outcomesCount = Array.isArray(market.outcomes)
+                        ? market.outcomes.length
+                        : 0;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          disabled={loadingMarketKey === key}
+                          aria-busy={loadingMarketKey === key}
+                          className={`w-full rounded-md border bg-background p-4 text-left text-sm shadow-sm transition hover:bg-muted/40 ${
+                            isSelected
+                              ? 'border-primary ring-1 ring-primary/30'
+                              : 'border-border/70'
+                          }`}
+                          onClick={() => handleSelectMarket(market)}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-semibold">
+                                {getMarketTitle(market)}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {outcomesCount} outcomes
+                              </div>
+                            </div>
+                            {loadingMarketKey === key && (
+                              <span className="text-xs text-muted-foreground">Loading…</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </AccordionContent>
@@ -605,17 +625,17 @@ export function ClubPredictionForm({
             </AccordionTrigger>
             <AccordionContent className={!canPickWinner ? 'opacity-50' : ''}>
               {!state.selectedMarket && (
-                <div className="text-sm text-muted-foreground">
+                <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
                   Pick a market to view outcomes.
                 </div>
               )}
               {state.selectedMarket && outcomes.length === 0 && (
-                <div className="text-sm text-muted-foreground">
+                <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
                   No outcomes available for this market.
                 </div>
               )}
               {state.selectedMarket && outcomes.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
                     {outcomes.map((outcome) => (
                       <Button
@@ -628,14 +648,16 @@ export function ClubPredictionForm({
                       </Button>
                     ))}
                   </div>
-                  <div className="grid gap-3">
-                    {outcomeDetails.map((detail) => (
-                      <OutcomeDetails
-                        key={detail.outcome}
-                        outcome={detail.outcome}
-                        tokenId={detail.tokenId}
-                      />
-                    ))}
+                  <div className="rounded-lg border border-border/50 bg-muted/20 p-2">
+                    <div className="grid gap-3">
+                      {outcomeDetails.map((detail) => (
+                        <OutcomeDetails
+                          key={detail.outcome}
+                          outcome={detail.outcome}
+                          tokenId={detail.tokenId}
+                        />
+                      ))}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Bet amount (USDC)</label>
