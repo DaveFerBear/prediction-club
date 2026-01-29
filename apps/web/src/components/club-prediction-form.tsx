@@ -487,7 +487,7 @@ export function ClubPredictionForm({
             <AccordionContent>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <div className="flex flex-col gap-2 sm:flex-row px-1">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
