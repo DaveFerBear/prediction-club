@@ -3,6 +3,7 @@ const GAMMA_BASE_URL = 'https://gamma-api.polymarket.com';
 export interface ListMarketsInput {
   limit?: number;
   offset?: number;
+  active?: boolean;
   closed?: boolean;
   order?: string;
 }
@@ -42,12 +43,15 @@ export class GammaController {
    * List markets from Gamma API.
    */
   static async listMarkets(input: ListMarketsInput = {}) {
-    const { limit = 50, offset = 0, closed = false, order } = input;
+    const { limit = 50, offset = 0, active, closed = false, order } = input;
     const params: Record<string, string | number | boolean> = {
       limit,
       offset,
       closed,
     };
+    if (typeof active === 'boolean') {
+      params.active = active;
+    }
     if (order) {
       params.order = order;
     }

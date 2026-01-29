@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
     const closed = searchParams.get('closed') === 'true';
+    const activeParam = searchParams.get('active');
+    const active = activeParam === 'true' ? true : activeParam === 'false' ? false : undefined;
 
     if (q) {
       const result = await GammaController.publicSearch({
@@ -29,10 +31,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const markets = await GammaController.listMarkets({ limit, offset, closed });
+    const markets = await GammaController.listMarkets({ limit, offset, closed, active });
+    const filtered = q
+      ? markets.filter((item) => {
+          const title = (item as { question?: string; title?: string; slug?: string }).question
+            ?? (item as { question?: string; title?: string; slug?: string }).title
+            ?? (item as { question?: string; title?: string; slug?: string }).slug
+            ?? '';
+          return title.toLowerCase().includes(q.toLowerCase());
+        })
+      : markets;
     return apiResponse({
       mode: 'markets',
-      items: markets,
+      items: filtered,
       pagination: {
         limit,
         offset,

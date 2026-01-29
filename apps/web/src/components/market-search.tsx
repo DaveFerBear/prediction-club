@@ -13,7 +13,7 @@ function getMarketKey(market: MarketItem) {
 }
 
 function getMarketTitle(market: MarketItem) {
-  return market.question || market.title || market.slug || 'Market';
+  return market.question || market.title || market.subtitle || market.slug || 'Market';
 }
 
 function getMarketUrl(market: MarketItem) {
@@ -24,6 +24,10 @@ function getMarketUrl(market: MarketItem) {
 
 function getMarketImage(market: MarketItem) {
   return market.image || market.image_url || market.icon || '';
+}
+
+function formatUrl(url: string) {
+  return url.replace(/^https?:\/\//, '');
 }
 
 export function MarketSearch({ selectedMarket, onSelect }: MarketSearchProps) {
@@ -79,24 +83,24 @@ export function MarketSearch({ selectedMarket, onSelect }: MarketSearchProps) {
                         className="h-10 w-10 rounded-md object-cover"
                       />
                     )}
-                    <div className="min-w-0">
-                      <div className="text-xs text-muted-foreground truncate">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         {url ? (
                           <a
                             href={url}
                             target="_blank"
                             rel="noreferrer"
-                            className="block truncate underline"
+                            className="max-w-[180px] truncate text-xs text-muted-foreground underline"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            {url}
+                            {formatUrl(url)}
                           </a>
                         ) : (
-                          <span className="italic">No link</span>
+                          <span className="text-xs italic text-muted-foreground">No link</span>
                         )}
-                      </div>
-                      <div className="mt-1 text-sm font-medium">
-                        {getMarketTitle(market)}
+                        <div className="min-w-0 text-sm font-medium truncate">
+                          {getMarketTitle(market)}
+                        </div>
                       </div>
                     </div>
                   </div>
