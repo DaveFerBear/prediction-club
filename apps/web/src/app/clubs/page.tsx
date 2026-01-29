@@ -48,29 +48,28 @@ export default function ClubsPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {clubs.map((club) => (
-              <Card key={club.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>{club.name}</CardTitle>
-                    <Badge variant="secondary">{club._count.members} members</Badge>
-                  </div>
-                  <CardDescription>/{club.slug}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {club.description && (
-                    <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
-                      {club.description}
-                    </p>
-                  )}
-                  <div className="flex justify-between text-sm mb-4">
-                    <span className="text-muted-foreground">Predictions</span>
-                    <span>{club._count.predictionRounds}</span>
-                  </div>
-                  <Link href={`/clubs/${club.slug}`}>
-                    <Button className="w-full">View Club</Button>
-                  </Link>
-                </CardContent>
-              </Card>
+              <Link key={club.id} href={`/clubs/${club.slug}`} className="group">
+                <Card className="transition-shadow group-hover:shadow-md">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>{club.name}</CardTitle>
+                      <Badge variant="secondary">{club._count.members} members</Badge>
+                    </div>
+                    <CardDescription>/{club.slug}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {club.description && (
+                      <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
+                        {club.description}
+                      </p>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Predictions</span>
+                      <span>{club._count.predictionRounds}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         )}
