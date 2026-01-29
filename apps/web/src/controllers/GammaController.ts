@@ -17,13 +17,23 @@ export interface PublicSearchInput {
   keepClosedMarkets?: number;
   sort?: string;
   ascending?: boolean;
+  type?: string;
+  eventsStatus?: string;
+  eventsTag?: string;
+  presets?: string[];
 }
 
-async function fetchGamma<T>(path: string, params?: Record<string, string | number | boolean>) {
+type GammaParamValue = string | number | boolean | string[];
+
+async function fetchGamma<T>(path: string, params?: Record<string, GammaParamValue>) {
   const url = new URL(path, GAMMA_BASE_URL);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
-      url.searchParams.set(key, String(value));
+      if (Array.isArray(value)) {
+        value.forEach((entry) => url.searchParams.append(key, String(entry)));
+      } else {
+        url.searchParams.set(key, String(value));
+      }
     }
   }
 
@@ -45,15 +55,13 @@ export class GammaController {
    * List markets from Gamma API.
    */
   static async listMarkets(input: ListMarketsInput = {}) {
-    const { limit = 50, offset = 0, active, closed = false, order, slug, id } = input;
+    const { limit = 50, offset = 0, active = true, closed = false, order, slug, id } = input;
     const params: Record<string, string | number | boolean> = {
       limit,
       offset,
       closed,
+      active,
     };
-    if (typeof active === 'boolean') {
-      params.active = active;
-    }
     if (order) {
       params.order = order;
     }
@@ -71,17 +79,32 @@ export class GammaController {
    * Public search across events/tags/profiles.
    */
   static async publicSearch(input: PublicSearchInput) {
-    const { q, page = 0, limitPerType = 20, keepClosedMarkets = 0, sort, ascending } = input;
-    const params: Record<string, string | number | boolean> = {
+    const {
+      q,
+      page = 1,
+      limitPerType = 20,
+      keepClosedMarkets = 0,
+      sort = 'volume_24hr',
+      ascending,
+      type = 'events',
+      eventsStatus = 'active',
+      eventsTag,
+      presets = ['EventsTitle', 'Events'],
+    } = input;
+    const params: Record<string, GammaParamValue> = {
       q,
       page,
       limit_per_type: limitPerType,
       keep_closed_markets: keepClosedMarkets,
       search_tags: false,
       search_profiles: false,
+      type,
+      events_status: eventsStatus,
+      sort,
+      presets,
     };
-    if (sort) {
-      params.sort = sort;
+    if (eventsTag) {
+      params.events_tag = eventsTag;
     }
     if (typeof ascending === 'boolean') {
       params.ascending = ascending;
