@@ -31,12 +31,12 @@ async function main() {
 
   // Create a test club
   const club = await prisma.club.upsert({
-    where: { slug: 'alpha-traders' },
+    where: { slug: 'signal-room' },
     update: {},
     create: {
-      name: 'Alpha Traders',
-      slug: 'alpha-traders',
-      description: 'A prediction club for alpha traders on Polymarket.',
+      name: 'Signal Room',
+      slug: 'signal-room',
+      description: 'A prediction club for signal traders on Polymarket.',
       managerUserId: manager.id,
       isPublic: true,
     },

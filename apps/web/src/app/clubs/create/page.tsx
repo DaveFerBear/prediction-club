@@ -103,7 +103,7 @@ export default function CreateClubPage() {
                 <Input
                   value={formData.name}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g., Alpha Traders"
+                  placeholder="e.g., Signal Room"
                   required
                 />
               </div>
@@ -116,7 +116,7 @@ export default function CreateClubPage() {
                     setSlugTouched(true);
                     setFormData({ ...formData, slug: e.target.value });
                   }}
-                  placeholder="alpha-traders"
+                  placeholder="signal-room"
                 />
                 <p className="text-xs text-muted-foreground">Your club URL: /clubs/{slugPreview}</p>
               </div>
@@ -150,7 +150,12 @@ export default function CreateClubPage() {
               )}
 
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => router.back()}
+                >
                   Back
                 </Button>
                 <Button
