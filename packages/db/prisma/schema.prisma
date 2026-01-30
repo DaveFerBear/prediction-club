@@ -28,6 +28,7 @@ model User {
   memberships     ClubMember[]
   applications    Application[]
   predictionRoundMembers   PredictionRoundMember[]
+  ledgerEntries           LedgerEntry[]
   verifications   Verification[]
 
   @@index([walletAddress])
@@ -59,6 +60,7 @@ model Club {
   members       ClubMember[]
   applications  Application[]
   predictionRounds       PredictionRound[]
+  ledgerEntries          LedgerEntry[]
 
   @@index([slug])
   @@index([managerUserId])
@@ -136,6 +138,14 @@ enum PredictionRoundStatus {
   CANCELLED   // Cancelled before execution
 }
 
+enum LedgerEntryType {
+  DEPOSIT
+  COMMIT
+  PAYOUT
+  WITHDRAW
+  ADJUSTMENT
+}
+
 model PredictionRound {
   id              String       @id @default(cuid())
   clubId          String
@@ -144,14 +154,6 @@ model PredictionRound {
   // Market reference (e.g., Polymarket condition ID or URL)
   marketRef       String?
   marketTitle     String?
-  polymarketConditionId  String?
-  polymarketMarketUrl    String?
-  polymarketOutcomeYesToken  String?
-  polymarketOutcomeNoToken   String?
-  polymarketResolvedAt   DateTime?
-  polymarketWinningOutcome String?
-  polymarketInitialYesPrice String?
-  polymarketSettlementYesPrice String?
 
   // Aggregated stake
   stakeTotal      String       @default("0") // BigInt as string (wei)
@@ -163,10 +165,10 @@ model PredictionRound {
 
   // Relations
   members         PredictionRoundMember[]
+  ledgerEntries   LedgerEntry[]
 
   @@index([clubId])
   @@index([status])
-  @@index([polymarketConditionId])
 }
 
 // ============================================================================
@@ -191,6 +193,28 @@ model PredictionRoundMember {
   @@unique([predictionRoundId, userId])
   @@index([predictionRoundId])
   @@index([userId])
+}
+
+model LedgerEntry {
+  id                 String           @id @default(cuid())
+  safeAddress        String
+  clubId             String
+  club               Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  predictionRoundId  String?
+  predictionRound    PredictionRound? @relation(fields: [predictionRoundId], references: [id], onDelete: SetNull)
+  type               LedgerEntryType
+  amount             String           // signed amount in wei as string
+  asset              String
+  txHash             String?          // on-chain or relayer transaction hash (when applicable)
+  metadata           Json?
+  createdAt          DateTime         @default(now())
+
+  @@index([safeAddress])
+  @@index([clubId])
+  @@index([userId])
+  @@index([predictionRoundId])
 }
 
 // ============================================================================

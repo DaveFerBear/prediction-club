@@ -1,4 +1,8 @@
 export { ClubController, ClubError } from './ClubController';
 export { ApplicationController, ApplicationError } from './ApplicationController';
-export { VaultController, VaultError } from './VaultController';
+export { LedgerController, LedgerError } from './LedgerController';
+export {
+  PredictionRoundController,
+  PredictionRoundError,
+} from './PredictionRoundController';
 export { GammaController } from './GammaController';
