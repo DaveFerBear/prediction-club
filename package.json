@@ -18,9 +18,6 @@
     "db:push": "yarn workspace @prediction-club/db push",
     "db:seed": "yarn workspace @prediction-club/db seed",
     "db:studio": "yarn workspace @prediction-club/db studio",
-    "contracts:build": "cd contracts && forge build",
-    "contracts:test": "cd contracts && forge test",
-    "contracts:deploy": "cd contracts && forge script script/Deploy.s.sol --broadcast",
     "typecheck": "yarn workspaces run typecheck"
   },
   "devDependencies": {

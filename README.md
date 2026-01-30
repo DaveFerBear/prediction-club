@@ -1,6 +1,6 @@
 # Prediction Club
 
-A SaaS platform for "prediction clubs" that trade as a single on-chain actor on Polygon. Clubs pool capital in a smart contract vault, managed by a Gnosis Safe multisig.
+A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a single actor on Polygon.
 
 ## Architecture Overview
 
@@ -9,16 +9,16 @@ A SaaS platform for "prediction clubs" that trade as a single on-chain actor on 
 │                         Prediction Club                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │   Next.js    │  │   Indexer    │  │    Smart Contracts   │  │
-│  │   Web App    │  │   Service    │  │    (Foundry)         │  │
-│  │              │  │              │  │                      │  │
-│  │  - Pages     │  │  - Poll      │  │  - ClubVaultV1.sol   │  │
-│  │  - API       │  │  - Process   │  │  - Gnosis Safe       │  │
-│  │  - Auth      │  │  - Backfill  │  │                      │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
-│         │                 │                      │              │
-│         └────────┬────────┴──────────────────────┘              │
+│  ┌──────────────┐  ┌──────────────┐                              │
+│  │   Next.js    │  │   Indexer    │                              │
+│  │   Web App    │  │   Service    │                              │
+│  │              │  │              │                              │
+│  │  - Pages     │  │  - Poll      │                              │
+│  │  - API       │  │  - Process   │                              │
+│  │  - Auth      │  │  - Backfill  │                              │
+│  └──────┬───────┘  └──────┬───────┘                              │
+│         │                 │                                      │
+│         └────────┬────────┘                                      │
 │                  │                                               │
 │         ┌────────▼────────┐                                     │
 │         │    PostgreSQL   │                                     │
@@ -30,11 +30,9 @@ A SaaS platform for "prediction clubs" that trade as a single on-chain actor on 
 
 ### Key Components
 
-- **ClubVaultV1**: Smart contract holding USDC, tracking member balances (available vs committed)
-- **Gnosis Safe**: Multisig owner of each vault (starts 1-of-1, upgradeable to 2-of-3)
 - **Web App**: Next.js app with public pages, dashboard, and club admin
-- **Indexer**: Polls vault events and syncs to Postgres
-- **Predictions**: Prediction rounds - automatic participation for eligible members
+- **Indexer**: Disabled during Polymarket migration
+- **Predictions**: Prediction rounds with market references
 
 ## Repo Structure
 
@@ -46,12 +44,7 @@ A SaaS platform for "prediction clubs" that trade as a single on-chain actor on 
 ├── packages/
 │   ├── db/               # Prisma schema and client
 │   ├── shared/           # Shared types, utils, env validation
-│   ├── chain/            # ABI, viem client, Safe SDK utils
 │   └── ui/               # Shared UI components (shadcn/ui)
-├── contracts/
-│   ├── src/              # Solidity contracts
-│   ├── test/             # Foundry tests
-│   └── script/           # Deployment scripts
 ├── docker-compose.yml    # Local Postgres
 └── package.json          # Yarn workspaces root
 ```
@@ -63,17 +56,14 @@ A SaaS platform for "prediction clubs" that trade as a single on-chain actor on 
 - **Styling**: Tailwind CSS, shadcn/ui
 - **Backend**: Next.js Route Handlers
 - **Database**: PostgreSQL, Prisma ORM
-- **Blockchain**: Polygon (Amoy testnet / Mainnet)
-- **Smart Contracts**: Solidity 0.8.20, Foundry
+- **Blockchain**: Polygon (Polymarket chain)
 - **Chain Interaction**: viem
-- **Safe Integration**: Safe SDK (stubbed)
 
 ## Prerequisites
 
 - Node.js >= 18
 - Yarn Classic (v1.22.x) - **NOT Yarn Berry/v3+**
 - Docker & Docker Compose
-- Foundry (for contract development)
 
 ## Local Development Setup
 
@@ -132,76 +122,6 @@ yarn indexer:dev
 
 The web app will be available at http://localhost:3000
 
-### 5b. Build Chain Package (Deploy Logic)
-
-The web app consumes the compiled `@prediction-club/chain` package (`packages/chain/dist`).
-If you change deploy logic in `packages/chain/src` (e.g., Safe/Vault deployment),
-you must rebuild it:
-
-```bash
-yarn workspace @prediction-club/chain build
-
-# Or keep it updated while you work:
-yarn workspace @prediction-club/chain dev
-```
-
-### 6. Smart Contract Development
-
-#### Install Foundry
-
-If you don't have Foundry installed:
-
-```bash
-# Install foundryup
-curl -L https://foundry.paradigm.xyz | bash
-
-# Reload shell or run:
-source ~/.zshenv  # or ~/.bashrc
-
-# Install Foundry toolchain
-foundryup
-```
-
-#### Compile Contracts
-
-```bash
-cd contracts
-
-# Install dependencies (OpenZeppelin, forge-std)
-forge install OpenZeppelin/openzeppelin-contracts@v5.0.0 foundry-rs/forge-std --no-git
-
-# Build contracts
-forge build
-
-# Run tests
-forge test
-
-# Run tests with verbosity
-forge test -vvv
-```
-
-#### Update TypeScript Bytecode
-
-After modifying contracts, update the bytecode in the `chain` package:
-
-```bash
-# From contracts directory, extract bytecode
-cat out/ClubVaultV1.sol/ClubVaultV1.json | jq -r '.bytecode.object'
-
-# Copy the output to packages/chain/src/abi/ClubVaultV1.ts
-# Update the ClubVaultV1Bytecode constant
-
-# Rebuild chain package
-cd .. && yarn workspace @prediction-club/chain build
-```
-
-#### Deploy to Amoy Testnet
-
-```bash
-cd contracts
-forge script script/Deploy.s.sol --rpc-url amoy --broadcast
-```
-
 ## Environment Variables
 
 ### Web App (`apps/web/.env`)
@@ -228,17 +148,6 @@ forge script script/Deploy.s.sol --rpc-url amoy --broadcast
 | `POLYGON_RPC_URL`          | Polygon mainnet RPC              | No       |
 | `AMOY_RPC_URL`             | Amoy testnet RPC                 | No       |
 
-### Contract Deployment
-
-| Variable              | Description                       |
-| --------------------- | --------------------------------- |
-| `PRIVATE_KEY`         | Deployer wallet private key       |
-| `SAFE_ADDRESS`        | Gnosis Safe address (vault owner) |
-| `COLLATERAL_TOKEN`    | USDC address on target chain      |
-| `POLYGON_RPC_URL`     | Polygon RPC URL                   |
-| `AMOY_RPC_URL`        | Amoy RPC URL                      |
-| `POLYGONSCAN_API_KEY` | For contract verification         |
-
 ## Available Scripts
 
 ### Root
@@ -253,37 +162,22 @@ yarn db:migrate       # Run database migrations
 yarn db:push          # Push schema to database
 yarn db:seed          # Seed database
 yarn db:studio        # Open Prisma Studio
-yarn contracts:build  # Build contracts
-yarn contracts:test   # Run contract tests
 yarn typecheck        # Run TypeScript checks
 yarn lint             # Run linting
-```
-
-### Indexer
-
-```bash
-# Backfill events for a club
-yarn indexer:backfill --club alpha-traders --from 50000000
 ```
 
 ## What's Implemented vs Stubbed
 
 ### Implemented
 
-- ✅ Complete ClubVaultV1 smart contract
-- ✅ Foundry tests for all contract functions
 - ✅ Prisma schema with all models
-- ✅ API routes (clubs, applications, cohorts, balance, withdraw)
-- ✅ Indexer with event processing and backfill
+- ✅ API routes (clubs, applications, predictions)
 - ✅ UI pages (landing, dashboard, club public, club admin)
-- ✅ Chain utilities (viem client, ABI exports)
-- ✅ Safe transaction building utilities
 
 ### Stubbed / TODO
 
 - 🔲 Authentication (NextAuth configured but not wired)
 - 🔲 Wallet connection (wagmi configured but not integrated)
-- 🔲 Safe SDK actual execution (transaction building works, execution stubbed)
 - 🔲 Polymarket integration (market reference is just a string)
 - 🔲 Real-time updates (would need WebSocket or polling)
 - 🔲 Club discovery/ranking
@@ -295,51 +189,12 @@ yarn indexer:backfill --club alpha-traders --from 50000000
 Key models:
 
 - **User**: Wallet address, email, verification status
-- **Club**: Name, Safe address, vault address, chain ID
+- **Club**: Name, manager, visibility, metadata
 - **ClubMember**: Role (ADMIN/MEMBER), status
 - **Application**: Membership applications
 - **PredictionRound**: Prediction rounds with market reference
 - **PredictionRoundMember**: Individual participation, PnL tracking
-- **VaultEvent**: Indexed on-chain events
 - **Verification**: Off-chain manager verification
-
-## Smart Contract
-
-The `ClubVaultV1` contract:
-
-- Holds USDC collateral
-- Tracks per-member balances (available vs committed)
-- Supports cohort-based commitment and settlement
-- Only the Safe owner can commit, settle, withdraw, or rescue tokens
-- Members can deposit and set withdrawal addresses
-
-Key functions:
-
-- `deposit(amount)` - Deposit USDC
-- `depositFor(member, amount)` - Deposit for another member
-- `commitToCohort(cohortId, entries)` - Lock funds (Safe only)
-- `settleCohort(cohortId, entries)` - Release + payout (Safe only)
-- `withdraw(member, amount)` - Withdraw to member's address (Safe only)
-
-## Deployment
-
-### Deploy Contract to Amoy
-
-```bash
-cd contracts
-
-# Set environment
-export PRIVATE_KEY="your-private-key"
-export SAFE_ADDRESS="0x..."
-export COLLATERAL_TOKEN="0x..." # USDC on Amoy
-
-# Deploy
-forge script script/Deploy.s.sol:DeployTestnet \
-  --rpc-url $AMOY_RPC_URL \
-  --broadcast \
-  --verify
-```
-
 ### Deploy Web App
 
 The web app can be deployed to Vercel, Railway, or any Node.js hosting:
@@ -354,9 +209,6 @@ Ensure environment variables are set in your deployment platform.
 ## Testing
 
 ```bash
-# Contract tests
-yarn contracts:test
-
 # TypeScript type checking
 yarn typecheck
 

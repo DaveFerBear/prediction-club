@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@prediction-club/chain": "*",
     "@prediction-club/db": "*",
     "@prediction-club/shared": "*",
     "dotenv": "^17.2.3",
