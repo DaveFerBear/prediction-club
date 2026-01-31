@@ -9,21 +9,21 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 │                         Prediction Club                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  ┌──────────────┐  ┌──────────────┐                              │
-│  │   Next.js    │  │   Indexer    │                              │
-│  │   Web App    │  │   Service    │                              │
-│  │              │  │              │                              │
-│  │  - Pages     │  │  - Poll      │                              │
-│  │  - API       │  │  - Process   │                              │
-│  │  - Auth      │  │  - Backfill  │                              │
-│  └──────┬───────┘  └──────┬───────┘                              │
-│         │                 │                                      │
-│         └────────┬────────┘                                      │
-│                  │                                               │
-│         ┌────────▼────────┐                                     │
-│         │    PostgreSQL   │                                     │
-│         │    (Prisma)     │                                     │
-│         └─────────────────┘                                     │
+│  ┌──────────────┐                                               │
+│  │   Next.js    │                                               │
+│  │   Web App    │                                               │
+│  │              │                                               │
+│  │  - Pages     │                                               │
+│  │  - API       │                                               │
+│  │  - Auth      │                                               │
+│  └──────┬───────┘                                               │
+│         │                                                       │
+│         │                                                       │
+│         ▼                                                       │
+│  ┌──────────────────┐                                          │
+│  │   PostgreSQL     │                                          │
+│  │   (Prisma ORM)   │                                          │
+│  └──────────────────┘                                          │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -31,16 +31,14 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 ### Key Components
 
 - **Web App**: Next.js app with public pages, dashboard, and club admin
-- **Indexer**: Disabled during Polymarket migration
-- **Predictions**: Prediction rounds with market references
+- **Predictions**: Prediction rounds with market references and ledger entries
 
 ## Repo Structure
 
 ```
 /
 ├── apps/
-│   ├── web/              # Next.js web application
-│   └── indexer/          # Event indexer service
+│   └── web/              # Next.js web application
 ├── packages/
 │   ├── db/               # Prisma schema and client
 │   ├── shared/           # Shared types, utils, env validation
@@ -56,12 +54,11 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 - **Styling**: Tailwind CSS, shadcn/ui
 - **Backend**: Next.js Route Handlers
 - **Database**: PostgreSQL, Prisma ORM
-- **Blockchain**: Polygon (Polymarket chain)
-- **Chain Interaction**: viem
+- **Markets**: Polymarket APIs (Gamma + CLOB)
 
 ## Prerequisites
 
-- Node.js >= 18
+- Node.js >= 22.12.0
 - Yarn Classic (v1.22.x) - **NOT Yarn Berry/v3+**
 - Docker & Docker Compose
 
@@ -82,7 +79,6 @@ yarn install
 ```bash
 # Copy environment files
 cp apps/web/.env.example apps/web/.env
-cp apps/indexer/.env.example apps/indexer/.env
 
 # Edit with your values (see Environment Variables section)
 ```
@@ -115,9 +111,6 @@ yarn db:seed
 ```bash
 # Terminal 1: Web app
 yarn dev
-
-# Terminal 2: Indexer (optional)
-yarn indexer:dev
 ```
 
 The web app will be available at http://localhost:3000
@@ -136,18 +129,6 @@ The web app will be available at http://localhost:3000
 | `NEXT_PUBLIC_AMOY_RPC_URL`             | Amoy testnet RPC                   | No       |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect project ID           | No       |
 
-### Indexer (`apps/indexer/.env`)
-
-| Variable                   | Description                      | Required |
-| -------------------------- | -------------------------------- | -------- |
-| `DATABASE_URL`             | PostgreSQL connection string     | Yes      |
-| `INDEXER_CHAIN_ID`         | Chain to index (default: 80002)  | No       |
-| `INDEXER_START_BLOCK`      | Block to start indexing from     | No       |
-| `INDEXER_POLL_INTERVAL_MS` | Poll interval (default: 5000)    | No       |
-| `INDEXER_BATCH_SIZE`       | Blocks per batch (default: 1000) | No       |
-| `POLYGON_RPC_URL`          | Polygon mainnet RPC              | No       |
-| `AMOY_RPC_URL`             | Amoy testnet RPC                 | No       |
-
 ## Available Scripts
 
 ### Root
@@ -155,8 +136,6 @@ The web app will be available at http://localhost:3000
 ```bash
 yarn dev              # Run web app in dev mode
 yarn build            # Build web app
-yarn indexer          # Run indexer
-yarn indexer:dev      # Run indexer in dev mode
 yarn db:generate      # Generate Prisma client
 yarn db:migrate       # Run database migrations
 yarn db:push          # Push schema to database
@@ -173,12 +152,13 @@ yarn lint             # Run linting
 - ✅ Prisma schema with all models
 - ✅ API routes (clubs, applications, predictions)
 - ✅ UI pages (landing, dashboard, club public, club admin)
+- ✅ Ledger entries for club balances and prediction rounds
 
 ### Stubbed / TODO
 
 - 🔲 Authentication (NextAuth configured but not wired)
 - 🔲 Wallet connection (wagmi configured but not integrated)
-- 🔲 Polymarket integration (market reference is just a string)
+- 🔲 Polymarket order execution (relay/CLOB orders)
 - 🔲 Real-time updates (would need WebSocket or polling)
 - 🔲 Club discovery/ranking
 - 🔲 Email notifications
