@@ -26,17 +26,9 @@ export class PredictionRoundController {
    */
   static async createPredictionRound(input: CreatePredictionRoundInput) {
     const { clubSlug, marketRef, marketTitle, members, adminUserId } = input;
-    let club;
-    try {
-      club = await ClubController.getBySlug(clubSlug);
-    } catch (error) {
-      if (error instanceof ClubError && error.code === 'NOT_FOUND') {
-        throw new LedgerError('CLUB_NOT_FOUND', 'Club not found');
-      }
-      throw error;
-    }
+    const club = await this.getClubOrThrow(clubSlug);
 
-    await LedgerController.requireAdmin(club.id, adminUserId);
+    await this.requireAdminOrThrow(club.id, adminUserId);
 
     const stakeTotal = members
       .reduce((sum, m) => sum + BigInt(m.commitAmount), BigInt(0))
@@ -80,8 +72,8 @@ export class PredictionRoundController {
         },
       });
 
-      await tx.ledgerEntry.createMany({
-        data: members.map((member) => ({
+      await LedgerController.createEntries(
+        members.map((member) => ({
           safeAddress: safeByUser.get(member.userId) ?? '',
           clubId: club.id,
           userId: member.userId,
@@ -89,8 +81,11 @@ export class PredictionRoundController {
           type: 'COMMIT',
           amount: `-${member.commitAmount}`,
           asset: 'USDC.e',
+          metadata: undefined,
+          txHash: undefined,
         })),
-      });
+        tx as Parameters<typeof LedgerController.createEntries>[1]
+      );
 
       return created;
     });
@@ -103,15 +98,7 @@ export class PredictionRoundController {
    */
   static async listPredictionRounds(input: ListPredictionRoundsInput) {
     const { clubSlug, page = 1, pageSize = 20, status } = input;
-    let club;
-    try {
-      club = await ClubController.getBySlug(clubSlug);
-    } catch (error) {
-      if (error instanceof ClubError && error.code === 'NOT_FOUND') {
-        throw new LedgerError('CLUB_NOT_FOUND', 'Club not found');
-      }
-      throw error;
-    }
+    const club = await this.getClubOrThrow(clubSlug);
 
     const skip = (page - 1) * pageSize;
     const where: Record<string, unknown> = { clubId: club.id };
@@ -142,6 +129,28 @@ export class PredictionRoundController {
       pageSize,
       hasMore: skip + predictionRounds.length < total,
     };
+  }
+
+  private static async getClubOrThrow(slug: string) {
+    try {
+      return await ClubController.getBySlug(slug);
+    } catch (error) {
+      if (error instanceof ClubError && error.code === 'NOT_FOUND') {
+        throw new LedgerError('CLUB_NOT_FOUND', 'Club not found');
+      }
+      throw error;
+    }
+  }
+
+  private static async requireAdminOrThrow(clubId: string, userId: string) {
+    try {
+      await ClubController.requireAdmin(clubId, userId);
+    } catch (error) {
+      if (error instanceof ClubError && error.code === 'FORBIDDEN') {
+        throw new LedgerError('FORBIDDEN', 'Only club admins can perform this action');
+      }
+      throw error;
+    }
   }
 }
 

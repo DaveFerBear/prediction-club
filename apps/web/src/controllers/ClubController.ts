@@ -34,6 +34,13 @@ export class ClubController {
     return !!member;
   }
 
+  static async requireAdmin(clubId: string, userId: string) {
+    const isAdmin = await this.isAdmin(clubId, userId);
+    if (!isAdmin) {
+      throw new ClubError('FORBIDDEN', 'Only club admins can perform this action');
+    }
+  }
+
   /**
    * Create a new club
    */
