@@ -11,8 +11,6 @@
     "build": "yarn workspace @prediction-club/web build",
     "start": "yarn workspace @prediction-club/web start",
     "lint": "yarn workspaces run lint",
-    "indexer": "yarn workspace @prediction-club/indexer start",
-    "indexer:dev": "yarn workspace @prediction-club/indexer dev",
     "db:generate": "yarn workspace @prediction-club/db generate",
     "db:migrate": "yarn workspace @prediction-club/db migrate",
     "db:push": "yarn workspace @prediction-club/db push",

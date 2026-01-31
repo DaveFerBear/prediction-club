@@ -1,14 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@prediction-club/ui';
+import { Button, Card, CardContent } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { ClubPredictionForm } from '@/components/club-prediction-form';
 import { useApi, useClub } from '@/hooks';

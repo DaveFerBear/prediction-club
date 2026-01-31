@@ -28,24 +28,8 @@ export const webEnvSchema = sharedEnvSchema.extend({
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
 });
 
-/**
- * Indexer environment schema
- */
-export const indexerEnvSchema = sharedEnvSchema.extend({
-  // RPC URLs
-  POLYGON_RPC_URL: z.string().url().optional(),
-  AMOY_RPC_URL: z.string().url().optional(),
-
-  // Indexer config
-  INDEXER_CHAIN_ID: z.coerce.number().default(80002),
-  INDEXER_START_BLOCK: z.coerce.number().optional(),
-  INDEXER_POLL_INTERVAL_MS: z.coerce.number().default(5000),
-  INDEXER_BATCH_SIZE: z.coerce.number().default(1000),
-});
-
 export type SharedEnv = z.infer<typeof sharedEnvSchema>;
 export type WebEnv = z.infer<typeof webEnvSchema>;
-export type IndexerEnv = z.infer<typeof indexerEnvSchema>;
 
 /**
  * Validate environment variables

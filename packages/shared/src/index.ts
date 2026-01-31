@@ -5,11 +5,9 @@ export * from './types';
 export {
   sharedEnvSchema,
   webEnvSchema,
-  indexerEnvSchema,
   validateEnv,
   type SharedEnv,
   type WebEnv,
-  type IndexerEnv,
 } from './env';
 
 // Utilities
