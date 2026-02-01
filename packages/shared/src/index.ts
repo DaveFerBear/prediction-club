@@ -23,6 +23,7 @@ export {
   calculatePnlPercent,
   isValidAddress,
   isValidBytes32,
+  sumLedgerAmounts,
   sleep,
   retry,
 } from './utils';

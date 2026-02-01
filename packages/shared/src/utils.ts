@@ -49,6 +49,14 @@ export function formatUSDC(value: bigint | string): string {
 }
 
 /**
+ * Sum ledger entry amounts (string wei values).
+ */
+export function sumLedgerAmounts(entries: Array<{ amount: string }>): string {
+  const total = entries.reduce((sum, entry) => sum + BigInt(entry.amount), 0n);
+  return total.toString();
+}
+
+/**
  * Parse USDC amount to wei
  */
 export function parseUSDC(value: string | number): bigint {

@@ -1,5 +1,6 @@
 import { prisma } from '@prediction-club/db';
 import type { Prisma } from '@prediction-club/db';
+import { sumLedgerAmounts } from '@prediction-club/shared';
 
 export class LedgerController {
   static async createEntries(
@@ -55,8 +56,15 @@ export class LedgerController {
       where: { userId, clubId },
       select: { amount: true },
     });
-    const total = entries.reduce((sum, entry) => sum + BigInt(entry.amount), 0n);
-    return total.toString();
+    return sumLedgerAmounts(entries);
+  }
+
+  static async getUserNetBalance(input: { userId: string }) {
+    const entries = await prisma.ledgerEntry.findMany({
+      where: { userId: input.userId },
+      select: { amount: true },
+    });
+    return sumLedgerAmounts(entries);
   }
 }
 

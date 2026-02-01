@@ -135,6 +135,28 @@ const rounds: SeedRound[] = [
     ],
   },
   {
+    clubSlug: 'signal-room',
+    marketRef: 'polymarket:ai-regulation-2025',
+    marketTitle: 'Will the US pass major AI regulation in 2025?',
+    status: 'PENDING',
+    members: [
+      { wallet: users[0].walletAddress, commit: 90 },
+      { wallet: users[1].walletAddress, commit: 60 },
+      { wallet: users[2].walletAddress, commit: 50 },
+    ],
+  },
+  {
+    clubSlug: 'signal-room',
+    marketRef: 'polymarket:inflation-2024',
+    marketTitle: 'US inflation above 3% by year-end 2024?',
+    status: 'SETTLED',
+    members: [
+      { wallet: users[0].walletAddress, commit: 120, payout: 210 },
+      { wallet: users[1].walletAddress, commit: 90, payout: 0 },
+      { wallet: users[2].walletAddress, commit: 60, payout: 105 },
+    ],
+  },
+  {
     clubSlug: 'macro-mavericks',
     marketRef: 'polymarket:fed-cuts-2024',
     marketTitle: 'Will the Fed cut rates in 2024?',
@@ -146,6 +168,27 @@ const rounds: SeedRound[] = [
     ],
   },
   {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:oil-100-2025',
+    marketTitle: 'Will oil trade above $100 in 2025?',
+    status: 'PENDING',
+    members: [
+      { wallet: users[2].walletAddress, commit: 180 },
+      { wallet: users[3].walletAddress, commit: 120 },
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:soft-landing-2024',
+    marketTitle: 'Will the US economy achieve a soft landing in 2024?',
+    status: 'SETTLED',
+    members: [
+      { wallet: users[2].walletAddress, commit: 220, payout: 0 },
+      { wallet: users[3].walletAddress, commit: 140, payout: 240 },
+      { wallet: users[4].walletAddress, commit: 80, payout: 130 },
+    ],
+  },
+  {
     clubSlug: 'sports-lab',
     marketRef: 'polymarket:nfl-superbowl',
     marketTitle: 'Super Bowl winner 2025',
@@ -154,6 +197,28 @@ const rounds: SeedRound[] = [
       { wallet: users[3].walletAddress, commit: 120, payout: 180 },
       { wallet: users[1].walletAddress, commit: 80, payout: 0 },
       { wallet: users[5].walletAddress, commit: 60, payout: 90 },
+    ],
+  },
+  {
+    clubSlug: 'sports-lab',
+    marketRef: 'polymarket:nba-finals-2025',
+    marketTitle: 'NBA Finals winner 2025',
+    status: 'PENDING',
+    members: [
+      { wallet: users[3].walletAddress, commit: 110 },
+      { wallet: users[1].walletAddress, commit: 70 },
+      { wallet: users[5].walletAddress, commit: 50 },
+    ],
+  },
+  {
+    clubSlug: 'sports-lab',
+    marketRef: 'polymarket:nfl-mvp-2024',
+    marketTitle: 'NFL MVP 2024 season',
+    status: 'SETTLED',
+    members: [
+      { wallet: users[3].walletAddress, commit: 90, payout: 150 },
+      { wallet: users[1].walletAddress, commit: 60, payout: 0 },
+      { wallet: users[5].walletAddress, commit: 40, payout: 70 },
     ],
   },
 ];
