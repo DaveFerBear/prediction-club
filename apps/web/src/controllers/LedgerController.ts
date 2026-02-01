@@ -66,6 +66,47 @@ export class LedgerController {
     });
     return sumLedgerAmounts(entries);
   }
+
+  static async getClubActiveCommitVolume(input: { clubId: string }) {
+    const entries = await prisma.ledgerEntry.findMany({
+      where: {
+        clubId: input.clubId,
+        type: 'COMMIT',
+        predictionRound: {
+          status: { in: ['PENDING', 'COMMITTED'] },
+        },
+      },
+      select: { amount: true },
+    });
+    const total = entries.reduce((sum, entry) => {
+      const value = BigInt(entry.amount);
+      return sum + (value < 0n ? -value : value);
+    }, 0n);
+    return total.toString();
+  }
+
+  static async getClubsActiveCommitVolume(input: { clubIds: string[] }) {
+    if (input.clubIds.length === 0) return new Map<string, string>();
+    const entries = await prisma.ledgerEntry.findMany({
+      where: {
+        clubId: { in: input.clubIds },
+        type: 'COMMIT',
+        predictionRound: {
+          status: { in: ['PENDING', 'COMMITTED'] },
+        },
+      },
+      select: { clubId: true, amount: true },
+    });
+    const totals = new Map<string, bigint>();
+    for (const entry of entries) {
+      const value = BigInt(entry.amount);
+      const next = (totals.get(entry.clubId) ?? 0n) + (value < 0n ? -value : value);
+      totals.set(entry.clubId, next);
+    }
+    return new Map<string, string>(
+      Array.from(totals.entries()).map(([clubId, total]) => [clubId, total.toString()])
+    );
+  }
 }
 
 export class LedgerError extends Error {

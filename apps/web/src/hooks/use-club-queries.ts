@@ -11,6 +11,7 @@ export interface ClubListItem {
   slug: string;
   description: string | null;
   isPublic: boolean;
+  activeCommittedVolume: string;
   _count: {
     members: number;
     predictionRounds: number;
@@ -23,6 +24,7 @@ export interface ClubDetail {
   slug: string;
   description: string | null;
   isPublic: boolean;
+  activeCommittedVolume: string;
   manager: {
     id: string;
     walletAddress: string;
@@ -237,11 +239,7 @@ export function useUpdateClub(slug: string) {
   const updateClub = async (input: UpdateClubInput) => {
     const response = await mutation.trigger(input);
     if (response?.success) {
-      await Promise.all([
-        mutate(clubKey(slug)),
-        mutate(clubsKey(true)),
-        mutate(clubsKey(false)),
-      ]);
+      await Promise.all([mutate(clubKey(slug)), mutate(clubsKey(true)), mutate(clubsKey(false))]);
     }
     return response;
   };

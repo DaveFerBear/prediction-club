@@ -236,11 +236,19 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         </div>
 
         {/* Stats */}
-        <div className="mb-8 grid gap-4 md:grid-cols-3">
+        <div className="mb-8 grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Members</CardDescription>
               <CardTitle className="text-2xl">{club._count.members}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Active Volume</CardDescription>
+              <CardTitle className="text-2xl">
+                ${formatAmount(club.activeCommittedVolume)} USDC
+              </CardTitle>
             </CardHeader>
           </Card>
           <Card>

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { ClubController, ClubError } from '@/controllers';
+import { ClubController, ClubError, LedgerController } from '@/controllers';
 import {
   apiResponse,
   apiError,
@@ -25,7 +25,10 @@ const updateClubSchema = z.object({
 export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
   try {
     const club = await ClubController.getBySlug(params.slug);
-    return apiResponse(club);
+    const activeCommittedVolume = await LedgerController.getClubActiveCommitVolume({
+      clubId: club.id,
+    });
+    return apiResponse({ ...club, activeCommittedVolume });
   } catch (error) {
     if (error instanceof ClubError && error.code === 'NOT_FOUND') {
       return notFoundError('Club');

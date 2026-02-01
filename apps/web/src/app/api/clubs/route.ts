@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { ClubController, ClubError } from '@/controllers';
+import { ClubController, ClubError, LedgerController } from '@/controllers';
 import { apiResponse, apiError, validationError, unauthorizedError, serverError } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
 const createClubSchema = z.object({
@@ -51,7 +51,13 @@ export async function GET(request: NextRequest) {
     const publicOnly = searchParams.get('public') !== 'false';
 
     const result = await ClubController.list({ page, pageSize, publicOnly });
-    return apiResponse(result);
+    const clubIds = result.items.map((club) => club.id);
+    const volumeByClub = await LedgerController.getClubsActiveCommitVolume({ clubIds });
+    const items = result.items.map((club) => ({
+      ...club,
+      activeCommittedVolume: volumeByClub.get(club.id) ?? '0',
+    }));
+    return apiResponse({ ...result, items });
   } catch (error) {
     console.error('Error listing clubs:', error);
     return serverError();

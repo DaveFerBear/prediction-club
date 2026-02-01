@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatUSDC } from '@prediction-club/shared';
 import { useClubs } from '@/hooks';
 import {
   Button,
@@ -15,6 +16,7 @@ import { Header } from '@/components/header';
 
 export default function ClubsPage() {
   const { clubs, isLoading } = useClubs({ publicOnly: true });
+  const formatAmount = (amount: string) => Number(formatUSDC(amount)).toFixed(2);
 
   return (
     <div className="min-h-screen bg-background">
@@ -66,6 +68,10 @@ export default function ClubsPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Predictions</span>
                       <span>{club._count.predictionRounds}</span>
+                    </div>
+                    <div className="mt-2 flex justify-between text-sm">
+                      <span className="text-muted-foreground">Active volume</span>
+                      <span>${formatAmount(club.activeCommittedVolume)}</span>
                     </div>
                   </CardContent>
                 </Card>
