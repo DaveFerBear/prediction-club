@@ -58,18 +58,18 @@ export default function HomePage() {
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Step 2
                 </div>
-                <h3 className="mt-2 text-base font-semibold">Pick a Market</h3>
+                <h3 className="mt-2 text-base font-semibold">Predict Together</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Coordinate on Polymarket events and outcomes.
+                  Participate on-chain, or just join a club and automatically follow predictions.
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-5">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Step 3
                 </div>
-                <h3 className="mt-2 text-base font-semibold">Predict together</h3>
+                <h3 className="mt-2 text-base font-semibold">Compete</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Each member funds their own Safe, then the club executes.
+                  Measure your performance with other clubs and track your net gains.
                 </p>
               </div>
             </div>
