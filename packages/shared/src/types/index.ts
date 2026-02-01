@@ -11,7 +11,11 @@ export interface User {
   email: string | null;
   walletAddress: string;
   polymarketSafeAddress?: string | null;
+  polymarketApiKeyId?: string | null;
+  polymarketApiSecret?: string | null;
+  polymarketApiPassphrase?: string | null;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface UserWithVerification extends User {
@@ -30,6 +34,7 @@ export interface Club {
   managerUserId: string;
   isPublic: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ClubWithManager extends Club {
@@ -56,6 +61,7 @@ export interface ClubMember {
   role: MemberRole;
   status: MemberStatus;
   joinedAt: Date;
+  updatedAt: Date;
 }
 
 export interface ClubMemberWithUser extends ClubMember {
@@ -75,6 +81,7 @@ export interface Application {
   status: ApplicationStatus;
   message: string | null;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ApplicationWithUser extends Application {
@@ -92,17 +99,10 @@ export interface PredictionRound {
   clubId: string;
   marketRef: string | null;
   marketTitle: string | null;
-  polymarketConditionId?: string | null;
-  polymarketMarketUrl?: string | null;
-  polymarketOutcomeYesToken?: string | null;
-  polymarketOutcomeNoToken?: string | null;
-  polymarketResolvedAt?: Date | null;
-  polymarketWinningOutcome?: string | null;
-  polymarketInitialYesPrice?: string | null;
-  polymarketSettlementYesPrice?: string | null;
   stakeTotal: string; // BigInt as string
   status: PredictionRoundStatus;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface PredictionRoundMember {
@@ -112,6 +112,8 @@ export interface PredictionRoundMember {
   commitAmount: string;
   payoutAmount: string;
   pnlAmount: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface PredictionRoundWithMembers extends PredictionRound {
@@ -122,11 +124,6 @@ export interface PredictionRoundMemberWithUser extends PredictionRoundMember {
   user: User;
 }
 
-// ============================================================================
-// Vault Event Types
-// ============================================================================
-
-// ============================================================================
 // API Response Types
 // ============================================================================
 
