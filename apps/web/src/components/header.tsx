@@ -9,7 +9,7 @@ import { ConnectButton } from './connect-button';
 import { Logo } from './logo';
 import { useLedgerNetBalance } from '@/hooks';
 
-export function Header() {
+export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' }) {
   const logoRef = useRef<SVGSVGElement | null>(null);
   const { address, isConnected } = useAccount();
   const { balance } = useLedgerNetBalance();
@@ -26,8 +26,13 @@ export function Header() {
     logoRef.current?.classList.remove('logo-spin-anim');
   };
 
+  const headerClass =
+    variant === 'ghost'
+      ? 'border-b border-transparent bg-transparent'
+      : 'border-b bg-background';
+
   return (
-    <header className="border-b">
+    <header className={headerClass}>
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="group flex items-center gap-2 text-xl font-bold">
           <span onMouseEnter={handleLogoEnter} className="inline-flex">

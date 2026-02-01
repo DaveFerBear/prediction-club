@@ -8,8 +8,6 @@ import { ShieldCheckIcon } from '@/components/icons/shield-check-icon';
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
-
       {/* Hero */}
       <main className="flex-1">
         <section className="relative overflow-hidden border-b">
@@ -18,7 +16,8 @@ export default function HomePage() {
             <div className="absolute -right-32 top-10 h-96 w-96 rounded-full bg-emerald-400/10 blur-3xl" />
             <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)] bg-[size:48px_48px] opacity-25" />
           </div>
-          <div className="container py-24 md:py-32">
+          <Header variant="ghost" />
+          <div className="container py-16 md:py-24">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
                 Trade Predictions Together
