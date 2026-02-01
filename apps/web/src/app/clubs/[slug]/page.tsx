@@ -4,7 +4,13 @@ import Link from 'next/link';
 import { formatUsdAmount } from '@prediction-club/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { useSWRConfig } from 'swr';
-import { useApi, useClub, usePredictionRounds } from '@/hooks';
+import {
+  useApi,
+  useApproveApplication,
+  useClub,
+  useClubApplications,
+  usePredictionRounds,
+} from '@/hooks';
 import {
   Button,
   Card,
@@ -19,17 +25,6 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
-
-type Application = {
-  id: string;
-  message: string | null;
-  createdAt: string;
-  user: {
-    id: string;
-    walletAddress: string;
-    email: string | null;
-  };
-};
 
 export default function ClubPublicPage({ params }: { params: { slug: string } }) {
   const { fetch: apiFetch, address } = useApi();
@@ -66,11 +61,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
       (member) => member.user.walletAddress.toLowerCase() === address.toLowerCase()
     );
 
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [appsLoading, setAppsLoading] = useState(false);
-  const [appsError, setAppsError] = useState<string | null>(null);
-  const [approvingId, setApprovingId] = useState<string | null>(null);
-
   const [clubName, setClubName] = useState('');
   const [clubDescription, setClubDescription] = useState('');
   const [clubPublic, setClubPublic] = useState(false);
@@ -78,6 +68,11 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const [clubSaveError, setClubSaveError] = useState<string | null>(null);
   const [clubSaveSuccess, setClubSaveSuccess] = useState<string | null>(null);
 
+  const { applications, isLoading: appsLoading, error: appsError } = useClubApplications(
+    isAdmin ? params.slug : undefined,
+    'PENDING'
+  );
+  const { approve, approvingId } = useApproveApplication(params.slug);
 
   useEffect(() => {
     if (!club) return;
@@ -85,58 +80,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     setClubDescription(club.description ?? '');
     setClubPublic(club.isPublic);
   }, [club]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    let cancelled = false;
-
-    const fetchApplications = async () => {
-      setAppsLoading(true);
-      setAppsError(null);
-      try {
-        const response = await apiFetch<{
-          success: boolean;
-          data: { items: Application[] };
-        }>(`/api/clubs/${params.slug}/applications?status=PENDING`);
-        if (!cancelled) {
-          setApplications(response.success ? response.data.items : []);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setAppsError(err instanceof Error ? err.message : 'Failed to load applications');
-        }
-      } finally {
-        if (!cancelled) {
-          setAppsLoading(false);
-        }
-      }
-    };
-
-    fetchApplications();
-    return () => {
-      cancelled = true;
-    };
-  }, [apiFetch, isAdmin, params.slug]);
-
-  const handleApprove = async (applicationId: string) => {
-    setApprovingId(applicationId);
-    try {
-      const response = await apiFetch<{ success: boolean }>(
-        `/api/clubs/${params.slug}/applications/${applicationId}/approve`,
-        {
-          method: 'POST',
-        }
-      );
-      if (response.success) {
-        setApplications((prev) => prev.filter((app) => app.id !== applicationId));
-        await mutate(`/api/clubs/${params.slug}`);
-      }
-    } catch {
-      // errors handled by state below
-    } finally {
-      setApprovingId(null);
-    }
-  };
 
   const handleSaveClub = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -356,7 +299,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   {appsLoading ? (
                     <p className="text-sm text-muted-foreground">Loading applications...</p>
                   ) : appsError ? (
-                    <p className="text-sm text-destructive">{appsError}</p>
+                    <p className="text-sm text-destructive">{appsError.message}</p>
                   ) : applications.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No pending applications.</p>
                   ) : (
@@ -388,7 +331,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                           <div className="mt-3 flex gap-2">
                             <Button
                               size="sm"
-                              onClick={() => handleApprove(app.id)}
+                              onClick={() => approve(app.id)}
                               disabled={approvingId === app.id}
                             >
                               {approvingId === app.id ? 'Approving...' : 'Approve'}
