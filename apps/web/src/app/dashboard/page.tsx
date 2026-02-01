@@ -2,16 +2,9 @@
 
 import Link from 'next/link';
 import { useClubs } from '@/hooks';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Badge,
-} from '@prediction-club/ui';
+import { Button, Card, CardContent } from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { ClubCard } from '@/components/club-card';
 
 export default function DashboardPage() {
   const { clubs, isLoading } = useClubs({ publicOnly: false });
@@ -54,28 +47,7 @@ export default function DashboardPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {clubs.map((club) => (
-                <Link key={club.id} href={`/clubs/${club.slug}`} className="group">
-                  <Card className="transition-shadow group-hover:shadow-md">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle>{club.name}</CardTitle>
-                        <Badge variant="secondary">{club._count.predictionRounds} predictions</Badge>
-                      </div>
-                      <CardDescription>/{club.slug}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {club.description && (
-                        <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
-                          {club.description}
-                        </p>
-                      )}
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Members</span>
-                        <span>{club._count.members}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                <ClubCard key={club.id} club={club} statsLabel="predictions" />
               ))}
             </div>
           )}

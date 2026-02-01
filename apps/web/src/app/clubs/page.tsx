@@ -1,22 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { formatUSDC } from '@prediction-club/shared';
 import { useClubs } from '@/hooks';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Badge,
-} from '@prediction-club/ui';
+import { Button, Card, CardContent } from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { ClubCard } from '@/components/club-card';
 
 export default function ClubsPage() {
   const { clubs, isLoading } = useClubs({ publicOnly: true });
-  const formatAmount = (amount: string) => Number(formatUSDC(amount)).toFixed(2);
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,32 +41,7 @@ export default function ClubsPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {clubs.map((club) => (
-              <Link key={club.id} href={`/clubs/${club.slug}`} className="group">
-                <Card className="transition-shadow group-hover:shadow-md">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle>{club.name}</CardTitle>
-                      <Badge variant="secondary">{club._count.members} members</Badge>
-                    </div>
-                    <CardDescription>/{club.slug}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {club.description && (
-                      <p className="mb-4 text-sm text-muted-foreground line-clamp-2">
-                        {club.description}
-                      </p>
-                    )}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Predictions</span>
-                      <span>{club._count.predictionRounds}</span>
-                    </div>
-                    <div className="mt-2 flex justify-between text-sm">
-                      <span className="text-muted-foreground">Active volume</span>
-                      <span>${formatAmount(club.activeCommittedVolume)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <ClubCard key={club.id} club={club} statsLabel="members" />
             ))}
           </div>
         )}
