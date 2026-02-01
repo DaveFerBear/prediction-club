@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { formatUsdAmount } from '@prediction-club/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { useApi, useClub, usePredictionRounds } from '@/hooks';
@@ -18,11 +19,6 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
-
-function formatAmount(amount: string) {
-  const num = Number(amount) / 1e6; // Assuming USDC with 6 decimals
-  return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
-}
 
 type Application = {
   id: string;
@@ -247,7 +243,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
             <CardHeader className="pb-2">
               <CardDescription>Active Volume</CardDescription>
               <CardTitle className="text-2xl">
-                ${formatAmount(club.activeCommittedVolume)} USDC
+                ${formatUsdAmount(club.activeCommittedVolume)} USDC
               </CardTitle>
             </CardHeader>
           </Card>
@@ -299,7 +295,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                     <CardContent>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Total Stake</span>
-                        <span>${formatAmount(predictionRound.stakeTotal)} USDC</span>
+                        <span>${formatUsdAmount(predictionRound.stakeTotal)} USDC</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Participants</span>

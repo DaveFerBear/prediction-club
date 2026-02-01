@@ -49,6 +49,30 @@ export function formatUSDC(value: bigint | string): string {
 }
 
 /**
+ * Format USD-like amounts stored as integer strings (default 6 decimals).
+ */
+export function formatUsdAmount(
+  value: bigint | string,
+  decimals = 6,
+  displayDecimals = 2
+): string {
+  const raw = typeof value === 'string' ? BigInt(value) : value;
+  const negative = raw < 0n;
+  const abs = negative ? -raw : raw;
+  const divisor = 10n ** BigInt(decimals);
+  const whole = abs / divisor;
+  const fraction = abs % divisor;
+  const wholeStr = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  if (displayDecimals <= 0) {
+    return `${negative ? '-' : ''}${wholeStr}`;
+  }
+
+  const fractionStr = fraction.toString().padStart(decimals, '0').slice(0, displayDecimals);
+  return `${negative ? '-' : ''}${wholeStr}.${fractionStr}`;
+}
+
+/**
  * Sum ledger entry amounts (string wei values).
  */
 export function sumLedgerAmounts(entries: Array<{ amount: string }>): string {

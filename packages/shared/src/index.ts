@@ -16,6 +16,7 @@ export {
   truncateAddress,
   formatBigInt,
   formatUSDC,
+  formatUsdAmount,
   parseUSDC,
   formatDate,
   formatDateTime,

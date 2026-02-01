@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import Link from 'next/link';
-import { formatUSDC } from '@prediction-club/shared';
+import { formatUsdAmount } from '@prediction-club/shared';
 import { Button } from '@prediction-club/ui';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from './connect-button';
@@ -13,7 +13,7 @@ export function Header() {
   const logoRef = useRef<SVGSVGElement | null>(null);
   const { address, isConnected } = useAccount();
   const { balance } = useLedgerNetBalance();
-  const balanceDisplay = Number(formatUSDC(balance)).toFixed(2);
+  const balanceDisplay = formatUsdAmount(balance);
 
   const handleLogoEnter = () => {
     const el = logoRef.current;

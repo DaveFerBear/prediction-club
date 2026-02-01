@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { formatUSDC } from '@prediction-club/shared';
+import { formatUsdAmount } from '@prediction-club/shared';
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@prediction-club/ui';
 import type { ClubListItem } from '@/hooks';
 
@@ -7,8 +7,6 @@ type ClubCardProps = {
   club: ClubListItem;
   statsLabel: 'members' | 'predictions';
 };
-
-const formatAmount = (amount: string) => Number(formatUSDC(amount)).toFixed(2);
 
 export function ClubCard({ club, statsLabel }: ClubCardProps) {
   const statsValue =
@@ -31,7 +29,7 @@ export function ClubCard({ club, statsLabel }: ClubCardProps) {
           )}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Active volume</span>
-            <span>${formatAmount(club.activeCommittedVolume)}</span>
+            <span>${formatUsdAmount(club.activeCommittedVolume)}</span>
           </div>
         </CardContent>
       </Card>
