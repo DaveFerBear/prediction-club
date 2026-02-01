@@ -67,7 +67,7 @@ export default function HomePage() {
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Step 3
                 </div>
-                <h3 className="mt-2 text-base font-semibold">Commit together</h3>
+                <h3 className="mt-2 text-base font-semibold">Predict together</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Each member funds their own Safe, then the club executes.
                 </p>
@@ -141,17 +141,28 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t py-8">
-        <div className="container text-center text-sm text-muted-foreground">
-          Built on{' '}
+        <div className="container flex flex-col items-center gap-3 text-sm text-muted-foreground sm:flex-row sm:justify-between">
+          <div>
+            Built on{' '}
+            <a
+              href="https://polygon.technology/"
+              target="_blank"
+              rel="noreferrer"
+              className="decoration-muted-foreground/40 underline-offset-4 hover:underline"
+            >
+              Polygon
+            </a>
+            . Powered by prediction markets.
+          </div>
           <a
-            href="https://polygon.technology/"
+            href="https://x.com/prediction_club"
             target="_blank"
             rel="noreferrer"
-            className="decoration-muted-foreground/40 underline-offset-4 hover:underline"
+            aria-label="Prediction Club on X"
+            className="inline-flex items-center justify-center rounded-full border border-transparent px-2 py-1 text-lg text-muted-foreground hover:border-border hover:text-foreground"
           >
-            Polygon
+            𝕏
           </a>
-          . Powered by prediction markets.
         </div>
       </footer>
     </div>
