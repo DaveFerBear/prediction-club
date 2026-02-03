@@ -10,6 +10,8 @@ type RelayTransaction = {
   value: string;
 };
 
+const MIN_ALLOWANCE = 10_000n * 10n ** 6n;
+
 const usdcSpenders = [
   POLYMARKET_CONTRACTS.ctf,
   POLYMARKET_CONTRACTS.ctfExchange,
@@ -25,7 +27,7 @@ const outcomeOperators = [
 
 export function usePolymarketApprovals() {
   const publicClient = usePublicClient({ chainId: POLYMARKET_CHAIN_ID });
-  const { relayClient } = usePolymarketRelayClient();
+  const { relayClient, relaySafeAddress } = usePolymarketRelayClient();
   const [isApproving, setIsApproving] = useState(false);
 
   const approvalTransactions = useMemo<RelayTransaction[]>(() => {
@@ -86,7 +88,7 @@ export function usePolymarketApprovals() {
         )
       );
 
-      const usdcApproved = usdcAllowances.every((allowance) => allowance > 0n);
+      const usdcApproved = usdcAllowances.every((allowance) => allowance >= MIN_ALLOWANCE);
       const erc1155Approved = erc1155Approvals.every(Boolean);
 
       return { allApproved: usdcApproved && erc1155Approved };
@@ -94,9 +96,14 @@ export function usePolymarketApprovals() {
     [publicClient]
   );
 
-  const approveAll = useCallback(async () => {
+  const approveAll = useCallback(
+    async (expectedSafe: `0x${string}`) => {
     if (!relayClient) {
       throw new Error('Wallet not connected');
+    }
+
+    if (!relaySafeAddress || relaySafeAddress.toLowerCase() !== expectedSafe.toLowerCase()) {
+      throw new Error('Relay is configured for a different Safe');
     }
 
     setIsApproving(true);
@@ -106,7 +113,7 @@ export function usePolymarketApprovals() {
     } finally {
       setIsApproving(false);
     }
-  }, [relayClient, approvalTransactions]);
+  }, [relayClient, relaySafeAddress, approvalTransactions]);
 
   return { checkApprovals, approveAll, isApproving };
 }

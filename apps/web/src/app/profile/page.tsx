@@ -71,7 +71,7 @@ export default function ProfilePage() {
   const chainId = useChainId();
   const { connect, connectAsync, isPending: isConnecting } = useConnect();
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
-  const { data: walletClient } = useWalletClient({ chainId: POLYMARKET_CHAIN_ID });
+  const { data: walletClient } = useWalletClient();
   const signer = useMemo(() => walletClientToSigner(walletClient), [walletClient]);
   const { data: session, status: sessionStatus } = useSession();
   const { signInWithSiwe } = useSiweSignIn();
@@ -96,7 +96,7 @@ export default function ProfilePage() {
   const [safeAddressOverride, setSafeAddressOverride] = useState<string | null>(null);
   const lastChainCheckRef = useRef(0);
   const chainCheckInFlightRef = useRef(false);
-  const [, setIsRefreshing] = useState(false);
+  const waitForRerender = useCallback(() => new Promise((resolve) => setTimeout(resolve, 0)), []);
 
   const chainReady = chainId === POLYMARKET_CHAIN_ID && !!walletClient;
   const connectComplete = isConnected;
@@ -195,16 +195,14 @@ export default function ProfilePage() {
     async (address: string, options: { force?: boolean } = {}) => {
       if (!publicClient) return;
       if (chainCheckInFlightRef.current) return;
-      if (status === 'deploying-safe') return;
       const now = Date.now();
       if (!options.force && now - lastChainCheckRef.current < 15000) return;
       lastChainCheckRef.current = now;
       chainCheckInFlightRef.current = true;
-      setIsRefreshing(true);
       try {
         let deployed = await checkSafeDeployed(address);
         let deployedAddress: string | null = deployed ? address : null;
-        if (!deployed && safeAddress && safeAddress !== address) {
+        if (!safeAddressOverride && safeAddress && safeAddress !== address) {
           const derivedDeployed = await checkSafeDeployed(safeAddress);
           if (derivedDeployed) {
             deployed = true;
@@ -253,14 +251,12 @@ export default function ProfilePage() {
         setSafeBalanceUsdc(balanceUsdc);
         setSafeFunded(balanceUsdcE > BigInt(0));
       } catch (err) {
-        setStatus('error');
-        setError(err instanceof Error ? err.message : 'Failed to refresh Safe');
+        console.warn('[profile] refresh failed', err);
       } finally {
         chainCheckInFlightRef.current = false;
-        setIsRefreshing(false);
       }
     },
-    [checkApprovals, checkSafeDeployed, fetch, publicClient, safeAddress, status]
+    [checkApprovals, checkSafeDeployed, fetch, publicClient, safeAddress, safeAddressOverride]
   );
 
   useEffect(() => {
@@ -282,10 +278,14 @@ export default function ProfilePage() {
     if (!isConnected) {
       setStatus('connecting');
       await connectAsync({ connector: injected(), chainId: POLYMARKET_CHAIN_ID });
+      await waitForRerender();
+      await waitForRerender();
     }
     if (chainId !== POLYMARKET_CHAIN_ID) {
       setStatus('switching-chain');
       await switchChainAsync({ chainId: POLYMARKET_CHAIN_ID });
+      await waitForRerender();
+      await waitForRerender();
     }
     if (!walletClient || !signer) {
       throw new Error('Wallet client not ready');
@@ -400,7 +400,7 @@ export default function ProfilePage() {
     }
     setStatus('approving');
     try {
-      await approveAll();
+      await approveAll(toHexAddress(effectiveSafeAddress));
       setApprovalsReady(true);
       setStatus('idle');
       await refreshSafeState(effectiveSafeAddress, { force: true });
@@ -596,8 +596,10 @@ export default function ProfilePage() {
                     </span>
                     <div className="flex flex-col">
                       <span className="font-medium">Deploy Safe</span>
-                      {safeAddress && (
-                        <span className="text-xs text-muted-foreground">{safeAddress}</span>
+                      {effectiveSafeAddress && (
+                        <span className="text-xs text-muted-foreground">
+                          {effectiveSafeAddress}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -619,11 +621,7 @@ export default function ProfilePage() {
                 <ActiveCheckListItem
                   active={safeComplete}
                   status={
-                    approvalsComplete
-                      ? 'complete'
-                      : status === 'approving' || status === 'checking-approvals'
-                        ? 'in-progress'
-                        : 'idle'
+                    approvalsComplete ? 'complete' : status === 'approving' ? 'in-progress' : 'idle'
                   }
                 >
                   <div className="flex items-center gap-3">
