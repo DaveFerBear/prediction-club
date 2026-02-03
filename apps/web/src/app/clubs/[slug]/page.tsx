@@ -217,16 +217,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                 {isManager && <Badge variant="outline">You are a manager</Badge>}
               </div>
               <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
-              <div className="mt-4 flex items-center gap-4 text-sm">
-                {club.manager && (
-                  <span className="text-muted-foreground">
-                    Manager:{' '}
-                    <span className="text-foreground">
-                      <CopyableAddress address={club.manager.walletAddress} variant="inline" />
-                    </span>
-                  </span>
-                )}
-              </div>
             </div>
 
             {isAdmin ? (
