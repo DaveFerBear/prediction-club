@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { formatUsdAmount } from '@prediction-club/shared';
 import { Button } from '@prediction-club/ui';
 import { useAccount } from 'wagmi';
-import { ConnectButton } from './connect-button';
+import { ProfileDropdownMenu } from './menus/profile-dropdown-menu';
 import { Logo } from './logo';
 import { useUserBalance } from '@/hooks';
 
@@ -27,9 +27,7 @@ export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' 
   };
 
   const headerClass =
-    variant === 'ghost'
-      ? 'border-b border-transparent bg-transparent'
-      : 'border-b bg-background';
+    variant === 'ghost' ? 'border-b border-transparent bg-transparent' : 'border-b bg-background';
 
   return (
     <header className={headerClass}>
@@ -68,7 +66,7 @@ export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' 
               {address.slice(0, 6)}...{address.slice(-4)}
             </span>
           )}
-          <ConnectButton />
+          <ProfileDropdownMenu />
         </nav>
       </div>
     </header>
