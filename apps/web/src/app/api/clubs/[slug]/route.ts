@@ -32,12 +32,12 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     });
 
     const roundMembers = await prisma.predictionRoundMember.findMany({
-      where: { predictionRound: { clubId: club.id } },
+      where: { predictionRound: { clubId: club.id, status: 'SETTLED' } },
       select: {
         commitAmount: true,
         payoutAmount: true,
         pnlAmount: true,
-        predictionRound: { select: { clubId: true, createdAt: true } },
+        predictionRound: { select: { clubId: true, createdAt: true, status: true } },
       },
     });
     const performance = computeClubPerformanceFromRounds(

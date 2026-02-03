@@ -64,11 +64,12 @@ export async function GET(request: NextRequest) {
           commitAmount: true,
           payoutAmount: true,
           pnlAmount: true,
-          predictionRound: { select: { clubId: true, createdAt: true } },
+          predictionRound: { select: { clubId: true, createdAt: true, status: true } },
         },
       });
       const membersByClub = new Map<string, RoundMemberLike[]>();
       for (const m of members as unknown as RoundMemberLike[]) {
+        if (m.predictionRound.status !== 'SETTLED') continue;
         const list = membersByClub.get(m.predictionRound.clubId) ?? [];
         list.push(m);
         membersByClub.set(m.predictionRound.clubId, list);
