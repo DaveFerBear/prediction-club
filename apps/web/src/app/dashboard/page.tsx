@@ -7,7 +7,7 @@ import { Header } from '@/components/header';
 import { ClubCard } from '@/components/club-card';
 
 export default function DashboardPage() {
-  const { clubs, isLoading } = useClubs({ publicOnly: false });
+  const { clubs, isLoading } = useClubs();
 
   return (
     <div className="min-h-screen bg-background">

@@ -41,16 +41,15 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/clubs
- * List public clubs
+ * List clubs for the authenticated user
  */
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAuth(request);
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '10');
-    const publicOnly = searchParams.get('public') !== 'false';
-
-    const result = await ClubController.list({ page, pageSize, publicOnly });
+    const result = await ClubController.listForUser({ page, pageSize, userId: user.id });
     const clubIds = result.items.map((club) => club.id);
     const volumeByClub = await LedgerController.getClubsActiveCommitVolume({ clubIds });
     const items = result.items.map((club) => ({
@@ -59,6 +58,9 @@ export async function GET(request: NextRequest) {
     }));
     return apiResponse({ ...result, items });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return unauthorizedError(error.message);
+    }
     console.error('Error listing clubs:', error);
     return serverError();
   }

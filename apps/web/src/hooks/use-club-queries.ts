@@ -103,16 +103,39 @@ export interface UpdateClubInput {
   isPublic: boolean;
 }
 
-const clubsKey = (publicOnly: boolean) => (publicOnly ? '/api/clubs' : '/api/clubs?public=false');
 const clubKey = (slug?: string) => (slug ? `/api/clubs/${slug}` : null);
 const predictionRoundsKey = (slug?: string) => (slug ? `/api/clubs/${slug}/predictions` : null);
 const applicationsKey = (slug?: string, status = 'PENDING') =>
   slug ? `/api/clubs/${slug}/applications?status=${status}` : null;
 
-export function useClubs({ publicOnly = true }: { publicOnly?: boolean } = {}) {
+export function useClubs() {
   const { fetch } = useApi();
   const { data, error, isLoading } = useSWR<ApiResponse<ClubsPayload>>(
-    clubsKey(publicOnly),
+    '/api/clubs',
+    (url: string) => fetch<ApiResponse<ClubsPayload>>(url)
+  );
+
+  if (data && !data.success) {
+    return {
+      clubs: [],
+      total: 0,
+      isLoading,
+      error: new Error(data.error?.message || 'Request failed'),
+    };
+  }
+
+  return {
+    clubs: data?.data?.items ?? [],
+    total: data?.data?.total ?? 0,
+    isLoading,
+    error,
+  };
+}
+
+export function usePublicClubs() {
+  const { fetch } = useApi();
+  const { data, error, isLoading } = useSWR<ApiResponse<ClubsPayload>>(
+    '/api/clubs/public',
     (url: string) => fetch<ApiResponse<ClubsPayload>>(url)
   );
 
@@ -239,7 +262,7 @@ export function useUpdateClub(slug: string) {
   const updateClub = async (input: UpdateClubInput) => {
     const response = await mutation.trigger(input);
     if (response?.success) {
-      await Promise.all([mutate(clubKey(slug)), mutate(clubsKey(true)), mutate(clubsKey(false))]);
+      await Promise.all([mutate(clubKey(slug)), mutate('/api/clubs/public'), mutate('/api/clubs')]);
     }
     return response;
   };

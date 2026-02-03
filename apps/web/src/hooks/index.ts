@@ -13,6 +13,7 @@ export { useSafeBalance } from './use-safe-balance';
 export { useLedgerNetBalance } from './use-ledger-net-balance';
 export {
   useClubs,
+  usePublicClubs,
   useClub,
   usePredictionRounds,
   useClubApplications,

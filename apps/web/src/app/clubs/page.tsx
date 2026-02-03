@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useClubs } from '@/hooks';
+import { usePublicClubs } from '@/hooks';
 import { Button, Card, CardContent } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { ClubCard } from '@/components/club-card';
 
 export default function ClubsPage() {
-  const { clubs, isLoading } = useClubs({ publicOnly: true });
+  const { clubs, isLoading } = usePublicClubs();
 
   return (
     <div className="min-h-screen bg-background">

@@ -11,7 +11,12 @@ export interface CreateClubInput {
 export interface ListClubsInput {
   page?: number;
   pageSize?: number;
-  publicOnly?: boolean;
+  userId: string;
+}
+
+export interface ListPublicClubsInput {
+  page?: number;
+  pageSize?: number;
 }
 
 export interface UpdateClubInput {
@@ -81,10 +86,44 @@ export class ClubController {
   /**
    * List clubs with pagination
    */
-  static async list(input: ListClubsInput = {}) {
-    const { page = 1, pageSize = 10, publicOnly = true } = input;
+  static async listForUser(input: ListClubsInput) {
+    const { page = 1, pageSize = 10, userId } = input;
     const skip = (page - 1) * pageSize;
-    const where = publicOnly ? { isPublic: true } : {};
+    const where = {
+      OR: [
+        { managerUserId: userId },
+        { members: { some: { userId, status: 'ACTIVE' as const } } },
+      ],
+    };
+
+    const [clubs, total] = await Promise.all([
+      prisma.club.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: { members: true, predictionRounds: true },
+          },
+        },
+      }),
+      prisma.club.count({ where }),
+    ]);
+
+    return {
+      items: clubs,
+      total,
+      page,
+      pageSize,
+      hasMore: skip + clubs.length < total,
+    };
+  }
+
+  static async listPublic(input: ListPublicClubsInput = {}) {
+    const { page = 1, pageSize = 10 } = input;
+    const skip = (page - 1) * pageSize;
+    const where = { isPublic: true };
 
     const [clubs, total] = await Promise.all([
       prisma.club.findMany({

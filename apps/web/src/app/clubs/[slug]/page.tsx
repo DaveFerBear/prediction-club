@@ -29,11 +29,7 @@ import { CopyableAddress } from '@/components/copyable-address';
 export default function ClubPublicPage({ params }: { params: { slug: string } }) {
   const { fetch: apiFetch, address } = useApi();
   const { mutate } = useSWRConfig();
-  const {
-    club,
-    isLoading: clubLoading,
-    error: clubError,
-  } = useClub(params.slug);
+  const { club, isLoading: clubLoading, error: clubError } = useClub(params.slug);
   const {
     predictionRounds,
     isLoading: roundsLoading,
@@ -57,9 +53,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   }, [address, members, isManager]);
   const isMember =
     !!address &&
-    members.some(
-      (member) => member.user.walletAddress.toLowerCase() === address.toLowerCase()
-    );
+    members.some((member) => member.user.walletAddress.toLowerCase() === address.toLowerCase());
 
   const [clubName, setClubName] = useState('');
   const [clubDescription, setClubDescription] = useState('');
@@ -68,10 +62,11 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const [clubSaveError, setClubSaveError] = useState<string | null>(null);
   const [clubSaveSuccess, setClubSaveSuccess] = useState<string | null>(null);
 
-  const { applications, isLoading: appsLoading, error: appsError } = useClubApplications(
-    isAdmin ? params.slug : undefined,
-    'PENDING'
-  );
+  const {
+    applications,
+    isLoading: appsLoading,
+    error: appsError,
+  } = useClubApplications(isAdmin ? params.slug : undefined, 'PENDING');
   const { approve, approvingId } = useApproveApplication(params.slug);
 
   useEffect(() => {
@@ -105,7 +100,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
       setSavingClub(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -310,7 +304,10 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                             <div>
                               <p className="font-medium">
                                 {app.user.email || (
-                                  <CopyableAddress address={app.user.walletAddress} variant="inline" />
+                                  <CopyableAddress
+                                    address={app.user.walletAddress}
+                                    variant="inline"
+                                  />
                                 )}
                               </p>
                               {app.user.email && (
@@ -326,7 +323,9 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                             </span>
                           </div>
                           {app.message && (
-                            <p className="mt-2 text-sm text-muted-foreground">&ldquo;{app.message}&rdquo;</p>
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              &ldquo;{app.message}&rdquo;
+                            </p>
                           )}
                           <div className="mt-3 flex gap-2">
                             <Button
@@ -351,12 +350,8 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSaveClub} className="space-y-4">
-                    {clubSaveError && (
-                      <p className="text-sm text-destructive">{clubSaveError}</p>
-                    )}
-                    {clubSaveSuccess && (
-                      <p className="text-sm text-green-600">{clubSaveSuccess}</p>
-                    )}
+                    {clubSaveError && <p className="text-sm text-destructive">{clubSaveError}</p>}
+                    {clubSaveSuccess && <p className="text-sm text-green-600">{clubSaveSuccess}</p>}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Club name</label>
                       <Input value={clubName} onChange={(e) => setClubName(e.target.value)} />
@@ -384,7 +379,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                 </CardContent>
               </Card>
             </div>
-
           </div>
         )}
       </main>
