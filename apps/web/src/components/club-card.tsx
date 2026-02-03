@@ -2,14 +2,7 @@
 
 import Link from 'next/link';
 import { formatUsdAmount } from '@prediction-club/shared';
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@prediction-club/ui';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@prediction-club/ui';
 import type { ClubListItem } from '@/hooks';
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 

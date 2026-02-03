@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { formatUsdAmount } from '@prediction-club/shared';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSWRConfig } from 'swr';
 import {
   useApi,
@@ -29,30 +29,41 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { CopyableAddress } from '@/components/copyable-address';
+import { StatTile } from '@/components/stat-tile';
+import { Activity, Layers, Minus, Sigma, TrendingDown, TrendingUp, Users } from 'lucide-react';
 
 export default function ClubPublicPage({ params }: { params: { slug: string } }) {
   const { fetch: apiFetch, address } = useApi();
   const { mutate } = useSWRConfig();
+
   const { club, isLoading: clubLoading, error: clubError } = useClub(params.slug);
   const {
     predictionRounds,
     isLoading: roundsLoading,
     error: roundsError,
   } = usePredictionRounds(params.slug);
+
   const { history: clubHistory, isLoading: balanceLoading } = useClubBalance(params.slug);
-  const performance = club?.performance ?? null;
-  const hasActivity = performance?.hasWindowActivity ?? false;
-  const perfLoading = false;
+
   const loading = clubLoading || roundsLoading;
   const error = clubError || roundsError;
+
+  const performance = club?.performance ?? null;
+  const hasActivity = performance?.hasWindowActivity ?? false;
+
+  // if you later fetch perf separately, wire this up; for now it’s “not loading”.
+  const perfLoading = false;
 
   const members = club?.members ?? [];
   const activePredictionRounds = predictionRounds.filter(
     (round) => round.status === 'COMMITTED' || round.status === 'PENDING'
   );
+
   const exposureSeries = useMemo(() => buildExposureSeries(clubHistory), [clubHistory]);
+
   const isManager =
     !!address && club?.manager?.walletAddress?.toLowerCase() === address.toLowerCase();
+
   const isAdmin = useMemo(() => {
     if (!address) return false;
     const member = members.find(
@@ -60,16 +71,43 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     );
     return member?.role === 'ADMIN' || isManager;
   }, [address, members, isManager]);
+
   const isMember =
     !!address &&
     members.some((member) => member.user.walletAddress.toLowerCase() === address.toLowerCase());
 
+  // ---- stats formatting (page responsibility) ----
+  const activeVolumeText = `$${formatUsdAmount(club?.activeCommittedVolume ?? '0')}`;
+
+  const returnPct = perfLoading || !hasActivity ? null : (performance?.simpleReturn ?? 0) * 100;
+
+  const returnTone =
+    returnPct == null
+      ? 'neutral'
+      : returnPct > 0.05
+        ? 'up'
+        : returnPct < -0.05
+          ? 'down'
+          : 'neutral';
+
+  const ReturnIcon =
+    returnTone === 'up' ? TrendingUp : returnTone === 'down' ? TrendingDown : Minus;
+
+  const returnPillClass =
+    returnTone === 'up'
+      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+      : returnTone === 'down'
+        ? 'border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300'
+        : 'border-border/60 bg-muted text-muted-foreground';
+
+  // ---- edit/apply state ----
   const [clubName, setClubName] = useState('');
   const [clubDescription, setClubDescription] = useState('');
   const [clubPublic, setClubPublic] = useState(false);
   const [savingClub, setSavingClub] = useState(false);
   const [clubSaveError, setClubSaveError] = useState<string | null>(null);
   const [clubSaveSuccess, setClubSaveSuccess] = useState<string | null>(null);
+
   const [applyMessage, setApplyMessage] = useState('');
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
@@ -79,6 +117,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     isLoading: appsLoading,
     error: appsError,
   } = useClubApplications(isAdmin ? params.slug : undefined, 'PENDING');
+
   const { approve, approvingId } = useApproveApplication(params.slug);
   const { apply, isApplying, isAuthenticated: isUserAuthenticated } = useApplyToClub(params.slug);
 
@@ -89,7 +128,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     setClubPublic(club.isPublic);
   }, [club]);
 
-  const handleSaveClub = async (event: React.FormEvent) => {
+  const handleSaveClub = async (event: FormEvent) => {
     event.preventDefault();
     setSavingClub(true);
     setClubSaveError(null);
@@ -186,6 +225,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                 )}
               </div>
             </div>
+
             {isAdmin ? (
               <Link href={`/clubs/${club.slug}/predict`}>
                 <Button size="sm">Make prediction</Button>
@@ -213,46 +253,83 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="mb-8 grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Members</CardDescription>
-              <CardTitle className="text-2xl">{club._count.members}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Active Volume</CardDescription>
-              <CardTitle className="text-2xl">
-                ${formatUsdAmount(club.activeCommittedVolume)} USDC
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>30d Return</CardDescription>
-              <CardTitle className="text-2xl">
-                {perfLoading
-                  ? '—'
-                  : !hasActivity
-                    ? 'No 30d activity'
-                    : `${((performance?.simpleReturn ?? 0) * 100).toFixed(1)}%`}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Active Predictions</CardDescription>
-              <CardTitle className="text-2xl">{activePredictionRounds.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Predictions</CardDescription>
-              <CardTitle className="text-2xl">{club._count.predictionRounds}</CardTitle>
-            </CardHeader>
-          </Card>
+        {/* Stats (designed) */}
+        <div className="mb-8 grid gap-4 md:grid-cols-12">
+          {/* Primary: Active Volume */}
+          <div className="md:col-span-6">
+            <StatTile
+              label="Active Volume"
+              icon={Sigma}
+              emphasize
+              value={
+                <span>
+                  {activeVolumeText}
+                  <span className="ml-2 text-sm font-medium text-muted-foreground">USDC</span>
+                </span>
+              }
+              subValue={<span>Committed capital</span>}
+            />
+          </div>
+
+          {/* Primary: 30d Return */}
+          <div className="md:col-span-6">
+            <StatTile
+              label="30d Return"
+              icon={Activity}
+              emphasize
+              value={
+                perfLoading ? (
+                  '—'
+                ) : !hasActivity ? (
+                  <span className="text-muted-foreground">—</span>
+                ) : (
+                  <span className="tabular-nums">{returnPct!.toFixed(1)}%</span>
+                )
+              }
+              right={
+                <span
+                  className={[
+                    'inline-flex items-center gap-1.5 rounded-full border px-2 py-1',
+                    'text-xs font-medium tabular-nums',
+                    returnPillClass,
+                  ].join(' ')}
+                >
+                  <ReturnIcon className="h-3.5 w-3.5" />
+                  {perfLoading ? '—' : !hasActivity ? 'No activity' : `${returnPct!.toFixed(1)}%`}
+                  <span className="text-muted-foreground/70">(30d)</span>
+                </span>
+              }
+              subValue={<span>Net performance</span>}
+            />
+          </div>
+
+          {/* Secondary */}
+          <div className="md:col-span-4">
+            <StatTile
+              label="Members"
+              icon={Users}
+              value={club._count.members}
+              subValue={<span>Active participants</span>}
+            />
+          </div>
+
+          <div className="md:col-span-4">
+            <StatTile
+              label="Active Predictions"
+              icon={Layers}
+              value={activePredictionRounds.length}
+              subValue={<span>Open rounds</span>}
+            />
+          </div>
+
+          <div className="md:col-span-4">
+            <StatTile
+              label="Total Predictions"
+              icon={Layers}
+              value={club._count.predictionRounds}
+              subValue={<span>All-time</span>}
+            />
+          </div>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -343,12 +420,14 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                             {member.user.walletAddress.slice(2, 4).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
+
                         <div className="flex-1">
                           <CopyableAddress address={member.user.walletAddress} variant="compact" />
                           {member.user.email && (
                             <p className="text-xs text-muted-foreground">{member.user.email}</p>
                           )}
                         </div>
+
                         {member.role === 'ADMIN' && (
                           <Badge variant="outline" className="text-xs">
                             Admin
@@ -404,11 +483,13 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                               {new Date(app.createdAt).toLocaleDateString()}
                             </span>
                           </div>
+
                           {app.message && (
                             <p className="mt-2 text-sm text-muted-foreground">
                               &ldquo;{app.message}&rdquo;
                             </p>
                           )}
+
                           <div className="mt-3 flex gap-2">
                             <Button
                               size="sm"
@@ -434,10 +515,12 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   <form onSubmit={handleSaveClub} className="space-y-4">
                     {clubSaveError && <p className="text-sm text-destructive">{clubSaveError}</p>}
                     {clubSaveSuccess && <p className="text-sm text-green-600">{clubSaveSuccess}</p>}
+
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Club name</label>
                       <Input value={clubName} onChange={(e) => setClubName(e.target.value)} />
                     </div>
+
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Description</label>
                       <Input
@@ -446,6 +529,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                         placeholder="Describe your club"
                       />
                     </div>
+
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
@@ -454,6 +538,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                       />
                       Make club public
                     </label>
+
                     <Button type="submit" disabled={savingClub}>
                       {savingClub ? 'Saving...' : 'Save changes'}
                     </Button>
