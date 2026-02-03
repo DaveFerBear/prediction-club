@@ -17,6 +17,7 @@
     "@prediction-club/shared": "*",
     "@prediction-club/ui": "*",
     "@tanstack/react-query": "^5.17.0",
+    "recharts": "^2.12.3",
     "ethers": "^5.8.0",
     "next": "^14.0.4",
     "next-auth": "^4.24.13",

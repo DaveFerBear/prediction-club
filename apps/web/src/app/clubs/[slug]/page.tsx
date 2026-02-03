@@ -8,10 +8,13 @@ import {
   useApi,
   useApproveApplication,
   useApplyToClub,
+  useClubBalance,
   useClub,
   useClubApplications,
   usePredictionRounds,
 } from '@/hooks';
+import { ChartExposure } from '@/components/chart-exposure';
+import { buildExposureSeries } from '@/lib/exposure';
 import {
   Button,
   Card,
@@ -36,6 +39,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     isLoading: roundsLoading,
     error: roundsError,
   } = usePredictionRounds(params.slug);
+  const { history: clubHistory, isLoading: balanceLoading } = useClubBalance(params.slug);
   const loading = clubLoading || roundsLoading;
   const error = clubError || roundsError;
 
@@ -43,6 +47,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const activePredictionRounds = predictionRounds.filter(
     (round) => round.status === 'COMMITTED' || round.status === 'PENDING'
   );
+  const exposureSeries = useMemo(() => buildExposureSeries(clubHistory), [clubHistory]);
   const isManager =
     !!address && club?.manager?.walletAddress?.toLowerCase() === address.toLowerCase();
   const isAdmin = useMemo(() => {
@@ -192,23 +197,14 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   placeholder="Message (optional)"
                   className="sm:w-64"
                 />
-                <Button
-                  type="button"
-                  onClick={handleApply}
-                  disabled={isApplying}
-                  variant="default"
-                >
+                <Button type="button" onClick={handleApply} disabled={isApplying} variant="default">
                   {isApplying ? 'Submitting...' : 'Apply to Join'}
                 </Button>
                 {!isUserAuthenticated && (
                   <p className="text-xs text-muted-foreground">Connect your wallet to apply.</p>
                 )}
-                {applySuccess && (
-                  <p className="text-xs text-emerald-600">{applySuccess}</p>
-                )}
-                {applyError && (
-                  <p className="text-xs text-destructive">{applyError}</p>
-                )}
+                {applySuccess && <p className="text-xs text-emerald-600">{applySuccess}</p>}
+                {applyError && <p className="text-xs text-destructive">{applyError}</p>}
               </div>
             )}
           </div>
@@ -245,8 +241,33 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Predictions */}
-          <div className="lg:col-span-2">
+          {/* Performance + Predictions */}
+          <div className="lg:col-span-2 space-y-6">
+            <div>
+              <h2 className="mb-4 text-xl font-semibold">Club Performance</h2>
+              {balanceLoading ? (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-muted-foreground">Loading exposure...</p>
+                  </CardContent>
+                </Card>
+              ) : exposureSeries.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-muted-foreground">No activity yet to chart.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <ChartExposure
+                  title="Wallet vs In-Market"
+                  description="All-time"
+                  data={exposureSeries}
+                  footerText="Wallet + open market positions"
+                  footerSubtext="Based on ledger entries for this club"
+                />
+              )}
+            </div>
+
             <h2 className="mb-4 text-xl font-semibold">Predictions</h2>
             {predictionRounds.length === 0 ? (
               <Card>

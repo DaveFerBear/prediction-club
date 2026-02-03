@@ -56,6 +56,7 @@ export interface PredictionRound {
   marketRef: string | null;
   status: string;
   stakeTotal: string;
+   createdAt: string;
   _count: {
     members: number;
   };

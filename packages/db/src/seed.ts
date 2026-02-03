@@ -37,7 +37,15 @@ type SeedRound = {
   marketRef: string;
   marketTitle: string;
   status: PredictionRoundStatus;
+  createdAt?: string; // ISO date
   members: Array<{ wallet: string; commit: number; payout?: number }>;
+};
+
+type SeedDeposit = {
+  clubSlug: string;
+  wallet: string;
+  amount: number;
+  createdAt?: string;
 };
 
 const users: SeedUser[] = [
@@ -161,6 +169,7 @@ const rounds: SeedRound[] = [
     marketRef: 'polymarket:fed-cuts-2024',
     marketTitle: 'Will the Fed cut rates in 2024?',
     status: 'COMMITTED',
+    createdAt: '2024-06-15',
     members: [
       { wallet: users[2].walletAddress, commit: 300 },
       { wallet: users[3].walletAddress, commit: 200 },
@@ -172,6 +181,7 @@ const rounds: SeedRound[] = [
     marketRef: 'polymarket:oil-100-2025',
     marketTitle: 'Will oil trade above $100 in 2025?',
     status: 'PENDING',
+    createdAt: '2024-07-20',
     members: [
       { wallet: users[2].walletAddress, commit: 180 },
       { wallet: users[3].walletAddress, commit: 120 },
@@ -182,10 +192,84 @@ const rounds: SeedRound[] = [
     marketRef: 'polymarket:soft-landing-2024',
     marketTitle: 'Will the US economy achieve a soft landing in 2024?',
     status: 'SETTLED',
+    createdAt: '2024-04-10',
     members: [
       { wallet: users[2].walletAddress, commit: 220, payout: 0 },
       { wallet: users[3].walletAddress, commit: 140, payout: 240 },
       { wallet: users[4].walletAddress, commit: 80, payout: 130 },
+    ],
+  },
+  // Additional Macro Mavericks history for richer charts
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:usd-yen-150',
+    marketTitle: 'Will USD/JPY hit 150 before Oct 2024?',
+    status: 'SETTLED',
+    createdAt: '2024-02-05',
+    members: [
+      { wallet: users[2].walletAddress, commit: 180, payout: 260 }, // win
+      { wallet: users[3].walletAddress, commit: 120, payout: 0 },   // loss
+      { wallet: users[4].walletAddress, commit: 90, payout: 150 },  // win
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:europe-recession-2024',
+    marketTitle: 'Will Europe enter recession in 2024?',
+    status: 'SETTLED',
+    createdAt: '2024-03-12',
+    members: [
+      { wallet: users[2].walletAddress, commit: 200, payout: 0 },   // loss
+      { wallet: users[3].walletAddress, commit: 140, payout: 220 }, // win
+      { wallet: users[4].walletAddress, commit: 110, payout: 0 },   // loss
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:gold-2500-2024',
+    marketTitle: 'Will gold hit $2,500 in 2024?',
+    status: 'SETTLED',
+    createdAt: '2024-05-08',
+    members: [
+      { wallet: users[2].walletAddress, commit: 260, payout: 420 }, // strong win
+      { wallet: users[3].walletAddress, commit: 160, payout: 0 },   // loss
+      { wallet: users[4].walletAddress, commit: 120, payout: 90 },  // small loss
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:treasury-10y-6pct',
+    marketTitle: 'Will US 10Y yield touch 6% in 2024?',
+    status: 'SETTLED',
+    createdAt: '2024-08-18',
+    members: [
+      { wallet: users[2].walletAddress, commit: 240, payout: 0 },   // loss
+      { wallet: users[3].walletAddress, commit: 170, payout: 280 }, // win
+      { wallet: users[4].walletAddress, commit: 90, payout: 0 },    // loss
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:snp500-5200-2024',
+    marketTitle: 'Will S&P 500 close above 5200 in 2024?',
+    status: 'COMMITTED',
+    createdAt: '2024-10-05',
+    members: [
+      { wallet: users[2].walletAddress, commit: 300 },
+      { wallet: users[3].walletAddress, commit: 180 },
+      { wallet: users[4].walletAddress, commit: 140 },
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:btc-halving-2024',
+    marketTitle: 'Will BTC hit $90k by end of 2024?',
+    status: 'PENDING',
+    createdAt: '2024-11-12',
+    members: [
+      { wallet: users[2].walletAddress, commit: 280 },
+      { wallet: users[3].walletAddress, commit: 200 },
+      { wallet: users[4].walletAddress, commit: 120 },
     ],
   },
   {
@@ -350,6 +434,7 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
           marketTitle: round.marketTitle,
           stakeTotal,
           status: round.status,
+          createdAt: round.createdAt ? new Date(round.createdAt) : undefined,
           members: {
             create: members.map((member) => ({
               userId: member.userId,
@@ -362,10 +447,13 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
       });
 
       await prisma.ledgerEntry.createMany({
-        data: round.members.flatMap((member) => {
+        data: round.members.flatMap((member, idx) => {
           const userId = userIds.get(member.wallet) ?? '';
           const safeAddress =
             users.find((u) => u.walletAddress === member.wallet)?.safeAddress ?? '';
+          const baseCreatedAt = round.createdAt
+            ? new Date(new Date(round.createdAt).getTime() + idx * 60_000)
+            : undefined;
           const commitEntry = {
             safeAddress,
             clubId,
@@ -375,6 +463,7 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
             amount: `-${usdc(member.commit)}`,
             asset: 'USDC.e',
             metadata: { seed: SEED_TAG, marketRef: round.marketRef },
+            createdAt: baseCreatedAt,
           };
           const payout = member.payout ?? 0;
           if (payout > 0) {
@@ -389,6 +478,9 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
                 amount: usdc(payout),
                 asset: 'USDC.e',
                 metadata: { seed: SEED_TAG, marketRef: round.marketRef },
+                createdAt: baseCreatedAt
+                  ? new Date(baseCreatedAt.getTime() + 30_000)
+                  : undefined,
               },
             ];
           }
@@ -400,20 +492,21 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
 }
 
 async function seedDeposits(userIds: Map<string, string>, clubIds: Map<string, string>) {
-  const deposits: Array<{
-    clubSlug: string;
-    wallet: string;
-    amount: number;
-  }> = [
-    { clubSlug: 'signal-room', wallet: users[0].walletAddress, amount: 600 },
-    { clubSlug: 'signal-room', wallet: users[1].walletAddress, amount: 300 },
-    { clubSlug: 'signal-room', wallet: users[2].walletAddress, amount: 200 },
-    { clubSlug: 'macro-mavericks', wallet: users[2].walletAddress, amount: 700 },
-    { clubSlug: 'macro-mavericks', wallet: users[3].walletAddress, amount: 350 },
-    { clubSlug: 'macro-mavericks', wallet: users[4].walletAddress, amount: 150 },
-    { clubSlug: 'sports-lab', wallet: users[3].walletAddress, amount: 400 },
-    { clubSlug: 'sports-lab', wallet: users[1].walletAddress, amount: 180 },
-    { clubSlug: 'sports-lab', wallet: users[5].walletAddress, amount: 220 },
+  const deposits: SeedDeposit[] = [
+    // Signal Room base funding
+    { clubSlug: 'signal-room', wallet: users[0].walletAddress, amount: 600, createdAt: '2024-01-05' },
+    { clubSlug: 'signal-room', wallet: users[1].walletAddress, amount: 300, createdAt: '2024-01-08' },
+    { clubSlug: 'signal-room', wallet: users[2].walletAddress, amount: 200, createdAt: '2024-01-10' },
+    // Macro Mavericks richer history
+    { clubSlug: 'macro-mavericks', wallet: users[2].walletAddress, amount: 700, createdAt: '2024-01-02' },
+    { clubSlug: 'macro-mavericks', wallet: users[3].walletAddress, amount: 350, createdAt: '2024-01-06' },
+    { clubSlug: 'macro-mavericks', wallet: users[4].walletAddress, amount: 150, createdAt: '2024-01-12' },
+    { clubSlug: 'macro-mavericks', wallet: users[2].walletAddress, amount: 250, createdAt: '2024-06-01' },
+    { clubSlug: 'macro-mavericks', wallet: users[3].walletAddress, amount: 180, createdAt: '2024-06-03' },
+    // Sports Lab funding
+    { clubSlug: 'sports-lab', wallet: users[3].walletAddress, amount: 400, createdAt: '2024-02-01' },
+    { clubSlug: 'sports-lab', wallet: users[1].walletAddress, amount: 180, createdAt: '2024-02-04' },
+    { clubSlug: 'sports-lab', wallet: users[5].walletAddress, amount: 220, createdAt: '2024-02-05' },
   ];
 
   await prisma.ledgerEntry.createMany({
@@ -429,6 +522,7 @@ async function seedDeposits(userIds: Map<string, string>, clubIds: Map<string, s
         amount: usdc(entry.amount),
         asset: 'USDC.e',
         metadata: { seed: SEED_TAG },
+        createdAt: entry.createdAt ? new Date(entry.createdAt) : undefined,
       };
     }),
   });

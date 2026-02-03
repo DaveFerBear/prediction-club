@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { ClubController, LedgerController } from '@/controllers';
-import { apiResponse, validationError, unauthorizedError, serverError } from '@/lib/api';
-import { requireAuth, AuthError } from '@/lib/auth';
+import { apiResponse, validationError, serverError } from '@/lib/api';
 
 const paramsSchema = z.object({
   slug: z.string().min(1),
@@ -10,11 +9,10 @@ const paramsSchema = z.object({
 
 /**
  * GET /api/clubs/:slug/balance
- * Returns balance and ledger history for the authenticated user scoped to a club.
+ * Public: Returns aggregate club balance and ledger history (all members).
  */
 export async function GET(request: NextRequest, context: { params: unknown }) {
   try {
-    const user = await requireAuth(request);
     const parsed = paramsSchema.safeParse(context.params);
 
     if (!parsed.success) {
@@ -23,16 +21,11 @@ export async function GET(request: NextRequest, context: { params: unknown }) {
 
     const club = await ClubController.getBySlug(parsed.data.slug);
 
-    const [balance, history] = await Promise.all([
-      LedgerController.getUserClubBalance({ userId: user.id, clubId: club.id }),
-      LedgerController.getUserLedgerHistory({ userId: user.id, clubId: club.id }),
-    ]);
+    const history = await LedgerController.getClubLedgerHistory({ clubId: club.id });
+    const balance = history.reduce((sum, entry) => sum + BigInt(entry.amount), 0n).toString();
 
     return apiResponse({ balance, history });
   } catch (error) {
-    if (error instanceof AuthError) {
-      return unauthorizedError(error.message);
-    }
     console.error('Error fetching club balance:', error);
     return serverError();
   }

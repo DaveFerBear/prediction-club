@@ -50,6 +50,17 @@ export class LedgerController {
     });
   }
 
+  static async getClubLedgerHistory(input: { clubId: string }) {
+    return prisma.ledgerEntry.findMany({
+      where: { clubId: input.clubId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        predictionRound: true,
+        club: true,
+      },
+    });
+  }
+
   static async getUserClubBalance(input: { userId: string; clubId: string }) {
     const { userId, clubId } = input;
     const entries = await prisma.ledgerEntry.findMany({
