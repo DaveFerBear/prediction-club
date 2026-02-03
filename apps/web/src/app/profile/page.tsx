@@ -444,288 +444,302 @@ export default function ProfilePage() {
 
       <main className="container py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Profile Setup</h1>
-          <p className="text-muted-foreground">Set up Polymarket access to trade with your club.</p>
+          <h1 className="text-3xl font-bold">Profile</h1>
+          <p className="text-muted-foreground">Track your balance and manage account settings.</p>
         </div>
 
-        <Card className="mb-6 max-w-2xl">
-          <CardHeader>
-            <CardTitle>Balances</CardTitle>
-            <CardDescription>Track funds held in the Safe vs markets.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Safe balance (uncommitted)
+        <div className="grid items-start gap-6 lg:grid-cols-[1fr_1.4fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Balances</CardTitle>
+              <CardDescription>Track funds held in the Safe vs markets.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    CASH BALANCE (In Safe)
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold">
+                    {safeBalanceDisplay}{' '}
+                    <span className="text-base text-muted-foreground">USDC.e</span>
+                  </div>
+                  {safeBalanceUsdc !== null && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      USDC (native): {formatUnits(safeBalanceUsdc, 6)}
+                    </div>
+                  )}
                 </div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {safeBalanceDisplay}{' '}
-                  <span className="text-base text-muted-foreground">USDC.e</span>
+                <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Positions (in markets)
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold">
+                    {marketBalanceDisplay}{' '}
+                    <span className="text-base text-muted-foreground">USDC.e</span>
+                  </div>
                 </div>
-                {safeBalanceUsdc !== null && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    USDC (native): {formatUnits(safeBalanceUsdc, 6)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <Progress value={progressValue} className="mb-4" />
+              <CardTitle>Profile Setup</CardTitle>
+              <CardDescription>Set up Polymarket access to trade with your club.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {statusMessage && (
+                  <div className="rounded-md bg-blue-500/10 p-3 text-sm text-blue-600">
+                    {statusMessage}
                   </div>
                 )}
-              </div>
-              <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  In markets
-                </div>
-                <div className="mt-2 text-2xl font-semibold">
-                  {marketBalanceDisplay}{' '}
-                  <span className="text-base text-muted-foreground">USDC.e</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <Progress value={progressValue} className="mb-4" />
-            <CardTitle>Initialize Polymarket</CardTitle>
-            <CardDescription>Follow the steps below to finish your setup.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {statusMessage && (
-                <div className="rounded-md bg-blue-500/10 p-3 text-sm text-blue-600">
-                  {statusMessage}
-                </div>
-              )}
+                {error && (
+                  <div className="break-words rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
 
-              {error && (
-                <div className="break-words rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
-              <ActiveCheckList>
-                <ActiveCheckListItem
-                  active
-                  status={
-                    connectComplete
-                      ? 'complete'
-                      : isConnecting || isSwitching
-                        ? 'in-progress'
-                        : 'idle'
-                  }
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                      1
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="font-medium">Connect wallet</span>
-                      {address && <span className="text-xs text-muted-foreground">{address}</span>}
-                      {isConnected && !chainReady && (
-                        <span className="text-xs text-muted-foreground">
-                          Switch to Polygon to continue
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isConnected && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          connect({ connector: injected(), chainId: POLYMARKET_CHAIN_ID })
-                        }
-                        disabled={isConnecting || isSwitching}
-                      >
-                        {isConnecting || isSwitching ? 'Connecting...' : 'Connect'}
-                      </Button>
-                    )}
-                    {isConnected && !chainReady && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => switchChainAsync({ chainId: POLYMARKET_CHAIN_ID })}
-                        disabled={isSwitching}
-                      >
-                        {isSwitching ? 'Switching...' : 'Switch'}
-                      </Button>
-                    )}
-                  </div>
-                </ActiveCheckListItem>
-
-                <ActiveCheckListItem
-                  active
-                  status={
-                    credsReady ? 'complete' : status === 'deriving-creds' ? 'in-progress' : 'idle'
-                  }
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                      2
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="font-medium">Derive & save API credentials</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!credsReady && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleDeriveCreds}
-                        disabled={!connectComplete || status === 'deriving-creds'}
-                      >
-                        {status === 'deriving-creds' ? 'Deriving...' : 'Derive'}
-                      </Button>
-                    )}
-                  </div>
-                </ActiveCheckListItem>
-
-                <ActiveCheckListItem
-                  active
-                  status={
-                    safeComplete ? 'complete' : status === 'deploying-safe' ? 'in-progress' : 'idle'
-                  }
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                      3
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="font-medium">Deploy Safe</span>
-                      {effectiveSafeAddress && (
-                        <span className="text-xs text-muted-foreground">
-                          {effectiveSafeAddress}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!safeComplete && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleDeploySafe}
-                        disabled={!connectComplete || status === 'deploying-safe'}
-                      >
-                        {status === 'deploying-safe' ? 'Deploying...' : 'Deploy'}
-                      </Button>
-                    )}
-                  </div>
-                </ActiveCheckListItem>
-
-                <ActiveCheckListItem
-                  active={safeComplete}
-                  status={
-                    approvalsComplete ? 'complete' : status === 'approving' ? 'in-progress' : 'idle'
-                  }
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                      4
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="font-medium">Set approvals</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!approvalsComplete && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleApproveAll}
-                        disabled={!safeComplete || status === 'approving'}
-                      >
-                        {status === 'approving' ? 'Approving...' : 'Approve'}
-                      </Button>
-                    )}
-                  </div>
-                </ActiveCheckListItem>
-
-                <ActiveCheckListItem
-                  active={approvalsComplete}
-                  status={
-                    credsSaved ? 'complete' : status === 'saving-creds' ? 'in-progress' : 'idle'
-                  }
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                      5
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="font-medium">Save credentials</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!credsSaved && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleSaveCreds}
-                        disabled={!approvalsComplete || status === 'saving-creds'}
-                      >
-                        {status === 'saving-creds' ? 'Saving...' : 'Save'}
-                      </Button>
-                    )}
-                  </div>
-                </ActiveCheckListItem>
-
-                <ActiveCheckListItem
-                  active={safeComplete}
-                  status={safeFunded ? 'complete' : 'idle'}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
-                      6
-                    </span>
-                    <div className="flex flex-col">
-                      <span className="font-medium">Fund Safe (USDC.e)</span>
-                      {effectiveSafeAddress && (
-                        <span className="text-xs text-muted-foreground">
-                          Send USDC.e to your Safe address:{' '}
-                          <CopyableAddress address={effectiveSafeAddress} variant="inline" />
-                        </span>
-                      )}
-                      {safeBalanceUsdcE !== null && (
-                        <span className="text-xs text-muted-foreground">
-                          Balance: {formatUnits(safeBalanceUsdcE, 6)} USDC.e
-                        </span>
-                      )}
-                      {safeBalanceUsdc !== null && (
-                        <span className="text-xs text-muted-foreground">
-                          USDC (native): {formatUnits(safeBalanceUsdc, 6)}
-                        </span>
-                      )}
-                      <span className="text-xs text-muted-foreground">
-                        USDC.e token contract (do not send funds here):{' '}
-                        <CopyableAddress address={POLYMARKET_CONTRACTS.usdcE} variant="inline" />
+                <ActiveCheckList>
+                  <ActiveCheckListItem
+                    active
+                    status={
+                      connectComplete
+                        ? 'complete'
+                        : isConnecting || isSwitching
+                          ? 'in-progress'
+                          : 'idle'
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                        1
                       </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">Connect wallet</span>
+                        {address && (
+                          <CopyableAddress address={address} variant="inline" className="text-xs" />
+                        )}
+                        {isConnected && !chainReady && (
+                          <span className="text-xs text-muted-foreground">
+                            Switch to Polygon to continue
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!safeFunded && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleFundSafe}
-                        disabled={!safeComplete || status === 'funding-safe'}
-                      >
-                        {status === 'funding-safe' ? 'Funding...' : 'Fund'}
-                      </Button>
-                    )}
-                  </div>
-                </ActiveCheckListItem>
-              </ActiveCheckList>
-            </div>
-          </CardContent>
-        </Card>
+                    <div className="flex items-center gap-2">
+                      {!isConnected && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            connect({ connector: injected(), chainId: POLYMARKET_CHAIN_ID })
+                          }
+                          disabled={isConnecting || isSwitching}
+                        >
+                          {isConnecting || isSwitching ? 'Connecting...' : 'Connect'}
+                        </Button>
+                      )}
+                      {isConnected && !chainReady && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => switchChainAsync({ chainId: POLYMARKET_CHAIN_ID })}
+                          disabled={isSwitching}
+                        >
+                          {isSwitching ? 'Switching...' : 'Switch'}
+                        </Button>
+                      )}
+                    </div>
+                  </ActiveCheckListItem>
+
+                  <ActiveCheckListItem
+                    active
+                    status={
+                      credsReady ? 'complete' : status === 'deriving-creds' ? 'in-progress' : 'idle'
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                        2
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">Derive & save API credentials</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!credsReady && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleDeriveCreds}
+                          disabled={!connectComplete || status === 'deriving-creds'}
+                        >
+                          {status === 'deriving-creds' ? 'Deriving...' : 'Derive'}
+                        </Button>
+                      )}
+                    </div>
+                  </ActiveCheckListItem>
+
+                  <ActiveCheckListItem
+                    active
+                    status={
+                      safeComplete
+                        ? 'complete'
+                        : status === 'deploying-safe'
+                          ? 'in-progress'
+                          : 'idle'
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                        3
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">Deploy Safe</span>
+                        {effectiveSafeAddress && (
+                          <CopyableAddress
+                            address={effectiveSafeAddress}
+                            variant="inline"
+                            className="text-xs"
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!safeComplete && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleDeploySafe}
+                          disabled={!connectComplete || status === 'deploying-safe'}
+                        >
+                          {status === 'deploying-safe' ? 'Deploying...' : 'Deploy'}
+                        </Button>
+                      )}
+                    </div>
+                  </ActiveCheckListItem>
+
+                  <ActiveCheckListItem
+                    active={safeComplete}
+                    status={
+                      approvalsComplete
+                        ? 'complete'
+                        : status === 'approving'
+                          ? 'in-progress'
+                          : 'idle'
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                        4
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">Set approvals</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!approvalsComplete && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleApproveAll}
+                          disabled={!safeComplete || status === 'approving'}
+                        >
+                          {status === 'approving' ? 'Approving...' : 'Approve'}
+                        </Button>
+                      )}
+                    </div>
+                  </ActiveCheckListItem>
+
+                  <ActiveCheckListItem
+                    active={approvalsComplete}
+                    status={
+                      credsSaved ? 'complete' : status === 'saving-creds' ? 'in-progress' : 'idle'
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                        5
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">Save credentials</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!credsSaved && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSaveCreds}
+                          disabled={!approvalsComplete || status === 'saving-creds'}
+                        >
+                          {status === 'saving-creds' ? 'Saving...' : 'Save'}
+                        </Button>
+                      )}
+                    </div>
+                  </ActiveCheckListItem>
+
+                  <ActiveCheckListItem
+                    active={safeComplete}
+                    status={safeFunded ? 'complete' : 'idle'}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs text-muted-foreground">
+                        6
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium">Fund Safe (USDC.e)</span>
+                        {effectiveSafeAddress && (
+                          <span className="text-xs text-muted-foreground">
+                            Send USDC.e to your Safe address:{' '}
+                            <CopyableAddress address={effectiveSafeAddress} variant="inline" />
+                          </span>
+                        )}
+                        {safeBalanceUsdcE !== null && (
+                          <span className="text-xs text-muted-foreground">
+                            Balance: {formatUnits(safeBalanceUsdcE, 6)} USDC.e
+                          </span>
+                        )}
+                        {safeBalanceUsdc !== null && (
+                          <span className="text-xs text-muted-foreground">
+                            USDC (native): {formatUnits(safeBalanceUsdc, 6)}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          USDC.e token contract (do not send funds here):{' '}
+                          <CopyableAddress address={POLYMARKET_CONTRACTS.usdcE} variant="inline" />
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!safeFunded && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleFundSafe}
+                          disabled={!safeComplete || status === 'funding-safe'}
+                        >
+                          {status === 'funding-safe' ? 'Funding...' : 'Fund'}
+                        </Button>
+                      )}
+                    </div>
+                  </ActiveCheckListItem>
+                </ActiveCheckList>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );
