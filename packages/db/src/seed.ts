@@ -48,6 +48,16 @@ type SeedDeposit = {
   createdAt?: string;
 };
 
+function usdc(amount: number) {
+  return Math.round(amount * 1_000_000).toString();
+}
+
+const daysAgo = (days: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+};
+
 const users: SeedUser[] = [
   {
     email: 'manager@example.com',
@@ -272,6 +282,55 @@ const rounds: SeedRound[] = [
       { wallet: users[4].walletAddress, commit: 120 },
     ],
   },
+  // Recent activity for 30-day performance (relative dates)
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:cpi-latest',
+    marketTitle: 'Will US CPI print above 3.5% YoY this month?',
+    status: 'SETTLED',
+    createdAt: daysAgo(22),
+    members: [
+      { wallet: users[2].walletAddress, commit: 220, payout: 310 }, // win
+      { wallet: users[3].walletAddress, commit: 160, payout: 0 },   // loss
+      { wallet: users[4].walletAddress, commit: 120, payout: 90 },  // slight loss
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:fomc-next',
+    marketTitle: 'Will the Fed cut at the next FOMC?',
+    status: 'COMMITTED',
+    createdAt: daysAgo(8),
+    members: [
+      { wallet: users[2].walletAddress, commit: 260 },
+      { wallet: users[3].walletAddress, commit: 180 },
+      { wallet: users[4].walletAddress, commit: 140 },
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:gdp-surprise',
+    marketTitle: 'Will GDP surprise to the upside?',
+    status: 'SETTLED',
+    createdAt: daysAgo(5),
+    members: [
+      { wallet: users[2].walletAddress, commit: 180, payout: 0 },   // loss
+      { wallet: users[3].walletAddress, commit: 140, payout: 230 }, // win
+      { wallet: users[4].walletAddress, commit: 90, payout: 0 },    // loss
+    ],
+  },
+  {
+    clubSlug: 'macro-mavericks',
+    marketRef: 'polymarket:jobs-surprise',
+    marketTitle: 'Will nonfarm payrolls beat consensus by >100k?',
+    status: 'SETTLED',
+    createdAt: daysAgo(10),
+    members: [
+      { wallet: users[2].walletAddress, commit: 200, payout: 420 }, // strong win
+      { wallet: users[3].walletAddress, commit: 150, payout: 80 },  // loss
+      { wallet: users[4].walletAddress, commit: 120, payout: 60 },  // loss
+    ],
+  },
   {
     clubSlug: 'sports-lab',
     marketRef: 'polymarket:nfl-superbowl',
@@ -306,10 +365,6 @@ const rounds: SeedRound[] = [
     ],
   },
 ];
-
-function usdc(amount: number) {
-  return Math.round(amount * 1_000_000).toString();
-}
 
 function groupByClub<T extends { clubSlug: string }>(items: T[]) {
   const map = new Map<string, T[]>();
@@ -497,12 +552,16 @@ async function seedDeposits(userIds: Map<string, string>, clubIds: Map<string, s
     { clubSlug: 'signal-room', wallet: users[0].walletAddress, amount: 600, createdAt: '2024-01-05' },
     { clubSlug: 'signal-room', wallet: users[1].walletAddress, amount: 300, createdAt: '2024-01-08' },
     { clubSlug: 'signal-room', wallet: users[2].walletAddress, amount: 200, createdAt: '2024-01-10' },
-    // Macro Mavericks richer history
-    { clubSlug: 'macro-mavericks', wallet: users[2].walletAddress, amount: 700, createdAt: '2024-01-02' },
-    { clubSlug: 'macro-mavericks', wallet: users[3].walletAddress, amount: 350, createdAt: '2024-01-06' },
-    { clubSlug: 'macro-mavericks', wallet: users[4].walletAddress, amount: 150, createdAt: '2024-01-12' },
-    { clubSlug: 'macro-mavericks', wallet: users[2].walletAddress, amount: 250, createdAt: '2024-06-01' },
-    { clubSlug: 'macro-mavericks', wallet: users[3].walletAddress, amount: 180, createdAt: '2024-06-03' },
+    // Macro Mavericks richer history (recent relative dates)
+    { clubSlug: 'macro-mavericks', wallet: users[2].walletAddress, amount: 700, createdAt: daysAgo(400) },
+    { clubSlug: 'macro-mavericks', wallet: users[3].walletAddress, amount: 350, createdAt: daysAgo(396) },
+    { clubSlug: 'macro-mavericks', wallet: users[4].walletAddress, amount: 150, createdAt: daysAgo(392) },
+    { clubSlug: 'macro-mavericks', wallet: users[2].walletAddress, amount: 250, createdAt: daysAgo(250) },
+    { clubSlug: 'macro-mavericks', wallet: users[3].walletAddress, amount: 180, createdAt: daysAgo(248) },
+    // Recent Macro Mavericks funding for performance window
+    { clubSlug: 'macro-mavericks', wallet: users[2].walletAddress, amount: 400, createdAt: daysAgo(45) },
+    { clubSlug: 'macro-mavericks', wallet: users[3].walletAddress, amount: 250, createdAt: daysAgo(32) },
+    { clubSlug: 'macro-mavericks', wallet: users[4].walletAddress, amount: 180, createdAt: daysAgo(18) },
     // Sports Lab funding
     { clubSlug: 'sports-lab', wallet: users[3].walletAddress, amount: 400, createdAt: '2024-02-01' },
     { clubSlug: 'sports-lab', wallet: users[1].walletAddress, amount: 180, createdAt: '2024-02-04' },
