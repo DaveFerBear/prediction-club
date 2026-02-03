@@ -69,7 +69,7 @@ function walletClientToSigner(walletClient?: WalletClientWithAccount | null) {
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { connect, isPending: isConnecting } = useConnect();
+  const { connect, connectAsync, isPending: isConnecting } = useConnect();
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const { data: walletClient } = useWalletClient({ chainId: POLYMARKET_CHAIN_ID });
   const signer = useMemo(() => walletClientToSigner(walletClient), [walletClient]);
@@ -96,7 +96,7 @@ export default function ProfilePage() {
   const [safeAddressOverride, setSafeAddressOverride] = useState<string | null>(null);
   const lastChainCheckRef = useRef(0);
   const chainCheckInFlightRef = useRef(false);
-  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, setIsRefreshing] = useState(false);
 
   const chainReady = chainId === POLYMARKET_CHAIN_ID && !!walletClient;
   const connectComplete = isConnected;
@@ -191,36 +191,21 @@ export default function ProfilePage() {
     };
   }, [credsChecked, fetch, isAuthenticated]);
 
-  useEffect(() => {
-    if (!effectiveSafeAddress || !publicClient) return;
-    let cancelled = false;
-
-    const runCheck = async () => {
+  const refreshSafeState = useCallback(
+    async (address: string, options: { force?: boolean } = {}) => {
+      if (!publicClient) return;
       if (chainCheckInFlightRef.current) return;
       if (status === 'deploying-safe') return;
       const now = Date.now();
-      if (now - lastChainCheckRef.current < 15000) return;
+      if (!options.force && now - lastChainCheckRef.current < 15000) return;
       lastChainCheckRef.current = now;
       chainCheckInFlightRef.current = true;
-      setStatus('checking-approvals');
-      console.log('[profile] safe check start', {
-        effectiveSafeAddress,
-        derivedSafeAddress: safeAddress,
-        status,
-      });
+      setIsRefreshing(true);
       try {
-        let deployed = await checkSafeDeployed(effectiveSafeAddress);
-        let deployedAddress: string | null = deployed ? effectiveSafeAddress : null;
-        console.log('[profile] effective safe deployed', {
-          deployed,
-          address: effectiveSafeAddress,
-        });
-        if (!deployed && safeAddress && safeAddress !== effectiveSafeAddress) {
+        let deployed = await checkSafeDeployed(address);
+        let deployedAddress: string | null = deployed ? address : null;
+        if (!deployed && safeAddress && safeAddress !== address) {
           const derivedDeployed = await checkSafeDeployed(safeAddress);
-          console.log('[profile] derived safe deployed', {
-            deployed: derivedDeployed,
-            address: safeAddress,
-          });
           if (derivedDeployed) {
             deployed = true;
             deployedAddress = safeAddress;
@@ -235,30 +220,18 @@ export default function ProfilePage() {
             }
           }
         }
-        if (cancelled) return;
         setSafeReady(deployed);
 
         if (deployed) {
-          const targetAddress = toHexAddress(deployedAddress ?? effectiveSafeAddress);
+          const targetAddress = toHexAddress(deployedAddress ?? address);
           const approvalStatus = await checkApprovals(targetAddress);
-          if (cancelled) return;
           setApprovalsReady(approvalStatus.allApproved);
-          console.log('[profile] approvals checked', {
-            address: targetAddress,
-            allApproved: approvalStatus.allApproved,
-          });
         } else {
           setApprovalsReady(false);
-          if (!cancelled) {
-            if (retryTimeoutRef.current) {
-              clearTimeout(retryTimeoutRef.current);
-            }
-            retryTimeoutRef.current = setTimeout(() => {
-              if (cancelled) return;
-              lastChainCheckRef.current = 0;
-              runCheck();
-            }, 20000);
-          }
+          setSafeFunded(false);
+          setSafeBalanceUsdcE(null);
+          setSafeBalanceUsdc(null);
+          return;
         }
 
         const [balanceUsdcE, balanceUsdc] = await Promise.all([
@@ -266,61 +239,56 @@ export default function ProfilePage() {
             address: POLYMARKET_CONTRACTS.usdcE as `0x${string}`,
             abi: erc20Abi,
             functionName: 'balanceOf',
-            args: [toHexAddress(deployedAddress ?? effectiveSafeAddress)],
+            args: [toHexAddress(deployedAddress ?? address)],
           }),
           publicClient.readContract({
             address: POLYMARKET_CONTRACTS.usdc as `0x${string}`,
             abi: erc20Abi,
             functionName: 'balanceOf',
-            args: [toHexAddress(deployedAddress ?? effectiveSafeAddress)],
+            args: [toHexAddress(deployedAddress ?? address)],
           }),
         ]);
 
-        if (cancelled) return;
         setSafeBalanceUsdcE(balanceUsdcE);
         setSafeBalanceUsdc(balanceUsdc);
         setSafeFunded(balanceUsdcE > BigInt(0));
-        console.log('[profile] safe balance', {
-          address: deployedAddress ?? effectiveSafeAddress,
-          balanceUsdcE: balanceUsdcE.toString(),
-          balanceUsdc: balanceUsdc.toString(),
-        });
-        setStatus('idle');
       } catch (err) {
-        if (cancelled) return;
         setStatus('error');
-        setError(err instanceof Error ? err.message : 'Failed to check Safe');
-        console.log('[profile] safe check error', err);
+        setError(err instanceof Error ? err.message : 'Failed to refresh Safe');
       } finally {
         chainCheckInFlightRef.current = false;
+        setIsRefreshing(false);
       }
-    };
+    },
+    [checkApprovals, checkSafeDeployed, fetch, publicClient, safeAddress, status]
+  );
 
-    runCheck();
+  useEffect(() => {
+    if (!effectiveSafeAddress || !publicClient) return;
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      refreshSafeState(effectiveSafeAddress);
+    };
+    run();
+    const interval = setInterval(run, 20000);
     return () => {
       cancelled = true;
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
+      clearInterval(interval);
     };
-  }, [checkApprovals, checkSafeDeployed, effectiveSafeAddress, publicClient]);
+  }, [effectiveSafeAddress, publicClient, refreshSafeState]);
   const ensureConnected = async () => {
     setError(null);
     if (!isConnected) {
       setStatus('connecting');
-      connect({ connector: injected() });
-      return false;
+      await connectAsync({ connector: injected(), chainId: POLYMARKET_CHAIN_ID });
     }
     if (chainId !== POLYMARKET_CHAIN_ID) {
       setStatus('switching-chain');
       await switchChainAsync({ chainId: POLYMARKET_CHAIN_ID });
-      return false;
     }
     if (!walletClient || !signer) {
-      setStatus('connecting');
-      connect({ connector: injected(), chainId: POLYMARKET_CHAIN_ID });
-      return false;
+      throw new Error('Wallet client not ready');
     }
     if (sessionStatus === 'loading') {
       setStatus('signing-in');
@@ -368,6 +336,7 @@ export default function ProfilePage() {
         args: [safeAddressHex, parseUnits(trimmed, 6)],
       });
       setStatus('idle');
+      await refreshSafeState(effectiveSafeAddress, { force: true });
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to fund Safe');
@@ -414,6 +383,7 @@ export default function ProfilePage() {
         // best-effort persistence
       }
       setStatus('idle');
+      await refreshSafeState(deployedSafe, { force: true });
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to deploy Safe');
@@ -423,7 +393,7 @@ export default function ProfilePage() {
   const handleApproveAll = async () => {
     const ok = await ensureConnected();
     if (!ok) return;
-    if (!safeAddress) {
+    if (!effectiveSafeAddress) {
       setError('Safe address not available');
       setStatus('error');
       return;
@@ -433,6 +403,7 @@ export default function ProfilePage() {
       await approveAll();
       setApprovalsReady(true);
       setStatus('idle');
+      await refreshSafeState(effectiveSafeAddress, { force: true });
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to approve');
@@ -442,7 +413,7 @@ export default function ProfilePage() {
   const handleSaveCreds = async () => {
     const ok = await ensureConnected();
     if (!ok) return;
-    if (!creds || !safeAddress) {
+    if (!creds || !effectiveSafeAddress) {
       setError('Credentials or Safe address missing');
       setStatus('error');
       return;
@@ -453,13 +424,14 @@ export default function ProfilePage() {
         key: creds.key,
         secret: creds.secret,
         passphrase: creds.passphrase,
-        safeAddress,
+        safeAddress: effectiveSafeAddress,
       });
       if (response && !response.success) {
         throw new Error(response.error?.message || 'Failed to save credentials');
       }
       setCredsSaved(true);
       setStatus('success');
+      await refreshSafeState(effectiveSafeAddress, { force: true });
     } catch (err) {
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Failed to save credentials');
