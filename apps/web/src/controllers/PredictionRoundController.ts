@@ -6,10 +6,7 @@ export interface CreatePredictionRoundInput {
   clubSlug: string;
   marketRef?: string;
   marketTitle?: string;
-  members: Array<{
-    userId: string;
-    commitAmount: string;
-  }>;
+  commitAmount: string;
   adminUserId: string;
 }
 
@@ -25,16 +22,19 @@ export class PredictionRoundController {
    * Create a new prediction round (commit funds to a market)
    */
   static async createPredictionRound(input: CreatePredictionRoundInput) {
-    const { clubSlug, marketRef, marketTitle, members, adminUserId } = input;
+    const { clubSlug, marketRef, marketTitle, commitAmount, adminUserId } = input;
     const club = await this.getClubOrThrow(clubSlug);
 
     await this.requireAdminOrThrow(club.id, adminUserId);
 
-    const stakeTotal = members
-      .reduce((sum, m) => sum + BigInt(m.commitAmount), BigInt(0))
-      .toString();
+    const activeMembers = await ClubController.getActiveMembers(club.id);
+    if (activeMembers.length === 0) {
+      throw new LedgerError('NO_ACTIVE_MEMBERS', 'No active members in this club');
+    }
 
-    const memberIds = members.map((member) => member.userId);
+    const stakeTotal = (BigInt(commitAmount) * BigInt(activeMembers.length)).toString();
+
+    const memberIds = activeMembers.map((member) => member.userId);
     const memberSafes = await prisma.user.findMany({
       where: { id: { in: memberIds } },
       select: {
@@ -45,7 +45,7 @@ export class PredictionRoundController {
     const safeByUser = new Map(
       memberSafes.map((member) => [member.id, member.polymarketSafeAddress])
     );
-    for (const member of members) {
+    for (const member of activeMembers) {
       const safeAddress = safeByUser.get(member.userId);
       if (!safeAddress) {
         throw new LedgerError('SAFE_NOT_FOUND', 'Member Safe address not available');
@@ -56,14 +56,15 @@ export class PredictionRoundController {
       const created = await tx.predictionRound.create({
         data: {
           clubId: club.id,
+          createdByUserId: adminUserId,
           marketRef,
           marketTitle,
           stakeTotal,
           status: 'PENDING',
           members: {
-            create: members.map((m) => ({
+            create: activeMembers.map((m) => ({
               userId: m.userId,
-              commitAmount: m.commitAmount,
+              commitAmount,
             })),
           },
         },
@@ -73,13 +74,13 @@ export class PredictionRoundController {
       });
 
       await LedgerController.createEntries(
-        members.map((member) => ({
+        activeMembers.map((member) => ({
           safeAddress: safeByUser.get(member.userId) ?? '',
           clubId: club.id,
           userId: member.userId,
           predictionRoundId: created.id,
           type: 'COMMIT',
-          amount: `-${member.commitAmount}`,
+          amount: `-${commitAmount}`,
           asset: 'USDC.e',
           metadata: undefined,
           txHash: undefined,

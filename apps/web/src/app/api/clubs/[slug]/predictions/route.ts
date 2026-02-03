@@ -6,12 +6,7 @@ import { requireAuth, AuthError } from '@/lib/auth';
 const createPredictionRoundSchema = z.object({
   marketRef: z.string().max(500).optional(),
   marketTitle: z.string().max(200).optional(),
-  members: z.array(
-    z.object({
-      userId: z.string(),
-      commitAmount: z.string(),
-    })
-  ),
+  commitAmount: z.string().min(1),
 });
 
 /**

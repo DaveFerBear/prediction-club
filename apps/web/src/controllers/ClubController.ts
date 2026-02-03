@@ -39,6 +39,18 @@ export class ClubController {
     return !!member;
   }
 
+  static async getActiveMembers(clubId: string) {
+    return prisma.clubMember.findMany({
+      where: {
+        clubId,
+        status: 'ACTIVE',
+      },
+      select: {
+        userId: true,
+      },
+    });
+  }
+
   static async requireAdmin(clubId: string, userId: string) {
     const isAdmin = await this.isAdmin(clubId, userId);
     if (!isAdmin) {
@@ -69,7 +81,7 @@ export class ClubController {
         slug,
         description,
         isPublic,
-        managerUserId: userId,
+        createdByUserId: userId,
         members: {
           create: {
             userId,
@@ -90,10 +102,7 @@ export class ClubController {
     const { page = 1, pageSize = 10, userId } = input;
     const skip = (page - 1) * pageSize;
     const where = {
-      OR: [
-        { managerUserId: userId },
-        { members: { some: { userId, status: 'ACTIVE' as const } } },
-      ],
+      members: { some: { userId, status: 'ACTIVE' as const } },
     };
 
     const [clubs, total] = await Promise.all([
@@ -156,13 +165,6 @@ export class ClubController {
     const club = await prisma.club.findUnique({
       where: { slug },
       include: {
-        manager: {
-          select: {
-            id: true,
-            walletAddress: true,
-            email: true,
-          },
-        },
         members: {
           where: { status: 'ACTIVE' },
           include: {

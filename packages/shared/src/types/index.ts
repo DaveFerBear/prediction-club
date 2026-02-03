@@ -31,14 +31,10 @@ export interface Club {
   name: string;
   slug: string;
   description: string | null;
-  managerUserId: string;
   isPublic: boolean;
+  createdByUserId: string | null;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface ClubWithManager extends Club {
-  manager: User;
 }
 
 export interface ClubWithStats extends Club {
@@ -97,6 +93,7 @@ export type PredictionRoundStatus = 'PENDING' | 'COMMITTED' | 'SETTLED' | 'CANCE
 export interface PredictionRound {
   id: string;
   clubId: string;
+  createdByUserId: string | null;
   marketRef: string | null;
   marketTitle: string | null;
   stakeTotal: string; // BigInt as string
@@ -162,10 +159,7 @@ export interface ApplyToClubRequest {
 export interface CreatePredictionRoundRequest {
   marketRef?: string;
   marketTitle?: string;
-  members: {
-    userId: string;
-    commitAmount: string;
-  }[];
+  commitAmount: string;
 }
 
 export interface WithdrawRequest {

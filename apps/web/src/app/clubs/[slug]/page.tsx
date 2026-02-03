@@ -61,16 +61,13 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
 
   const exposureSeries = useMemo(() => buildExposureSeries(clubHistory), [clubHistory]);
 
-  const isManager =
-    !!address && club?.manager?.walletAddress?.toLowerCase() === address.toLowerCase();
-
   const isAdmin = useMemo(() => {
     if (!address) return false;
     const member = members.find(
       (item) => item.user.walletAddress.toLowerCase() === address.toLowerCase()
     );
-    return member?.role === 'ADMIN' || isManager;
-  }, [address, members, isManager]);
+    return member?.role === 'ADMIN';
+  }, [address, members]);
 
   const isMember =
     !!address &&
@@ -214,7 +211,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-bold">{club.name}</h1>
                 <Badge variant="secondary">{club.isPublic ? 'Public' : 'Private'}</Badge>
-                {isManager && <Badge variant="outline">You are a manager</Badge>}
               </div>
               <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
             </div>

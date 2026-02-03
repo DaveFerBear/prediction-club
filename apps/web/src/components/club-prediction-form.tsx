@@ -283,16 +283,13 @@ export function ClubPredictionForm({
   const { balance, balanceDisplay, isLoading: isBalanceLoading } = useSafeBalance(safeAddress);
 
   const members = club.members ?? [];
-  const isManager =
-    !!address && club.manager?.walletAddress?.toLowerCase() === address.toLowerCase();
-
   const isAdmin = useMemo(() => {
     if (!address) return false;
     const member = members.find(
       (item) => item.user.walletAddress.toLowerCase() === address.toLowerCase()
     );
-    return member?.role === 'ADMIN' || isManager;
-  }, [address, members, isManager]);
+    return member?.role === 'ADMIN';
+  }, [address, members]);
 
   const outcomes = useMemo(
     () =>
@@ -421,12 +418,7 @@ export function ClubPredictionForm({
       return;
     }
 
-    const entries = members.map((member) => ({
-      userId: member.user.id,
-      commitAmount,
-    }));
-
-    if (entries.length === 0) {
+    if (members.length === 0) {
       dispatch({ type: 'submitError', message: 'No active members found.' });
       return;
     }
@@ -438,7 +430,7 @@ export function ClubPredictionForm({
       const response = await createPrediction({
         marketRef: getMarketRef(state.selectedMarket),
         marketTitle,
-        members: entries,
+        commitAmount,
       });
 
       if (response?.success) {

@@ -28,7 +28,6 @@ type SeedClub = {
   slug: string;
   description: string;
   isPublic: boolean;
-  managerWallet: string;
   members: Array<{ wallet: string; role: 'ADMIN' | 'MEMBER' }>;
 };
 
@@ -97,7 +96,6 @@ const clubs: SeedClub[] = [
     slug: 'signal-room',
     description: 'A prediction club for signal traders on Polymarket.',
     isPublic: true,
-    managerWallet: users[0].walletAddress,
     members: [
       { wallet: users[0].walletAddress, role: 'ADMIN' },
       { wallet: users[1].walletAddress, role: 'MEMBER' },
@@ -109,7 +107,6 @@ const clubs: SeedClub[] = [
     slug: 'macro-mavericks',
     description: 'Macro trades, rates, and big-picture bets.',
     isPublic: true,
-    managerWallet: users[2].walletAddress,
     members: [
       { wallet: users[2].walletAddress, role: 'ADMIN' },
       { wallet: users[3].walletAddress, role: 'MEMBER' },
@@ -121,7 +118,6 @@ const clubs: SeedClub[] = [
     slug: 'sports-lab',
     description: 'Collaborative sports prediction club.',
     isPublic: false,
-    managerWallet: users[3].walletAddress,
     members: [
       { wallet: users[3].walletAddress, role: 'ADMIN' },
       { wallet: users[1].walletAddress, role: 'MEMBER' },
@@ -399,9 +395,10 @@ async function ensureUsers() {
 async function ensureClubs(userIds: Map<string, string>) {
   const results = new Map<string, string>();
   for (const club of clubs) {
-    const managerId = userIds.get(club.managerWallet);
-    if (!managerId) {
-      throw new Error(`Missing manager for club ${club.slug}`);
+    const adminWallet = club.members.find((member) => member.role === 'ADMIN')?.wallet;
+    const adminUserId = adminWallet ? userIds.get(adminWallet) : undefined;
+    if (!adminUserId) {
+      throw new Error(`Missing admin user for club ${club.slug}`);
     }
     const record = await prisma.club.upsert({
       where: { slug: club.slug },
@@ -409,14 +406,14 @@ async function ensureClubs(userIds: Map<string, string>) {
         name: club.name,
         description: club.description,
         isPublic: club.isPublic,
-        managerUserId: managerId,
+        createdByUserId: adminUserId,
       },
       create: {
         name: club.name,
         slug: club.slug,
         description: club.description,
         isPublic: club.isPublic,
-        managerUserId: managerId,
+        createdByUserId: adminUserId,
       },
     });
     results.set(club.slug, record.id);
@@ -465,6 +462,14 @@ async function resetClubActivity(clubIds: Map<string, string>) {
 
 async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<string, string>) {
   const roundsByClub = groupByClub(rounds);
+  const adminByClub = new Map<string, string>();
+  for (const club of clubs) {
+    const adminWallet = club.members.find((member) => member.role === 'ADMIN')?.wallet;
+    const adminUserId = adminWallet ? userIds.get(adminWallet) : undefined;
+    if (adminUserId) {
+      adminByClub.set(club.slug, adminUserId);
+    }
+  }
 
   for (const [clubSlug, clubRounds] of roundsByClub.entries()) {
     const clubId = clubIds.get(clubSlug);
@@ -481,10 +486,12 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
       const stakeTotal = members
         .reduce((sum, entry) => sum + BigInt(entry.commitAmount), 0n)
         .toString();
+      const createdByUserId = adminByClub.get(clubSlug) ?? members[0]?.userId;
 
       const created = await prisma.predictionRound.create({
         data: {
           clubId,
+          createdByUserId,
           marketRef: round.marketRef,
           marketTitle: round.marketTitle,
           stakeTotal,

@@ -11,6 +11,7 @@ export interface ClubListItem {
   slug: string;
   description: string | null;
   isPublic: boolean;
+  createdByUserId: string | null;
   activeCommittedVolume: string;
   performance?: {
     days: number;
@@ -33,6 +34,7 @@ export interface ClubDetail {
   slug: string;
   description: string | null;
   isPublic: boolean;
+  createdByUserId: string | null;
   activeCommittedVolume: string;
   performance?: {
     days: number;
@@ -42,11 +44,6 @@ export interface ClubDetail {
     simpleReturn: number;
     hasWindowActivity: boolean;
     realizedPnl: string;
-  } | null;
-  manager: {
-    id: string;
-    walletAddress: string;
-    email: string | null;
   } | null;
   members: Array<{
     role: string;
@@ -70,11 +67,12 @@ export interface ClubDetail {
 
 export interface PredictionRound {
   id: string;
+  createdByUserId: string | null;
   marketTitle: string | null;
   marketRef: string | null;
   status: string;
   stakeTotal: string;
-   createdAt: string;
+  createdAt: string;
   _count: {
     members: number;
   };

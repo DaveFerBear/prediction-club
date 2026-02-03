@@ -24,12 +24,13 @@ model User {
   updatedAt                 DateTime @updatedAt
 
   // Relations
-  managedClubs    Club[]         @relation("ClubManager")
   memberships     ClubMember[]
   applications    Application[]
   predictionRoundMembers   PredictionRoundMember[]
   ledgerEntries           LedgerEntry[]
   verifications   Verification[]
+  createdClubs    Club[]            @relation("ClubCreatedBy")
+  createdPredictionRounds PredictionRound[] @relation("PredictionRoundCreatedBy")
 
   @@index([walletAddress])
   @@index([email])
@@ -44,10 +45,8 @@ model Club {
   name          String
   slug          String   @unique
   description   String?
-
-  // Manager (off-chain role)
-  managerUserId String
-  manager       User     @relation("ClubManager", fields: [managerUserId], references: [id])
+  createdByUserId String?
+  createdBy     User?    @relation("ClubCreatedBy", fields: [createdByUserId], references: [id])
 
   // Visibility
   isPublic      Boolean  @default(false)
@@ -63,7 +62,7 @@ model Club {
   ledgerEntries          LedgerEntry[]
 
   @@index([slug])
-  @@index([managerUserId])
+  @@index([createdByUserId])
 }
 
 // ============================================================================
@@ -150,6 +149,8 @@ model PredictionRound {
   id              String       @id @default(cuid())
   clubId          String
   club            Club         @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  createdByUserId String?
+  createdBy       User?        @relation("PredictionRoundCreatedBy", fields: [createdByUserId], references: [id])
 
   // Market reference (e.g., Polymarket condition ID or URL)
   marketRef       String?
@@ -169,6 +170,7 @@ model PredictionRound {
 
   @@index([clubId])
   @@index([status])
+  @@index([createdByUserId])
 }
 
 // ============================================================================
