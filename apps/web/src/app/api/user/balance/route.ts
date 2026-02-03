@@ -4,18 +4,25 @@ import { apiResponse, unauthorizedError, serverError } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
 
 /**
- * GET /api/ledger/net-balance
+ * GET /api/user/balance
+ * Returns overall balance and full ledger history for the authenticated user.
  */
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    const balance = await LedgerController.getUserNetBalance({ userId: user.id });
-    return apiResponse({ balance });
+
+    const [balance, history] = await Promise.all([
+      LedgerController.getUserNetBalance({ userId: user.id }),
+      LedgerController.getUserLedgerHistory({ userId: user.id }),
+    ]);
+
+    return apiResponse({ balance, history });
   } catch (error) {
     if (error instanceof AuthError) {
       return unauthorizedError(error.message);
     }
-    console.error('Error fetching net balance:', error);
+    console.error('Error fetching user balance:', error);
     return serverError();
   }
 }
+

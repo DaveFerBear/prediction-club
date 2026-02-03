@@ -7,12 +7,12 @@ import { Button } from '@prediction-club/ui';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from './connect-button';
 import { Logo } from './logo';
-import { useLedgerNetBalance } from '@/hooks';
+import { useUserBalance } from '@/hooks';
 
 export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' }) {
   const logoRef = useRef<SVGSVGElement | null>(null);
   const { address, isConnected } = useAccount();
-  const { balance } = useLedgerNetBalance();
+  const { balance } = useUserBalance();
   const balanceDisplay = formatUsdAmount(balance);
 
   const handleLogoEnter = () => {

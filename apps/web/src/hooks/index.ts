@@ -10,7 +10,7 @@ export { useMarketSearch, useMarketDetails, type MarketItem } from './use-market
 export { useCreatePrediction } from './use-create-prediction';
 export { usePolymarketMarketData } from './use-polymarket-market-data';
 export { useSafeBalance } from './use-safe-balance';
-export { useLedgerNetBalance } from './use-ledger-net-balance';
+export { useUserBalance } from './use-user-balance';
 export {
   useClubs,
   usePublicClubs,
