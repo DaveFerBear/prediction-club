@@ -9,7 +9,6 @@ import {
   useApproveApplication,
   useApplyToClub,
   useClubBalance,
-  useClubPerformance,
   useClub,
   useClubApplications,
   usePredictionRounds,
@@ -41,7 +40,9 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     error: roundsError,
   } = usePredictionRounds(params.slug);
   const { history: clubHistory, isLoading: balanceLoading } = useClubBalance(params.slug);
-  const { performance, isLoading: perfLoading, hasActivity } = useClubPerformance(params.slug, 30);
+  const performance = club?.performance ?? null;
+  const hasActivity = performance?.hasWindowActivity ?? false;
+  const perfLoading = false;
   const loading = clubLoading || roundsLoading;
   const error = clubError || roundsError;
 
@@ -237,18 +238,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   : !hasActivity
                     ? 'No 30d activity'
                     : `${((performance?.simpleReturn ?? 0) * 100).toFixed(1)}%`}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>30d APR</CardDescription>
-              <CardTitle className="text-2xl">
-                {perfLoading
-                  ? '—'
-                  : !hasActivity
-                    ? 'No 30d activity'
-                    : `${((performance?.apr ?? 0) * 100).toFixed(1)}%`}
               </CardTitle>
             </CardHeader>
           </Card>

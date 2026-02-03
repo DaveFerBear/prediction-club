@@ -13,7 +13,6 @@ export { useSafeBalance } from './use-safe-balance';
 export { useUserBalance } from './use-user-balance';
 export { useApplyToClub } from './use-apply-to-club';
 export { useClubBalance } from './use-club-balance';
-export { useClubPerformance } from './use-club-performance';
 export {
   useClubs,
   usePublicClubs,

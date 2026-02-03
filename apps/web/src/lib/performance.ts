@@ -12,6 +12,7 @@ export type RoundMemberLike = {
   pnlAmount: string;
   predictionRound: {
     createdAt: string;
+    clubId: string;
   };
 };
 
@@ -21,7 +22,6 @@ export type ClubPerformance = {
   navEnd: string;
   netFlows: string;
   simpleReturn: number; // decimal, e.g., 0.12 = 12%
-  apr: number; // annualized from simpleReturn over days
   hasWindowActivity: boolean;
   realizedPnl: string;
 };
@@ -70,7 +70,6 @@ export function computeClubPerformance(
       navEnd: '0',
       netFlows: '0',
       simpleReturn: 0,
-      apr: 0,
       hasWindowActivity: false,
       realizedPnl: '0',
     };
@@ -133,7 +132,6 @@ export function computeClubPerformance(
   } else {
     simpleReturn = 0;
   }
-  const apr = simpleReturn === 0 ? 0 : Math.pow(1 + simpleReturn, 365 / days) - 1;
   const realizedPnl = (windowPayouts - windowCommitAbs).toString();
 
   return {
@@ -142,7 +140,6 @@ export function computeClubPerformance(
     navEnd: navEnd.toString(),
     netFlows: netFlows.toString(),
     simpleReturn,
-    apr,
     hasWindowActivity: windowActivity > 0,
     realizedPnl,
   };
@@ -163,7 +160,6 @@ export function computeClubPerformanceFromRounds(
       navEnd: '0',
       netFlows: '0',
       simpleReturn: 0,
-      apr: 0,
       hasWindowActivity: false,
       realizedPnl: '0',
     };
@@ -189,7 +185,6 @@ export function computeClubPerformanceFromRounds(
       navEnd: '0',
       netFlows: '0',
       simpleReturn: 0,
-      apr: 0,
       hasWindowActivity: false,
       realizedPnl: '0',
     };
@@ -197,7 +192,6 @@ export function computeClubPerformanceFromRounds(
 
   const pnl = payoutTotal - commitTotal;
   const simpleReturn = commitTotal === 0n ? 0 : Number(pnl) / Number(commitTotal);
-  const apr = simpleReturn === 0 ? 0 : Math.pow(1 + simpleReturn, 365 / days) - 1;
 
   return {
     days,
@@ -205,9 +199,7 @@ export function computeClubPerformanceFromRounds(
     navEnd: '0',
     netFlows: '0',
     simpleReturn,
-    apr,
     hasWindowActivity: true,
     realizedPnl: pnl.toString(),
   };
 }
-

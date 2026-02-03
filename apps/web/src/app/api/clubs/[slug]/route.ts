@@ -11,6 +11,7 @@ import {
   serverError,
 } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
+import { computeClubPerformanceFromRounds, type RoundMemberLike } from '@/lib/performance';
 
 const updateClubSchema = z.object({
   name: z.string().min(1).max(100),
@@ -28,7 +29,22 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     const activeCommittedVolume = await LedgerController.getClubActiveCommitVolume({
       clubId: club.id,
     });
-    return apiResponse({ ...club, activeCommittedVolume });
+
+    const roundMembers = await prisma.predictionRoundMember.findMany({
+      where: { predictionRound: { clubId: club.id } },
+      select: {
+        commitAmount: true,
+        payoutAmount: true,
+        pnlAmount: true,
+        predictionRound: { select: { clubId: true, createdAt: true } },
+      },
+    });
+    const performance = computeClubPerformanceFromRounds(
+      roundMembers as unknown as RoundMemberLike[],
+      30
+    );
+
+    return apiResponse({ ...club, activeCommittedVolume, performance });
   } catch (error) {
     if (error instanceof ClubError && error.code === 'NOT_FOUND') {
       return notFoundError('Club');

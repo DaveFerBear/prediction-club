@@ -1,6 +1,5 @@
 ﻿'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
 import { formatUsdAmount } from '@prediction-club/shared';
 import {
@@ -12,7 +11,6 @@ import {
   CardTitle,
 } from '@prediction-club/ui';
 import type { ClubListItem } from '@/hooks';
-import { useClubPerformance } from '@/hooks';
 
 type ClubCardProps = {
   club: ClubListItem;
@@ -20,15 +18,10 @@ type ClubCardProps = {
 };
 
 export function ClubCard({ club, statsLabel }: ClubCardProps) {
-  const { performance, isLoading, hasActivity } = useClubPerformance(club.slug, 30);
-  const aprLabel = useMemo(() => {
-    if (!performance || !hasActivity) return null;
-    const aprPct = (performance.apr ?? 0) * 100;
-    const simplePct = (performance.simpleReturn ?? 0) * 100;
-    const format = (v: number) =>
-      `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-    return `${format(simplePct)} (30d), APR ${format(aprPct)}`;
-  }, [performance]);
+  const aprLabel =
+    club.performance && club.performance.hasWindowActivity
+      ? `${((club.performance.simpleReturn ?? 0) * 100).toFixed(1)}% (30d)`
+      : 'No 30d activity';
 
   const statsValue = statsLabel === 'members' ? club._count.members : club._count.predictionRounds;
   const badgeLabel =
@@ -55,9 +48,7 @@ export function ClubCard({ club, statsLabel }: ClubCardProps) {
             <span>${formatUsdAmount(club.activeCommittedVolume)}</span>
           </div>
           <div className="mt-2 text-sm text-muted-foreground">
-            {isLoading
-              ? 'Loading performance...'
-              : aprLabel || 'No 30d activity'}
+            {aprLabel}
           </div>
         </CardContent>
       </Card>
