@@ -11,6 +11,7 @@ export { useCreatePrediction } from './use-create-prediction';
 export { usePolymarketMarketData } from './use-polymarket-market-data';
 export { useSafeBalance } from './use-safe-balance';
 export { useUserBalance } from './use-user-balance';
+export { useApplyToClub } from './use-apply-to-club';
 export {
   useClubs,
   usePublicClubs,

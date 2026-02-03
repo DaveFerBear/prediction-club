@@ -7,6 +7,7 @@ import { useSWRConfig } from 'swr';
 import {
   useApi,
   useApproveApplication,
+  useApplyToClub,
   useClub,
   useClubApplications,
   usePredictionRounds,
@@ -61,6 +62,9 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const [savingClub, setSavingClub] = useState(false);
   const [clubSaveError, setClubSaveError] = useState<string | null>(null);
   const [clubSaveSuccess, setClubSaveSuccess] = useState<string | null>(null);
+  const [applyMessage, setApplyMessage] = useState('');
+  const [applySuccess, setApplySuccess] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   const {
     applications,
@@ -68,6 +72,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     error: appsError,
   } = useClubApplications(isAdmin ? params.slug : undefined, 'PENDING');
   const { approve, approvingId } = useApproveApplication(params.slug);
+  const { apply, isApplying, isAuthenticated: isUserAuthenticated } = useApplyToClub(params.slug);
 
   useEffect(() => {
     if (!club) return;
@@ -98,6 +103,23 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
       setClubSaveError(err instanceof Error ? err.message : 'Failed to update club');
     } finally {
       setSavingClub(false);
+    }
+  };
+
+  const handleApply = async () => {
+    setApplyError(null);
+    setApplySuccess(null);
+    if (!isUserAuthenticated) {
+      setApplyError('Connect your wallet to apply.');
+      return;
+    }
+
+    try {
+      await apply(applyMessage.trim() || undefined);
+      setApplySuccess('Application submitted.');
+      setApplyMessage('');
+    } catch (err) {
+      setApplyError(err instanceof Error ? err.message : 'Failed to submit application.');
     }
   };
 
@@ -163,7 +185,31 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
             ) : isMember ? (
               <Badge variant="secondary">You are a member</Badge>
             ) : (
-              <Button>Apply to Join</Button>
+              <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+                <Input
+                  value={applyMessage}
+                  onChange={(e) => setApplyMessage(e.target.value)}
+                  placeholder="Message (optional)"
+                  className="sm:w-64"
+                />
+                <Button
+                  type="button"
+                  onClick={handleApply}
+                  disabled={isApplying}
+                  variant="default"
+                >
+                  {isApplying ? 'Submitting...' : 'Apply to Join'}
+                </Button>
+                {!isUserAuthenticated && (
+                  <p className="text-xs text-muted-foreground">Connect your wallet to apply.</p>
+                )}
+                {applySuccess && (
+                  <p className="text-xs text-emerald-600">{applySuccess}</p>
+                )}
+                {applyError && (
+                  <p className="text-xs text-destructive">{applyError}</p>
+                )}
+              </div>
             )}
           </div>
         </div>
