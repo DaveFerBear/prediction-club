@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { prisma } from '@prediction-club/db';
 import { ClubController, LedgerController } from '@/controllers';
 import { computeClubPerformanceFromRounds, type RoundMemberLike } from '@/lib/performance';
 import { apiResponse, serverError } from '@/lib/api';

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { prisma } from '@prediction-club/db';
 import { ClubController, ClubError, LedgerController } from '@/controllers';
 import {
   apiResponse,

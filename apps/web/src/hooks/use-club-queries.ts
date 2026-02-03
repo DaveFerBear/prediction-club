@@ -12,6 +12,15 @@ export interface ClubListItem {
   description: string | null;
   isPublic: boolean;
   activeCommittedVolume: string;
+  performance?: {
+    days: number;
+    navStart: string;
+    navEnd: string;
+    netFlows: string;
+    simpleReturn: number;
+    hasWindowActivity: boolean;
+    realizedPnl: string;
+  } | null;
   _count: {
     members: number;
     predictionRounds: number;
@@ -25,6 +34,15 @@ export interface ClubDetail {
   description: string | null;
   isPublic: boolean;
   activeCommittedVolume: string;
+  performance?: {
+    days: number;
+    navStart: string;
+    navEnd: string;
+    netFlows: string;
+    simpleReturn: number;
+    hasWindowActivity: boolean;
+    realizedPnl: string;
+  } | null;
   manager: {
     id: string;
     walletAddress: string;
