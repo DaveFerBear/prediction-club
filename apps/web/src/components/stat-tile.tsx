@@ -33,7 +33,7 @@ export function StatTile({
 }: StatTileProps) {
   return (
     <Card
-      className={['relative border-border/70 transition-all duration-150', className]
+      className={['relative border-border/70 transition-all duration-150 h-full', className]
         .filter(Boolean)
         .join(' ')}
     >
@@ -47,7 +47,7 @@ export function StatTile({
           {right ? <div className="shrink-0">{right}</div> : null}
         </div>
 
-        <div className="mt-2 flex items-baseline justify-between gap-3">
+        <div className="mt-2 flex flex-col gap-1">
           <CardTitle
             className={[
               'tabular-nums tracking-tight',
@@ -56,10 +56,7 @@ export function StatTile({
           >
             {value}
           </CardTitle>
-
-          {subValue ? (
-            <div className="text-xs text-muted-foreground shrink-0">{subValue}</div>
-          ) : null}
+          {subValue ? <div className="text-xs text-muted-foreground">{subValue}</div> : null}
         </div>
       </CardHeader>
     </Card>

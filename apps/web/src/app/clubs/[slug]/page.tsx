@@ -100,6 +100,9 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         ? 'border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300'
         : 'border-border/60 bg-muted text-muted-foreground';
 
+  const returnPillLabel =
+    returnTone === 'up' ? 'Up 30d' : returnTone === 'down' ? 'Down 30d' : 'Flat (30d)';
+
   // ---- edit/apply state ----
   const [clubName, setClubName] = useState('');
   const [clubDescription, setClubDescription] = useState('');
@@ -238,7 +241,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   value={applyMessage}
                   onChange={(e) => setApplyMessage(e.target.value)}
                   placeholder="Message (optional)"
-                  className="sm:w-64"
+                  className="sm:w-64 h-9 bg-muted border border-border/60 text-sm"
                 />
                 <Button type="button" onClick={handleApply} disabled={isApplying} variant="default">
                   {isApplying ? 'Submitting...' : 'Apply to Join'}
@@ -254,25 +257,20 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         </div>
 
         {/* Stats (designed) */}
-        <div className="mb-8 grid gap-4 md:grid-cols-12">
+        <div className="mb-8 grid gap-4 md:grid-cols-5">
           {/* Primary: Active Volume */}
-          <div className="md:col-span-6">
+          <div>
             <StatTile
               label="Active Volume"
               icon={Sigma}
               emphasize
-              value={
-                <span>
-                  {activeVolumeText}
-                  <span className="ml-2 text-sm font-medium text-muted-foreground">USDC</span>
-                </span>
-              }
-              subValue={<span>Committed capital</span>}
+              value={<span>{activeVolumeText}</span>}
+              subValue={<span className="text-muted-foreground">USDC committed</span>}
             />
           </div>
 
           {/* Primary: 30d Return */}
-          <div className="md:col-span-6">
+          <div>
             <StatTile
               label="30d Return"
               icon={Activity}
@@ -286,25 +284,24 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   <span className="tabular-nums">{returnPct!.toFixed(1)}%</span>
                 )
               }
-              right={
+              right={null}
+              subValue={
                 <span
                   className={[
                     'inline-flex items-center gap-1.5 rounded-full border px-2 py-1',
-                    'text-xs font-medium tabular-nums',
+                    'text-xs font-medium',
                     returnPillClass,
                   ].join(' ')}
                 >
                   <ReturnIcon className="h-3.5 w-3.5" />
-                  {perfLoading ? '—' : !hasActivity ? 'No activity' : `${returnPct!.toFixed(1)}%`}
-                  <span className="text-muted-foreground/70">(30d)</span>
+                  {perfLoading ? '—' : returnPillLabel}
                 </span>
               }
-              subValue={<span>Net performance</span>}
             />
           </div>
 
           {/* Secondary */}
-          <div className="md:col-span-4">
+          <div>
             <StatTile
               label="Members"
               icon={Users}
@@ -313,7 +310,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
             />
           </div>
 
-          <div className="md:col-span-4">
+          <div>
             <StatTile
               label="Active Predictions"
               icon={Layers}
@@ -322,7 +319,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
             />
           </div>
 
-          <div className="md:col-span-4">
+          <div>
             <StatTile
               label="Total Predictions"
               icon={Layers}
