@@ -160,6 +160,11 @@ model PredictionRound {
   stakeTotal      String       @default("0") // BigInt as string (wei)
 
   status          PredictionRoundStatus @default(PENDING)
+  targetOutcome   String?
+  targetTokenId   String?
+  outcome         String?
+  resolvedAt      DateTime?
+  settledAt       DateTime?
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -170,6 +175,7 @@ model PredictionRound {
 
   @@index([clubId])
   @@index([status])
+  @@index([targetTokenId])
   @@index([createdByUserId])
 }
 
@@ -189,12 +195,29 @@ model PredictionRoundMember {
   payoutAmount  String   @default("0") // Amount received after settlement
   pnlAmount     String   @default("0") // Profit/loss (payout - commit)
 
+  // Polymarket order metadata (store the minimal useful fields from /orders/get-order)
+  orderId       String?
+  orderStatus   String?
+  orderSide     String?
+  orderPrice    String?
+  orderSize     String?
+  orderSizeMatched String?
+  orderType     String?
+  orderOutcome  String?
+  orderCreatedAt DateTime?
+  orderTxHashes Json?
+  orderMakingAmount String?
+  orderTakingAmount String?
+
+  settledAt     DateTime?
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@unique([predictionRoundId, userId])
   @@index([predictionRoundId])
   @@index([userId])
+  @@index([orderId])
 }
 
 model LedgerEntry {

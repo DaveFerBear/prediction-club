@@ -7,6 +7,8 @@ const createPredictionRoundSchema = z.object({
   marketRef: z.string().max(500).optional(),
   marketTitle: z.string().max(200).optional(),
   commitAmount: z.string().min(1),
+  tokenId: z.string().min(1),
+  outcome: z.string().min(1),
 });
 
 /**
