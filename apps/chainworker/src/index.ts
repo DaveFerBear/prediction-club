@@ -32,8 +32,19 @@ function assertCriticalEnv() {
 
 assertCriticalEnv();
 
-const pollIntervalMs = Number(process.env.CHAINWORKER_POLL_INTERVAL_MS ?? 30_000);
-const batchSize = Number(process.env.CHAINWORKER_BATCH_SIZE ?? 25);
+function readPositiveNumber(name: string, fallback: number) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    console.warn(`[chainworker] Invalid ${name}="${raw}". Using ${fallback}.`);
+    return fallback;
+  }
+  return value;
+}
+
+const pollIntervalMs = readPositiveNumber('CHAINWORKER_POLL_INTERVAL_MS', 30_000);
+const batchSize = readPositiveNumber('CHAINWORKER_BATCH_SIZE', 25);
 
 let prisma: PrismaClient;
 let ChainWorkerDBController: (typeof import('./controllers/ChainWorkerDBController'))['ChainWorkerDBController'];
