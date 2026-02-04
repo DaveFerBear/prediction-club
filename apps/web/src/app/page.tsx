@@ -60,7 +60,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="mt-2 text-base font-semibold">Predict Together</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Participate on-chain, or just join a club and automatically follow predictions.
+                  Participate on-chain and automatically follow predictions.
                 </p>
               </div>
               <div className="rounded-lg border bg-card p-5">
@@ -69,7 +69,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="mt-2 text-base font-semibold">Compete</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Measure your performance with other clubs and track your net gains.
+                  Track net gains and measure your performance against other clubs.
                 </p>
               </div>
             </div>
@@ -99,7 +99,7 @@ export default function HomePage() {
                       <ShieldCheckIcon className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold">Self-Custody First</h3>
+                      <h3 className="text-lg font-semibold">Self-Custody</h3>
                       <p className="mt-2 text-sm text-muted-foreground">
                         Each member funds and maintains custody of their safe, with no on-chain
                         pooling.
