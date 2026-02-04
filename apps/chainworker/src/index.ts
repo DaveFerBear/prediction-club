@@ -1,6 +1,8 @@
 import path from 'path';
 import { config as loadEnv } from 'dotenv';
 import type { PrismaClient } from '@prediction-club/db';
+import { ChainWorkerDBController } from './controllers/ChainWorkerDBController';
+import { PolymarketController } from './controllers/PolymarketController';
 
 const localEnvPath = path.resolve(process.cwd(), '.env');
 const rootEnvPath = path.resolve(process.cwd(), '../../.env');
@@ -17,13 +19,6 @@ async function initPrisma() {
   prisma = db.prisma;
 }
 
-type PendingRound = {
-  id: string;
-  clubId: string;
-  marketRef: string | null;
-  createdAt: Date;
-};
-
 const shutdownState = { requested: false };
 
 function requestShutdown(signal: string) {
@@ -35,32 +30,65 @@ function requestShutdown(signal: string) {
 process.on('SIGINT', () => requestShutdown('SIGINT'));
 process.on('SIGTERM', () => requestShutdown('SIGTERM'));
 
-async function fetchPendingRounds(): Promise<PendingRound[]> {
-  return prisma.predictionRound.findMany({
-    where: { status: 'COMMITTED' },
-    orderBy: { createdAt: 'asc' },
-    take: batchSize,
-    select: {
-      id: true,
-      clubId: true,
-      marketRef: true,
-      createdAt: true,
-    },
-  });
-}
-
-async function handleRound(round: PendingRound) {
-  // TODO: fetch resolution + fills from Polymarket (CLOB/relay) and update:
-  // - PredictionRound status/outcome timestamps
-  // - PredictionRoundMember payouts + pnl
-  // - LedgerEntry PAYOUT rows per member
-  console.log(
-    `[chainworker] Round ${round.id} (club ${round.clubId}) awaiting settlement for ${round.marketRef ?? 'unknown market'}`
-  );
-}
-
 async function runOnce() {
-  const rounds = await fetchPendingRounds();
+  const executionRounds = await ChainWorkerDBController.listRoundsToExecute(batchSize);
+  if (executionRounds.length > 0) {
+    for (const round of executionRounds) {
+      if (shutdownState.requested) break;
+      if (!round.targetTokenId) {
+        console.log(`[chainworker] Round ${round.id} missing token id; skipping execution.`);
+        continue;
+      }
+
+      try {
+        const members = await ChainWorkerDBController.getRoundMembers(round.id);
+        const missingCreds = members.filter(
+          (member) =>
+            !member.user.polymarketApiKeyId ||
+            !member.user.polymarketApiSecret ||
+            !member.user.polymarketApiPassphrase
+        );
+        if (missingCreds.length > 0) {
+          console.log(
+            `[chainworker] Round ${round.id} missing Polymarket creds for ${missingCreds.length} members.`
+          );
+          continue;
+        }
+
+        let allSucceeded = true;
+        for (const member of members) {
+          if (member.orderId) {
+            continue;
+          }
+          try {
+            const order = await PolymarketController.placeMarketOrder({
+              tokenId: round.targetTokenId,
+              commitAmount: member.commitAmount,
+              member,
+            });
+            await ChainWorkerDBController.updateMemberOrder(member.id, order);
+            member.orderId = order.orderId;
+          } catch (error) {
+            allSucceeded = false;
+            console.error(
+              `[chainworker] Round ${round.id} order failed for member ${member.userId}:`,
+              error
+            );
+          }
+        }
+
+        const pendingMembers = members.filter((member) => !member.orderId);
+        if (pendingMembers.length === 0 && allSucceeded) {
+          await ChainWorkerDBController.markRoundCommitted(round.id);
+          console.log(`[chainworker] Round ${round.id} committed.`);
+        }
+      } catch (error) {
+        console.error(`[chainworker] Round ${round.id} execution failed:`, error);
+      }
+    }
+  }
+
+  const rounds = await ChainWorkerDBController.listRoundsToSettle(batchSize);
   if (rounds.length === 0) {
     console.log('[chainworker] No committed rounds found.');
     return;
@@ -68,7 +96,39 @@ async function runOnce() {
 
   for (const round of rounds) {
     if (shutdownState.requested) break;
-    await handleRound(round);
+    try {
+      const resolution = round.resolvedAt
+        ? { isResolved: true, outcome: round.outcome, resolvedAt: round.resolvedAt }
+        : await PolymarketController.fetchMarketResolution(round.marketRef);
+
+      if (!resolution.isResolved) {
+        console.log(
+          `[chainworker] Round ${round.id} unresolved for ${round.marketRef ?? 'unknown market'}`
+        );
+        continue;
+      }
+
+      const members = await ChainWorkerDBController.getRoundMembers(round.id);
+      const payouts = PolymarketController.computeMemberPayouts(members);
+      if (!payouts) {
+        console.log(`[chainworker] Round ${round.id} missing payout data.`);
+        continue;
+      }
+
+      await ChainWorkerDBController.settleRound(
+        round,
+        members,
+        payouts,
+        {
+          outcome: resolution.outcome ?? null,
+          resolvedAt: resolution.resolvedAt ?? null,
+        }
+      );
+
+      console.log(`[chainworker] Round ${round.id} settled.`);
+    } catch (error) {
+      console.error(`[chainworker] Round ${round.id} failed to settle:`, error);
+    }
   }
 }
 

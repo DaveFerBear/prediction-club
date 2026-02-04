@@ -98,6 +98,11 @@ export interface PredictionRound {
   marketTitle: string | null;
   stakeTotal: string; // BigInt as string
   status: PredictionRoundStatus;
+  targetOutcome: string | null;
+  targetTokenId: string | null;
+  outcome: string | null;
+  resolvedAt: Date | null;
+  settledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -109,6 +114,19 @@ export interface PredictionRoundMember {
   commitAmount: string;
   payoutAmount: string;
   pnlAmount: string;
+  orderId: string | null;
+  orderStatus: string | null;
+  orderSide: string | null;
+  orderPrice: string | null;
+  orderSize: string | null;
+  orderSizeMatched: string | null;
+  orderType: string | null;
+  orderOutcome: string | null;
+  orderCreatedAt: Date | null;
+  orderTxHashes: unknown | null;
+  orderMakingAmount: string | null;
+  orderTakingAmount: string | null;
+  settledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -160,6 +178,8 @@ export interface CreatePredictionRoundRequest {
   marketRef?: string;
   marketTitle?: string;
   commitAmount: string;
+  tokenId: string;
+  outcome: string;
 }
 
 export interface WithdrawRequest {

@@ -159,7 +159,18 @@ function formatUrl(url: string) {
 
 function getMarketRef(market: MarketItem | null) {
   if (!market) return '';
-  return String(market.id ?? market.slug ?? market.eventId ?? '');
+  return String(
+    market.conditionId ?? market.condition_id ?? market.id ?? market.slug ?? market.eventId ?? ''
+  );
+}
+
+function getOutcomeTokenId(market: MarketItem | null, outcome: string | null) {
+  if (!market || !outcome) return null;
+  const outcomes = Array.isArray(market.outcomes) ? market.outcomes : [];
+  const tokenIds = Array.isArray(market.clobTokenIds) ? market.clobTokenIds : [];
+  const index = outcomes.findIndex((entry) => entry === outcome);
+  if (index < 0) return null;
+  return tokenIds[index] ?? null;
 }
 
 function getMarketImage(market: MarketItem) {
@@ -427,10 +438,18 @@ export function ClubPredictionForm({
 
     try {
       const marketTitle = `${getMarketTitle(state.selectedMarket)} — ${state.selectedOutcome}`;
+      const tokenId = getOutcomeTokenId(state.selectedMarket, state.selectedOutcome);
+
+      if (!tokenId) {
+        dispatch({ type: 'submitError', message: 'Missing market token id for outcome.' });
+        return;
+      }
       const response = await createPrediction({
         marketRef: getMarketRef(state.selectedMarket),
         marketTitle,
         commitAmount,
+        tokenId,
+        outcome: state.selectedOutcome ?? '',
       });
 
       if (response?.success) {

@@ -7,6 +7,8 @@ export interface CreatePredictionRoundInput {
   marketRef?: string;
   marketTitle?: string;
   commitAmount: string;
+  tokenId: string;
+  outcome: string;
   adminUserId: string;
 }
 
@@ -22,7 +24,7 @@ export class PredictionRoundController {
    * Create a new prediction round (commit funds to a market)
    */
   static async createPredictionRound(input: CreatePredictionRoundInput) {
-    const { clubSlug, marketRef, marketTitle, commitAmount, adminUserId } = input;
+    const { clubSlug, marketRef, marketTitle, commitAmount, tokenId, outcome, adminUserId } = input;
     const club = await this.getClubOrThrow(clubSlug);
 
     await this.requireAdminOrThrow(club.id, adminUserId);
@@ -59,6 +61,8 @@ export class PredictionRoundController {
           createdByUserId: adminUserId,
           marketRef,
           marketTitle,
+          targetTokenId: tokenId,
+          targetOutcome: outcome,
           stakeTotal,
           status: 'PENDING',
           members: {
