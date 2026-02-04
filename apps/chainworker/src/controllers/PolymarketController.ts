@@ -38,7 +38,9 @@ function parseResolvedAt(value: unknown): Date | null {
 
 function isMarketResolved(market: Record<string, unknown>) {
   const status = typeof market.status === 'string' ? market.status.toLowerCase() : '';
-  const resolvedFlag = Boolean(market.resolved ?? market.isResolved ?? market.settled ?? market.finalized);
+  const resolvedFlag = Boolean(
+    market.resolved ?? market.isResolved ?? market.settled ?? market.finalized
+  );
   return resolvedFlag || status === 'resolved' || status === 'settled' || status === 'final';
 }
 

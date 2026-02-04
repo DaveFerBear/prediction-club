@@ -164,9 +164,13 @@ model PredictionRound {
   status          PredictionRoundStatus @default(PENDING)
   targetOutcome   String
   targetTokenId   String
-  outcome         String?
-  resolvedAt      DateTime?
-  settledAt       DateTime?
+
+  // Resolution metadata: null at creation, set when chainworker resolves the market.
+  outcome         String? // Resolved market outcome label.
+  resolvedAt      DateTime? // Timestamp reported by market resolution.
+
+  // Settlement metadata: null at creation, set when chainworker finalizes payouts.
+  settledAt       DateTime? // Timestamp when round settlement finished.
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -195,24 +199,26 @@ model PredictionRoundMember {
 
   // Amounts in wei as strings
   commitAmount  String   @default("0") // Amount committed
-  payoutAmount  String   @default("0") // Amount received after settlement
-  pnlAmount     String   @default("0") // Profit/loss (payout - commit)
+  payoutAmount  String   @default("0") // Amount received after settlement (updated at settlement)
+  pnlAmount     String   @default("0") // Profit/loss (updated at settlement)
 
-  // Polymarket order metadata (store the minimal useful fields from /orders/get-order)
-  orderId       String?
-  orderStatus   String?
-  orderSide     String?
-  orderPrice    String?
-  orderSize     String?
-  orderSizeMatched String?
-  orderType     String?
-  orderOutcome  String?
-  orderCreatedAt DateTime?
-  orderTxHashes Json?
-  orderMakingAmount String?
-  orderTakingAmount String?
+  // Order-placement metadata: null at creation, set when chainworker places orders.
+  // Polymarket order metadata (minimal useful fields from /orders/get-order)
+  orderId       String? // CLOB order identifier.
+  orderStatus   String? // Latest order status from CLOB.
+  orderSide     String? // Order side (BUY/SELL).
+  orderPrice    String? // Order price at placement.
+  orderSize     String? // Original requested order size.
+  orderSizeMatched String? // Filled size recorded by CLOB.
+  orderType     String? // Order execution type (e.g. FOK/FAK).
+  orderOutcome  String? // Outcome label attached to the order.
+  orderCreatedAt DateTime? // Timestamp when order was created.
+  orderTxHashes Json? // Transaction hashes returned by CLOB.
+  orderMakingAmount String? // Making amount from order response.
+  orderTakingAmount String? // Taking amount from order response.
 
-  settledAt     DateTime?
+  // Settlement metadata: null at creation, set when member settlement is finalized.
+  settledAt     DateTime? // Timestamp when member settlement finished.
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
