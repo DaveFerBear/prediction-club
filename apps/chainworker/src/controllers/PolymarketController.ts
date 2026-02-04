@@ -1,7 +1,12 @@
 import { BuilderConfig } from '@polymarket/builder-signing-sdk';
 import { ClobClient, OrderType, Side } from '@polymarket/clob-client';
 import { Wallet } from 'ethers';
-import type { RoundMember, MemberPayout } from './ChainWorkerDBController';
+import type {
+  RoundMember,
+  MemberPayout,
+  MemberOrder,
+  MarketResolution as SettledMarketResolution,
+} from '../types/chainworker-db';
 
 const POLYMARKET_CLOB_URL = process.env.POLYMARKET_CLOB_URL || 'https://clob.polymarket.com';
 const POLYMARKET_CHAIN_ID = Number(process.env.POLYMARKET_CHAIN_ID ?? 137);
@@ -14,11 +19,7 @@ type UserCreds = {
   passphrase: string;
 };
 
-export type MarketResolution = {
-  isResolved: boolean;
-  outcome: string | null;
-  resolvedAt: Date | null;
-};
+export type MarketResolution = { isResolved: boolean } & SettledMarketResolution;
 
 const CONDITION_ID_PATTERN = /0x[a-fA-F0-9]{64}/;
 
@@ -46,21 +47,6 @@ function isMarketResolved(market: Record<string, unknown>) {
   const resolvedFlag = Boolean(market.resolved ?? market.isResolved ?? market.settled ?? market.finalized);
   return resolvedFlag || status === 'resolved' || status === 'settled' || status === 'final';
 }
-
-export type PlacedOrder = {
-  orderId: string;
-  orderStatus?: string | null;
-  orderSide?: string | null;
-  orderPrice?: string | null;
-  orderSize?: string | null;
-  orderSizeMatched?: string | null;
-  orderType?: string | null;
-  orderOutcome?: string | null;
-  orderCreatedAt?: Date | null;
-  orderTxHashes?: string[] | null;
-  orderMakingAmount?: string | null;
-  orderTakingAmount?: string | null;
-};
 
 export class PolymarketController {
   static buildClient(creds: UserCreds, funderAddress?: string | null) {
@@ -150,7 +136,7 @@ export class PolymarketController {
     tokenId: string;
     commitAmount: string;
     member: RoundMember;
-  }): Promise<PlacedOrder> {
+  }): Promise<MemberOrder> {
     const { tokenId, commitAmount, member } = params;
     const creds =
       member.user.polymarketApiKeyId &&

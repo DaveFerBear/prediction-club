@@ -115,15 +115,10 @@ async function runOnce() {
         continue;
       }
 
-      await ChainWorkerDBController.settleRound(
-        round,
-        members,
-        payouts,
-        {
-          outcome: resolution.outcome ?? null,
-          resolvedAt: resolution.resolvedAt ?? null,
-        }
-      );
+      await ChainWorkerDBController.settleRound(round, members, payouts, {
+        outcome: resolution.outcome ?? null,
+        resolvedAt: resolution.resolvedAt ?? null,
+      });
 
       console.log(`[chainworker] Round ${round.id} settled.`);
     } catch (error) {
@@ -139,9 +134,7 @@ function sleep(ms: number) {
 async function run() {
   await initPrisma();
   console.log('[chainworker] Starting settlement poller.');
-  console.log(
-    `[chainworker] Poll interval ${pollIntervalMs}ms, batch size ${batchSize}.`
-  );
+  console.log(`[chainworker] Poll interval ${pollIntervalMs}ms, batch size ${batchSize}.`);
 
   while (!shutdownState.requested) {
     const startedAt = Date.now();

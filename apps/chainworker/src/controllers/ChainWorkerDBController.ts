@@ -1,59 +1,13 @@
 import { prisma, Prisma, type LedgerEntryType } from '@prediction-club/db';
-
-export type PendingRound = {
-  id: string;
-  clubId: string;
-  marketRef: string | null;
-  targetOutcome: string | null;
-  targetTokenId: string | null;
-  status: string;
-  outcome: string | null;
-  resolvedAt: Date | null;
-  settledAt: Date | null;
-  createdAt: Date;
-};
-
-export type RoundMember = {
-  id: string;
-  userId: string;
-  commitAmount: string;
-  payoutAmount: string;
-  pnlAmount: string;
-  orderId: string | null;
-  settledAt: Date | null;
-  user: {
-    polymarketSafeAddress: string | null;
-    polymarketApiKeyId?: string | null;
-    polymarketApiSecret?: string | null;
-    polymarketApiPassphrase?: string | null;
-  };
-};
-
-export type MemberPayout = {
-  userId: string;
-  payoutAmount: string;
-  pnlAmount?: string;
-};
-
-export type MemberOrder = {
-  orderId: string;
-  orderStatus?: string | null;
-  orderSide?: string | null;
-  orderPrice?: string | null;
-  orderSize?: string | null;
-  orderSizeMatched?: string | null;
-  orderType?: string | null;
-  orderOutcome?: string | null;
-  orderCreatedAt?: Date | null;
-  orderTxHashes?: string[] | null;
-  orderMakingAmount?: string | null;
-  orderTakingAmount?: string | null;
-};
-
-export type MarketResolution = {
-  outcome: string | null;
-  resolvedAt: Date | null;
-};
+import {
+  pendingRoundSelect,
+  roundMemberSelect,
+  type PendingRound,
+  type RoundMember,
+  type MemberPayout,
+  type MemberOrder,
+  type MarketResolution,
+} from '../types/chainworker-db';
 
 export class ChainWorkerDBController {
   static async listRoundsToSettle(batchSize: number): Promise<PendingRound[]> {
@@ -64,18 +18,7 @@ export class ChainWorkerDBController {
       },
       orderBy: { createdAt: 'asc' },
       take: batchSize,
-      select: {
-        id: true,
-        clubId: true,
-        marketRef: true,
-        targetOutcome: true,
-        targetTokenId: true,
-        status: true,
-        outcome: true,
-        resolvedAt: true,
-        settledAt: true,
-        createdAt: true,
-      },
+      select: pendingRoundSelect,
     });
   }
 
@@ -86,41 +29,14 @@ export class ChainWorkerDBController {
       },
       orderBy: { createdAt: 'asc' },
       take: batchSize,
-      select: {
-        id: true,
-        clubId: true,
-        marketRef: true,
-        targetOutcome: true,
-        targetTokenId: true,
-        status: true,
-        outcome: true,
-        resolvedAt: true,
-        settledAt: true,
-        createdAt: true,
-      },
+      select: pendingRoundSelect,
     });
   }
 
   static async getRoundMembers(roundId: string): Promise<RoundMember[]> {
     return prisma.predictionRoundMember.findMany({
       where: { predictionRoundId: roundId },
-      select: {
-        id: true,
-        userId: true,
-        commitAmount: true,
-        payoutAmount: true,
-        pnlAmount: true,
-        orderId: true,
-        settledAt: true,
-        user: {
-          select: {
-            polymarketSafeAddress: true,
-            polymarketApiKeyId: true,
-            polymarketApiSecret: true,
-            polymarketApiPassphrase: true,
-          },
-        },
-      },
+      select: roundMemberSelect,
     });
   }
 
