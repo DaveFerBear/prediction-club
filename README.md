@@ -39,6 +39,7 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 /
 ├── apps/
 │   └── web/              # Next.js web application
+│   └── chainworker/       # Background worker for Polymarket execution/settlement
 ├── packages/
 │   ├── db/               # Prisma schema and client
 │   ├── shared/           # Shared types, utils, env validation
@@ -129,6 +130,24 @@ The web app will be available at http://localhost:3000
 | `NEXT_PUBLIC_AMOY_RPC_URL`             | Amoy testnet RPC                   | No       |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect project ID           | No       |
 
+### Chainworker (`apps/chainworker/.env`)
+
+Important: `docker --env-file` does not strip quotes. Avoid quoting values in this file.
+
+| Variable                         | Description                                  | Required |
+| -------------------------------- | -------------------------------------------- | -------- |
+| `DATABASE_URL`                   | Postgres connection string                   | Yes      |
+| `CHAINWORKER_SIGNER_PRIVATE_KEY` | Signing key used by the chainworker          | Yes      |
+| `CHAINWORKER_SIGNER_ADDRESS`     | Address derived from the signer private key  | Yes      |
+| `POLY_BUILDER_API_KEY`           | Polymarket builder API key                   | Yes      |
+| `POLY_BUILDER_SECRET`            | Polymarket builder API secret                | Yes      |
+| `POLY_BUILDER_PASSPHRASE`        | Polymarket builder API passphrase            | Yes      |
+| `POLYMARKET_CLOB_URL`            | CLOB base URL                                | No       |
+| `POLYMARKET_CHAIN_ID`            | Chain ID (Polygon mainnet is 137)            | No       |
+| `CHAINWORKER_POLL_INTERVAL_MS`   | Polling interval in ms                       | No       |
+| `CHAINWORKER_BATCH_SIZE`         | Batch size for polling                        | No       |
+| `CHAINWORKER_ALLOW_ZERO_PAYOUTS` | Allow zero payouts to be recorded            | No       |
+
 ## Available Scripts
 
 ### Root
@@ -143,6 +162,51 @@ yarn db:seed          # Seed database
 yarn db:studio        # Open Prisma Studio
 yarn typecheck        # Run TypeScript checks
 yarn lint             # Run linting
+```
+
+### Chainworker
+
+Local dev:
+
+```bash
+yarn chainworker:dev
+```
+
+Generate signer env values:
+
+```bash
+yarn workspace @prediction-club/chainworker env:generate
+```
+
+VM setup (installs Docker + Ops Agent, configures Docker log collection):
+
+```bash
+apps/chainworker/vm-setup.sh
+```
+
+VM setup via gcloud SSH (uses `GCP_PROJECT_ID`, `GCP_ZONE`, `GCP_VM_NAME`):
+
+```bash
+apps/chainworker/vm-setup-remote.sh
+```
+
+Deploy to GCP VM (builds, pushes, then restarts container on the VM):
+
+```bash
+yarn chainworker:deploy
+```
+
+Skip build/push if you want to reuse the last image tag:
+
+```bash
+SKIP_BUILD_PUSH=true GCP_IMAGE_TAG=<tag> yarn chainworker:deploy
+```
+
+Tail logs on the VM:
+
+```bash
+gcloud compute ssh <vm> --zone <zone> --project <project> \
+  --command "sudo docker logs -t prediction-chainworker --tail 200"
 ```
 
 ## What's Implemented vs Stubbed
