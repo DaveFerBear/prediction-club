@@ -16,7 +16,10 @@
     "db:push": "yarn workspace @prediction-club/db push",
     "db:seed": "yarn workspace @prediction-club/db seed",
     "db:studio": "yarn workspace @prediction-club/db studio",
-    "typecheck": "yarn workspaces run typecheck"
+    "typecheck": "yarn workspaces run typecheck",
+    "chainworker:dev": "yarn workspace @prediction-club/chainworker dev",
+    "chainworker:start": "yarn workspace @prediction-club/chainworker start",
+    "chainworker:typecheck": "yarn workspace @prediction-club/chainworker typecheck"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
