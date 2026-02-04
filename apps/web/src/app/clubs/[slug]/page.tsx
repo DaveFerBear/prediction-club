@@ -343,48 +343,50 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               )}
             </div>
 
-            <h2 className="mb-4 text-xl font-semibold">Predictions</h2>
-            {predictionRounds.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">No predictions yet</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {predictionRounds.map((predictionRound) => (
-                  <Card key={predictionRound.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">
-                          {predictionRound.marketTitle || 'Untitled Market'}
-                        </CardTitle>
-                        <Badge
-                          variant={
-                            predictionRound.status === 'COMMITTED' ||
-                            predictionRound.status === 'PENDING'
-                              ? 'default'
-                              : 'secondary'
-                          }
-                        >
-                          {predictionRound.status}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total Stake</span>
-                        <span>${formatUsdAmount(predictionRound.stakeTotal)} USDC</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Participants</span>
-                        <span>{predictionRound._count.members}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            <section id="predictions" className="scroll-mt-24">
+              <h2 className="mb-4 text-xl font-semibold">Predictions</h2>
+              {predictionRounds.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-muted-foreground">No predictions yet</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {predictionRounds.map((predictionRound) => (
+                    <Card key={predictionRound.id}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-lg">
+                            {predictionRound.marketTitle || 'Untitled Market'}
+                          </CardTitle>
+                          <Badge
+                            variant={
+                              predictionRound.status === 'COMMITTED' ||
+                              predictionRound.status === 'PENDING'
+                                ? 'default'
+                                : 'secondary'
+                            }
+                          >
+                            {predictionRound.status}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Total Stake</span>
+                          <span>${formatUsdAmount(predictionRound.stakeTotal)} USDC</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Participants</span>
+                          <span>{predictionRound._count.members}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
 
           {/* Members */}

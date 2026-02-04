@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useReducer, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { parseUnits } from 'viem';
 import {
   Accordion,
@@ -19,7 +20,7 @@ import { useMarketDetails, useMarketSearch, usePolymarketSafe, useSafeBalance, t
 import type { MarketItem } from '@/hooks/use-market-search';
 
 type PredictionFormState = {
-  tag: 'idle' | 'submitting' | 'success' | 'error';
+  tag: 'idle' | 'submitting' | 'error';
   selectedEvent: MarketItem | null;
   selectedMarket: MarketItem | null;
   selectedOutcome: string | null;
@@ -34,7 +35,6 @@ type PredictionFormAction =
   | { type: 'setBetAmount'; amount: string }
   | { type: 'clearMessage' }
   | { type: 'submitStart' }
-  | { type: 'submitSuccess'; message: string }
   | { type: 'submitError'; message: string };
 
 const initialState: PredictionFormState = {
@@ -85,15 +85,6 @@ function predictionFormReducer(
         ...state,
         tag: 'submitting',
         message: null,
-      };
-    case 'submitSuccess':
-      return {
-        tag: 'success',
-        selectedEvent: null,
-        selectedMarket: null,
-        selectedOutcome: null,
-        betAmount: '',
-        message: action.message,
       };
     case 'submitError':
       return {
@@ -282,6 +273,7 @@ export function ClubPredictionForm({
   clubSlug: string;
   address: string | null;
 }) {
+  const router = useRouter();
   const [state, dispatch] = useReducer(predictionFormReducer, initialState);
   const [accordionValue, setAccordionValue] = useState<
     'event' | 'market' | 'winner' | 'bet' | ''
@@ -453,8 +445,7 @@ export function ClubPredictionForm({
       });
 
       if (response?.success) {
-        dispatch({ type: 'submitSuccess', message: 'Prediction created.' });
-        setAccordionValue('event');
+        router.push(`/clubs/${clubSlug}#predictions`);
         return;
       }
 
@@ -465,7 +456,16 @@ export function ClubPredictionForm({
         message: err instanceof Error ? err.message : 'Failed to create prediction.',
       });
     }
-  }, [createPrediction, isAdmin, members, state.betAmount, state.selectedMarket, state.selectedOutcome]);
+  }, [
+    clubSlug,
+    createPrediction,
+    isAdmin,
+    members,
+    router,
+    state.betAmount,
+    state.selectedMarket,
+    state.selectedOutcome,
+  ]);
 
   return (
     <div className="space-y-4">
@@ -484,9 +484,6 @@ export function ClubPredictionForm({
       >
         {state.tag === 'error' && state.message && (
           <p className="text-sm text-destructive">{state.message}</p>
-        )}
-        {state.tag === 'success' && state.message && (
-          <p className="text-sm text-green-600">{state.message}</p>
         )}
         <Accordion
           type="single"

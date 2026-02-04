@@ -50,7 +50,7 @@ export default function ClubPredictPage({ params }: { params: { slug: string } }
               Search for a market, pick a winner, and set your bet.
             </p>
           </div>
-          <Link href={`/clubs/${club.slug}`}>
+          <Link href={`/clubs/${club.slug}#predictions`}>
             <Button variant="outline">Back to club</Button>
           </Link>
         </div>
