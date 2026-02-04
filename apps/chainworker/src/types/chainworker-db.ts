@@ -3,7 +3,9 @@ import { Prisma, type PredictionRound, type PredictionRoundMember } from '@predi
 export const pendingRoundSelect = Prisma.validator<Prisma.PredictionRoundSelect>()({
   id: true,
   clubId: true,
-  marketRef: true,
+  conditionId: true,
+  marketId: true,
+  marketSlug: true,
   targetOutcome: true,
   targetTokenId: true,
   status: true,

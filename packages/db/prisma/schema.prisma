@@ -152,16 +152,18 @@ model PredictionRound {
   createdByUserId String?
   createdBy       User?        @relation("PredictionRoundCreatedBy", fields: [createdByUserId], references: [id])
 
-  // Market reference (e.g., Polymarket condition ID or URL)
-  marketRef       String?
+  // Market identity
+  conditionId     String
+  marketId        String
+  marketSlug      String
   marketTitle     String?
 
   // Aggregated stake
   stakeTotal      String       @default("0") // BigInt as string (wei)
 
   status          PredictionRoundStatus @default(PENDING)
-  targetOutcome   String?
-  targetTokenId   String?
+  targetOutcome   String
+  targetTokenId   String
   outcome         String?
   resolvedAt      DateTime?
   settledAt       DateTime?
@@ -175,6 +177,7 @@ model PredictionRound {
 
   @@index([clubId])
   @@index([status])
+  @@index([conditionId])
   @@index([targetTokenId])
   @@index([createdByUserId])
 }

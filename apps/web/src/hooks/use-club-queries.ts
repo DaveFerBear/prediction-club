@@ -68,10 +68,12 @@ export interface ClubDetail {
 export interface PredictionRound {
   id: string;
   createdByUserId: string | null;
-  targetOutcome: string | null;
-  targetTokenId: string | null;
+  targetOutcome: string;
+  targetTokenId: string;
+  conditionId: string;
+  marketId: string;
+  marketSlug: string;
   marketTitle: string | null;
-  marketRef: string | null;
   status: string;
   stakeTotal: string;
   createdAt: string;

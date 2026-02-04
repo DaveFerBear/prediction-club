@@ -13,6 +13,7 @@ export type RoundMemberLike = {
   predictionRound: {
     createdAt: string;
     clubId: string;
+    status: string;
   };
 };
 

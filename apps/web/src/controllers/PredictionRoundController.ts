@@ -4,11 +4,13 @@ import { LedgerController, LedgerError } from './LedgerController';
 
 export interface CreatePredictionRoundInput {
   clubSlug: string;
-  marketRef?: string;
+  conditionId: string;
+  marketId: string;
+  marketSlug: string;
   marketTitle?: string;
   commitAmount: string;
-  tokenId: string;
-  outcome: string;
+  targetTokenId: string;
+  targetOutcome: string;
   adminUserId: string;
 }
 
@@ -24,7 +26,17 @@ export class PredictionRoundController {
    * Create a new prediction round (commit funds to a market)
    */
   static async createPredictionRound(input: CreatePredictionRoundInput) {
-    const { clubSlug, marketRef, marketTitle, commitAmount, tokenId, outcome, adminUserId } = input;
+    const {
+      clubSlug,
+      conditionId,
+      marketId,
+      marketSlug,
+      marketTitle,
+      commitAmount,
+      targetTokenId,
+      targetOutcome,
+      adminUserId,
+    } = input;
     const club = await this.getClubOrThrow(clubSlug);
 
     await this.requireAdminOrThrow(club.id, adminUserId);
@@ -59,10 +71,12 @@ export class PredictionRoundController {
         data: {
           clubId: club.id,
           createdByUserId: adminUserId,
-          marketRef,
+          conditionId,
+          marketId,
+          marketSlug,
           marketTitle,
-          targetTokenId: tokenId,
-          targetOutcome: outcome,
+          targetTokenId,
+          targetOutcome,
           stakeTotal,
           status: 'PENDING',
           members: {

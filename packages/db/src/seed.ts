@@ -1,4 +1,5 @@
 import path from 'path';
+import { createHash } from 'crypto';
 import { config as loadEnv } from 'dotenv';
 import { PrismaClient, LedgerEntryType, type PredictionRoundStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -49,6 +50,17 @@ type SeedDeposit = {
 
 function usdc(amount: number) {
   return Math.round(amount * 1_000_000).toString();
+}
+
+function toConditionId(value: string) {
+  const match = value.match(/0x[a-fA-F0-9]{64}/);
+  if (match) return match[0].toLowerCase();
+  return `0x${createHash('sha256').update(value).digest('hex')}`;
+}
+
+function toMarketSlug(value: string) {
+  const raw = value.startsWith('polymarket:') ? value.slice('polymarket:'.length) : value;
+  return raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
 }
 
 const daysAgo = (days: number) => {
@@ -487,13 +499,22 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
         .reduce((sum, entry) => sum + BigInt(entry.commitAmount), 0n)
         .toString();
       const createdByUserId = adminByClub.get(clubSlug) ?? members[0]?.userId;
+      const conditionId = toConditionId(round.marketRef);
+      const marketSlug = toMarketSlug(round.marketRef);
+      const marketId = marketSlug;
+      const targetOutcome = 'YES';
+      const targetTokenId = `seed-${conditionId.slice(2, 18)}-yes`;
 
       const created = await prisma.predictionRound.create({
         data: {
           clubId,
           createdByUserId,
-          marketRef: round.marketRef,
+          conditionId,
+          marketId,
+          marketSlug,
           marketTitle: round.marketTitle,
+          targetOutcome,
+          targetTokenId,
           stakeTotal,
           status: round.status,
           createdAt: round.createdAt ? new Date(round.createdAt) : undefined,
@@ -524,7 +545,7 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
             type: LedgerEntryType.COMMIT,
             amount: `-${usdc(member.commit)}`,
             asset: 'USDC.e',
-            metadata: { seed: SEED_TAG, marketRef: round.marketRef },
+            metadata: { seed: SEED_TAG, conditionId, marketId, marketSlug },
             createdAt: baseCreatedAt,
           };
           const payout = member.payout ?? 0;
@@ -539,7 +560,7 @@ async function seedPredictionRounds(userIds: Map<string, string>, clubIds: Map<s
                 type: LedgerEntryType.PAYOUT,
                 amount: usdc(payout),
                 asset: 'USDC.e',
-                metadata: { seed: SEED_TAG, marketRef: round.marketRef },
+                metadata: { seed: SEED_TAG, conditionId, marketId, marketSlug },
                 createdAt: baseCreatedAt
                   ? new Date(baseCreatedAt.getTime() + 30_000)
                   : undefined,

@@ -4,7 +4,6 @@ import { useApi } from './use-api';
 export type MarketItem = {
   id?: string | number;
   conditionId?: string;
-  condition_id?: string;
   eventId?: string | number;
   slug?: string;
   question?: string;
@@ -16,8 +15,13 @@ export type MarketItem = {
   markets?: MarketItem[];
   url?: string;
   image?: string;
-  image_url?: string;
+  imageUrl?: string;
   icon?: string;
+};
+
+type RawMarketItem = MarketItem & {
+  condition_id?: string;
+  image_url?: string;
 };
 
 function parseStringArray(value: string | string[] | undefined) {
@@ -31,19 +35,22 @@ function parseStringArray(value: string | string[] | undefined) {
   }
 }
 
-function normalizeMarketItem(item: MarketItem): MarketItem {
+function normalizeMarketItem(item: RawMarketItem): MarketItem {
+  const { condition_id, image_url, ...rest } = item;
   const outcomes = parseStringArray(item.outcomes);
   const outcomePrices = parseStringArray(item.outcomePrices);
   const clobTokenIds = parseStringArray(item.clobTokenIds);
   const markets = Array.isArray(item.markets)
-    ? item.markets.map((market) => normalizeMarketItem(market))
+    ? item.markets.map((market) => normalizeMarketItem(market as RawMarketItem))
     : undefined;
 
   return {
-    ...item,
+    ...rest,
+    conditionId: item.conditionId ?? condition_id,
     outcomes: outcomes ?? item.outcomes,
     outcomePrices: outcomePrices ?? item.outcomePrices,
     clobTokenIds: clobTokenIds ?? item.clobTokenIds,
+    imageUrl: item.imageUrl ?? image_url,
     markets,
   };
 }
@@ -60,7 +67,7 @@ async function fetchMarketDetailsRequest(apiFetch: <T>(url: string) => Promise<T
 
   const response = await apiFetch<{
     success: boolean;
-    data: { items: MarketItem[] };
+    data: { items: RawMarketItem[] };
   }>(`/api/markets?${params.toString()}`);
 
   if (!response.success) {
@@ -84,7 +91,6 @@ export function useMarketSearch() {
       const key =
         item.id ??
         item.conditionId ??
-        item.condition_id ??
         item.slug ??
         item.url ??
         item.eventId;
@@ -107,7 +113,7 @@ export function useMarketSearch() {
     try {
       const response = await apiFetch<{
         success: boolean;
-        data: { items: MarketItem[] };
+        data: { items: RawMarketItem[] };
       }>(`/api/markets?active=true&limit=50&q=${encodeURIComponent(trimmed)}`);
 
       if (!response.success) {

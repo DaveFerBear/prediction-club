@@ -16,7 +16,13 @@ import {
 } from '@prediction-club/ui';
 import { useCreatePrediction } from '@/hooks/use-create-prediction';
 import { usePolymarketMarketData } from '@/hooks/use-polymarket-market-data';
-import { useMarketDetails, useMarketSearch, usePolymarketSafe, useSafeBalance, type ClubDetail } from '@/hooks';
+import {
+  useMarketDetails,
+  useMarketSearch,
+  usePolymarketSafe,
+  useSafeBalance,
+  type ClubDetail,
+} from '@/hooks';
 import type { MarketItem } from '@/hooks/use-market-search';
 
 type PredictionFormState = {
@@ -141,18 +147,25 @@ function getEventUrl(event: MarketItem) {
 }
 
 function getEventImage(event: MarketItem) {
-  return event.image || event.image_url || event.icon || '';
+  return event.image || event.imageUrl || event.icon || '';
 }
 
 function formatUrl(url: string) {
   return url.replace(/^https?:\/\//, '');
 }
 
-function getMarketRef(market: MarketItem | null) {
+function getConditionId(market: MarketItem | null) {
+  return market?.conditionId?.trim() || '';
+}
+
+function getMarketId(market: MarketItem | null) {
   if (!market) return '';
-  return String(
-    market.conditionId ?? market.condition_id ?? market.id ?? market.slug ?? market.eventId ?? ''
-  );
+  const value = market.id ?? market.eventId;
+  return value !== undefined ? String(value) : '';
+}
+
+function getMarketSlug(market: MarketItem | null) {
+  return market?.slug?.trim() || '';
 }
 
 function getOutcomeTokenId(market: MarketItem | null, outcome: string | null) {
@@ -165,7 +178,7 @@ function getOutcomeTokenId(market: MarketItem | null, outcome: string | null) {
 }
 
 function getMarketImage(market: MarketItem) {
-  return market.image || market.image_url || market.icon || '';
+  return market.image || market.imageUrl || market.icon || '';
 }
 
 function getMarketUrl(market: MarketItem) {
@@ -218,15 +231,9 @@ function OutcomeDetails({ outcome, tokenId }: { outcome: string; tokenId?: strin
     <div className="rounded-md border p-3 text-sm">
       <div className="flex flex-wrap items-center gap-4">
         <div className="font-medium">{outcome}</div>
-        <div className="text-muted-foreground">
-          Buy: {formatPrice(data.price.buy)}
-        </div>
-        <div className="text-muted-foreground">
-          Sell: {formatPrice(data.price.sell)}
-        </div>
-        <div className="text-muted-foreground">
-          Mid: {formatPrice(data.price.midpoint)}
-        </div>
+        <div className="text-muted-foreground">Buy: {formatPrice(data.price.buy)}</div>
+        <div className="text-muted-foreground">Sell: {formatPrice(data.price.sell)}</div>
+        <div className="text-muted-foreground">Mid: {formatPrice(data.price.midpoint)}</div>
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div>
@@ -275,9 +282,9 @@ export function ClubPredictionForm({
 }) {
   const router = useRouter();
   const [state, dispatch] = useReducer(predictionFormReducer, initialState);
-  const [accordionValue, setAccordionValue] = useState<
-    'event' | 'market' | 'winner' | 'bet' | ''
-  >('event');
+  const [accordionValue, setAccordionValue] = useState<'event' | 'market' | 'winner' | 'bet' | ''>(
+    'event'
+  );
   const [loadingMarketKey, setLoadingMarketKey] = useState<string | null>(null);
   const { createPrediction } = useCreatePrediction(clubSlug);
   const { fetchMarketDetails } = useMarketDetails();
@@ -296,9 +303,7 @@ export function ClubPredictionForm({
 
   const outcomes = useMemo(
     () =>
-      Array.isArray(state.selectedMarket?.outcomes)
-        ? (state.selectedMarket?.outcomes ?? [])
-        : [],
+      Array.isArray(state.selectedMarket?.outcomes) ? (state.selectedMarket?.outcomes ?? []) : [],
     [state.selectedMarket]
   );
   const clobTokenIds = useMemo(
@@ -313,7 +318,7 @@ export function ClubPredictionForm({
     tokenId: clobTokenIds[index],
   }));
   const availableMarkets = useMemo(
-    () => (Array.isArray(state.selectedEvent?.markets) ? state.selectedEvent?.markets ?? [] : []),
+    () => (Array.isArray(state.selectedEvent?.markets) ? (state.selectedEvent?.markets ?? []) : []),
     [state.selectedEvent]
   );
   const eventResults = useMemo(
@@ -379,9 +384,7 @@ export function ClubPredictionForm({
   const minBet = 0.01;
   const sliderMax = maxBalance > minBet ? maxBalance : minBet;
   const numericBet = Number(state.betAmount);
-  const sliderValue = Number.isFinite(numericBet)
-    ? clamp(numericBet, minBet, sliderMax)
-    : minBet;
+  const sliderValue = Number.isFinite(numericBet) ? clamp(numericBet, minBet, sliderMax) : minBet;
   const commitPercent =
     maxBalance > 0 && Number.isFinite(sliderValue) ? (sliderValue / maxBalance) * 100 : 0;
 
@@ -430,18 +433,38 @@ export function ClubPredictionForm({
 
     try {
       const marketTitle = `${getMarketTitle(state.selectedMarket)} — ${state.selectedOutcome}`;
+      const conditionId = getConditionId(state.selectedMarket);
+      const marketId = getMarketId(state.selectedMarket);
+      const marketSlug = getMarketSlug(state.selectedMarket);
       const tokenId = getOutcomeTokenId(state.selectedMarket, state.selectedOutcome);
+
+      if (!conditionId) {
+        dispatch({ type: 'submitError', message: 'Missing condition ID for market.' });
+        return;
+      }
+
+      if (!marketId) {
+        dispatch({ type: 'submitError', message: 'Missing market ID.' });
+        return;
+      }
+
+      if (!marketSlug) {
+        dispatch({ type: 'submitError', message: 'Missing market slug.' });
+        return;
+      }
 
       if (!tokenId) {
         dispatch({ type: 'submitError', message: 'Missing market token id for outcome.' });
         return;
       }
       const response = await createPrediction({
-        marketRef: getMarketRef(state.selectedMarket),
+        conditionId,
+        marketId,
+        marketSlug,
         marketTitle,
         commitAmount,
-        tokenId,
-        outcome: state.selectedOutcome ?? '',
+        targetTokenId: tokenId,
+        targetOutcome: state.selectedOutcome ?? '',
       });
 
       if (response?.success) {

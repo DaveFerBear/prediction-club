@@ -94,12 +94,14 @@ export interface PredictionRound {
   id: string;
   clubId: string;
   createdByUserId: string | null;
-  marketRef: string | null;
+  conditionId: string;
+  marketId: string;
+  marketSlug: string;
   marketTitle: string | null;
   stakeTotal: string; // BigInt as string
   status: PredictionRoundStatus;
-  targetOutcome: string | null;
-  targetTokenId: string | null;
+  targetOutcome: string;
+  targetTokenId: string;
   outcome: string | null;
   resolvedAt: Date | null;
   settledAt: Date | null;
@@ -175,11 +177,13 @@ export interface ApplyToClubRequest {
 }
 
 export interface CreatePredictionRoundRequest {
-  marketRef?: string;
+  conditionId: string;
+  marketId: string;
+  marketSlug: string;
   marketTitle?: string;
   commitAmount: string;
-  tokenId: string;
-  outcome: string;
+  targetTokenId: string;
+  targetOutcome: string;
 }
 
 export interface WithdrawRequest {

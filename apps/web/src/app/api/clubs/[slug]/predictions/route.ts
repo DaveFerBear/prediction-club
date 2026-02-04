@@ -4,11 +4,13 @@ import { PredictionRoundController, PredictionRoundError } from '@/controllers';
 import { apiResponse, apiError, validationError, notFoundError, forbiddenError, unauthorizedError, serverError } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
 const createPredictionRoundSchema = z.object({
-  marketRef: z.string().max(500).optional(),
+  conditionId: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  marketId: z.string().min(1).max(100),
+  marketSlug: z.string().min(1).max(200),
   marketTitle: z.string().max(200).optional(),
   commitAmount: z.string().min(1),
-  tokenId: z.string().min(1),
-  outcome: z.string().min(1),
+  targetTokenId: z.string().min(1),
+  targetOutcome: z.string().min(1),
 });
 
 /**

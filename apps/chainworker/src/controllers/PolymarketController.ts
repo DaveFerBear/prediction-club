@@ -23,12 +23,6 @@ export type MarketResolution = { isResolved: boolean } & SettledMarketResolution
 
 const CONDITION_ID_PATTERN = /0x[a-fA-F0-9]{64}/;
 
-function parseConditionId(marketRef: string | null) {
-  if (!marketRef) return null;
-  const match = marketRef.match(CONDITION_ID_PATTERN);
-  return match ? match[0] : null;
-}
-
 function parseResolvedAt(value: unknown): Date | null {
   if (value instanceof Date) return value;
   if (typeof value === 'string') {
@@ -81,9 +75,8 @@ export class PolymarketController {
     );
   }
 
-  static async fetchMarketResolution(marketRef: string | null): Promise<MarketResolution> {
-    const conditionId = parseConditionId(marketRef);
-    if (!conditionId) {
+  static async fetchMarketResolution(conditionId: string): Promise<MarketResolution> {
+    if (!CONDITION_ID_PATTERN.test(conditionId)) {
       return { isResolved: false, outcome: null, resolvedAt: null };
     }
 

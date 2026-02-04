@@ -99,11 +99,11 @@ async function runOnce() {
     try {
       const resolution = round.resolvedAt
         ? { isResolved: true, outcome: round.outcome, resolvedAt: round.resolvedAt }
-        : await PolymarketController.fetchMarketResolution(round.marketRef);
+        : await PolymarketController.fetchMarketResolution(round.conditionId);
 
       if (!resolution.isResolved) {
         console.log(
-          `[chainworker] Round ${round.id} unresolved for ${round.marketRef ?? 'unknown market'}`
+          `[chainworker] Round ${round.id} unresolved for ${round.conditionId}`
         );
         continue;
       }
