@@ -1,22 +1,49 @@
 import path from 'path';
 import { config as loadEnv } from 'dotenv';
 import type { PrismaClient } from '@prediction-club/db';
-import { ChainWorkerDBController } from './controllers/ChainWorkerDBController';
-import { PolymarketController } from './controllers/PolymarketController';
 
 const localEnvPath = path.resolve(process.cwd(), '.env');
 const rootEnvPath = path.resolve(process.cwd(), '../../.env');
 loadEnv({ path: localEnvPath });
 loadEnv({ path: rootEnvPath });
 
+const requiredEnvVars = [
+  'DATABASE_URL',
+  'CHAINWORKER_SIGNER_PRIVATE_KEY',
+  'POLY_BUILDER_API_KEY',
+  'POLY_BUILDER_SECRET',
+  'POLY_BUILDER_PASSPHRASE',
+] as const;
+
+function assertCriticalEnv() {
+  const missing = requiredEnvVars.filter((name) => {
+    const value = process.env[name];
+    return !value || value.trim().length === 0;
+  });
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[chainworker] Missing required env vars: ${missing.join(
+        ', '
+      )}. Set them in apps/chainworker/.env (or the root .env) and restart.`
+    );
+  }
+}
+
+assertCriticalEnv();
+
 const pollIntervalMs = Number(process.env.CHAINWORKER_POLL_INTERVAL_MS ?? 30_000);
 const batchSize = Number(process.env.CHAINWORKER_BATCH_SIZE ?? 25);
 
 let prisma: PrismaClient;
+let ChainWorkerDBController: (typeof import('./controllers/ChainWorkerDBController'))['ChainWorkerDBController'];
+let PolymarketController: (typeof import('./controllers/PolymarketController'))['PolymarketController'];
 
-async function initPrisma() {
+async function initDeps() {
   const db = await import('@prediction-club/db');
   prisma = db.prisma;
+  ({ ChainWorkerDBController } = await import('./controllers/ChainWorkerDBController'));
+  ({ PolymarketController } = await import('./controllers/PolymarketController'));
 }
 
 const shutdownState = { requested: false };
@@ -132,7 +159,7 @@ function sleep(ms: number) {
 }
 
 async function run() {
-  await initPrisma();
+  await initDeps();
   console.log('[chainworker] Starting settlement poller.');
   console.log(`[chainworker] Poll interval ${pollIntervalMs}ms, batch size ${batchSize}.`);
 
