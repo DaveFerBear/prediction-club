@@ -74,21 +74,29 @@ async function runOnce() {
     for (const round of executionRounds) {
       if (shutdownState.requested) break;
       if (!round.targetTokenId) {
-        console.log(`[chainworker] Round ${round.id} missing token id; skipping execution.`);
+        console.error(
+          `[chainworker] Round ${round.id} missing targetTokenId; cannot execute.`
+        );
         continue;
       }
 
       try {
         const members = await ChainWorkerDBController.getRoundMembers(round.id);
-        const missingCreds = members.filter(
-          (member) =>
-            !member.user.polymarketApiKeyId ||
-            !member.user.polymarketApiSecret ||
-            !member.user.polymarketApiPassphrase
-        );
-        if (missingCreds.length > 0) {
-          console.log(
-            `[chainworker] Round ${round.id} missing Polymarket creds for ${missingCreds.length} members.`
+        const invalidMembers = members
+          .map((member) => ({
+            member,
+            missing: PolymarketController.missingMemberFields(member),
+          }))
+          .filter((entry) => entry.missing.length > 0);
+        if (invalidMembers.length > 0) {
+          const details = invalidMembers
+            .map(
+              ({ member, missing }) =>
+                `${member.userId} (${missing.join(', ')})`
+            )
+            .join('; ');
+          console.error(
+            `[chainworker] Round ${round.id} missing required Polymarket fields: ${details}`
           );
           continue;
         }

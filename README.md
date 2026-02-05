@@ -134,19 +134,19 @@ The web app will be available at http://localhost:3000
 
 Important: `docker --env-file` does not strip quotes. Avoid quoting values in this file.
 
-| Variable                         | Description                                  | Required |
-| -------------------------------- | -------------------------------------------- | -------- |
-| `DATABASE_URL`                   | Postgres connection string                   | Yes      |
-| `CHAINWORKER_SIGNER_PRIVATE_KEY` | Signing key used by the chainworker          | Yes      |
-| `CHAINWORKER_SIGNER_ADDRESS`     | Address derived from the signer private key  | Yes      |
-| `POLY_BUILDER_API_KEY`           | Polymarket builder API key                   | Yes      |
-| `POLY_BUILDER_SECRET`            | Polymarket builder API secret                | Yes      |
-| `POLY_BUILDER_PASSPHRASE`        | Polymarket builder API passphrase            | Yes      |
-| `POLYMARKET_CLOB_URL`            | CLOB base URL                                | No       |
-| `POLYMARKET_CHAIN_ID`            | Chain ID (Polygon mainnet is 137)            | No       |
-| `CHAINWORKER_POLL_INTERVAL_MS`   | Polling interval in ms                       | No       |
-| `CHAINWORKER_BATCH_SIZE`         | Batch size for polling                        | No       |
-| `CHAINWORKER_ALLOW_ZERO_PAYOUTS` | Allow zero payouts to be recorded            | No       |
+| Variable                         | Description                                 | Required |
+| -------------------------------- | ------------------------------------------- | -------- |
+| `DATABASE_URL`                   | Postgres connection string                  | Yes      |
+| `CHAINWORKER_SIGNER_PRIVATE_KEY` | Signing key used by the chainworker         | Yes      |
+| `CHAINWORKER_SIGNER_ADDRESS`     | Address derived from the signer private key | Yes      |
+| `POLY_BUILDER_API_KEY`           | Polymarket builder API key                  | Yes      |
+| `POLY_BUILDER_SECRET`            | Polymarket builder API secret               | Yes      |
+| `POLY_BUILDER_PASSPHRASE`        | Polymarket builder API passphrase           | Yes      |
+| `POLYMARKET_CLOB_URL`            | CLOB base URL                               | No       |
+| `POLYMARKET_CHAIN_ID`            | Chain ID (Polygon mainnet is 137)           | No       |
+| `CHAINWORKER_POLL_INTERVAL_MS`   | Polling interval in ms                      | No       |
+| `CHAINWORKER_BATCH_SIZE`         | Batch size for polling                      | No       |
+| `CHAINWORKER_ALLOW_ZERO_PAYOUTS` | Allow zero payouts to be recorded           | No       |
 
 ## Available Scripts
 
@@ -209,6 +209,12 @@ gcloud compute ssh <vm> --zone <zone> --project <project> \
   --command "sudo docker logs -t prediction-chainworker --tail 200"
 ```
 
+Quick SSH:
+
+```bash
+gcloud compute ssh chainworker --project cad-ai-439508
+```
+
 ## What's Implemented vs Stubbed
 
 ### Implemented
@@ -239,6 +245,7 @@ Key models:
 - **PredictionRound**: Prediction rounds with market reference
 - **PredictionRoundMember**: Individual participation, PnL tracking
 - **Verification**: Off-chain manager verification
+
 ### Deploy Web App
 
 The web app can be deployed to Vercel, Railway, or any Node.js hosting:

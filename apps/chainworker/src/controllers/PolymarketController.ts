@@ -12,12 +12,32 @@ const POLYMARKET_CLOB_URL = process.env.POLYMARKET_CLOB_URL || 'https://clob.pol
 const POLYMARKET_CHAIN_ID = Number(process.env.POLYMARKET_CHAIN_ID ?? 137);
 const ALLOW_ZERO_PAYOUTS = process.env.CHAINWORKER_ALLOW_ZERO_PAYOUTS === 'true';
 const CHAINWORKER_SIGNER_KEY = process.env.CHAINWORKER_SIGNER_PRIVATE_KEY || '';
+const POLY_BUILDER_API_KEY = process.env.POLY_BUILDER_API_KEY || '';
+const POLY_BUILDER_SECRET = process.env.POLY_BUILDER_SECRET || '';
+const POLY_BUILDER_PASSPHRASE = process.env.POLY_BUILDER_PASSPHRASE || '';
 
 type UserCreds = {
   key: string;
   secret: string;
   passphrase: string;
 };
+
+function redact(value: string, keep = 4) {
+  if (!value) return '<empty>';
+  if (value.length <= keep * 2) return `${'*'.repeat(value.length)}`;
+  return `${value.slice(0, keep)}...${value.slice(-keep)}`;
+}
+
+function describeCreds(creds: UserCreds) {
+  return {
+    key: redact(creds.key),
+    secret: redact(creds.secret),
+    passphrase: redact(creds.passphrase),
+    keyLength: creds.key.length,
+    secretLength: creds.secret.length,
+    passphraseLength: creds.passphrase.length,
+  };
+}
 
 export type MarketResolution = { isResolved: boolean } & SettledMarketResolution;
 
@@ -45,24 +65,29 @@ function isMarketResolved(market: Record<string, unknown>) {
 }
 
 export class PolymarketController {
+  static missingMemberFields(member: RoundMember): string[] {
+    const missing: string[] = [];
+    if (!member.user.polymarketApiKeyId) missing.push('polymarketApiKeyId');
+    if (!member.user.polymarketApiSecret) missing.push('polymarketApiSecret');
+    if (!member.user.polymarketApiPassphrase) missing.push('polymarketApiPassphrase');
+    if (!member.user.polymarketSafeAddress) missing.push('polymarketSafeAddress');
+    return missing;
+  }
+
   static buildClient(creds: UserCreds, funderAddress?: string | null) {
-    if (!CHAINWORKER_SIGNER_KEY) {
-      throw new Error('CHAINWORKER_SIGNER_PRIVATE_KEY is not set.');
-    }
+    if (!CHAINWORKER_SIGNER_KEY) throw new Error('CHAINWORKER_SIGNER_PRIVATE_KEY is not set.');
+    if (!POLY_BUILDER_API_KEY) throw new Error('POLY_BUILDER_API_KEY is not set.');
+    if (!POLY_BUILDER_SECRET) throw new Error('POLY_BUILDER_SECRET is not set.');
+    if (!POLY_BUILDER_PASSPHRASE) throw new Error('POLY_BUILDER_PASSPHRASE is not set.');
+
     const signer = new Wallet(CHAINWORKER_SIGNER_KEY);
-    const builderKey = process.env.POLY_BUILDER_API_KEY || '';
-    const builderSecret = process.env.POLY_BUILDER_SECRET || '';
-    const builderPassphrase = process.env.POLY_BUILDER_PASSPHRASE || '';
-    const builderConfig =
-      builderKey && builderSecret && builderPassphrase
-        ? new BuilderConfig({
-            localBuilderCreds: {
-              key: builderKey,
-              secret: builderSecret,
-              passphrase: builderPassphrase,
-            },
-          })
-        : undefined;
+    const builderConfig = new BuilderConfig({
+      localBuilderCreds: {
+        key: POLY_BUILDER_API_KEY,
+        secret: POLY_BUILDER_SECRET,
+        passphrase: POLY_BUILDER_PASSPHRASE,
+      },
+    });
 
     return new ClobClient(
       POLYMARKET_CLOB_URL,
@@ -133,19 +158,11 @@ export class PolymarketController {
     member: RoundMember;
   }): Promise<MemberOrder> {
     const { tokenId, commitAmount, member } = params;
-    const creds =
-      member.user.polymarketApiKeyId &&
-      member.user.polymarketApiSecret &&
-      member.user.polymarketApiPassphrase
-        ? {
-            key: member.user.polymarketApiKeyId,
-            secret: member.user.polymarketApiSecret,
-            passphrase: member.user.polymarketApiPassphrase,
-          }
-        : null;
-
-    if (!creds) {
-      throw new Error(`Missing Polymarket API creds for user ${member.userId}`);
+    const missing = this.missingMemberFields(member);
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required Polymarket fields for user ${member.userId}: ${missing.join(', ')}`
+      );
     }
 
     const amount = Number(commitAmount) / 1_000_000;
@@ -153,6 +170,16 @@ export class PolymarketController {
       throw new Error(`Invalid commit amount for user ${member.userId}`);
     }
 
+    const creds = {
+      key: member.user.polymarketApiKeyId!,
+      secret: member.user.polymarketApiSecret!,
+      passphrase: member.user.polymarketApiPassphrase!,
+    };
+    console.log('[chainworker] Polymarket creds snapshot', {
+      userId: member.userId,
+      funderAddress: member.user.polymarketSafeAddress,
+      ...describeCreds(creds),
+    });
     const clobClient = this.buildClient(creds, member.user.polymarketSafeAddress);
     const response = await clobClient.createAndPostMarketOrder(
       {
