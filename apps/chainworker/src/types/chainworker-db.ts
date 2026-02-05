@@ -26,6 +26,7 @@ export const roundMemberSelect = Prisma.validator<Prisma.PredictionRoundMemberSe
   user: {
     select: {
       polymarketSafeAddress: true,
+      walletAddress: true,
       polymarketApiKeyId: true,
       polymarketApiSecret: true,
       polymarketApiPassphrase: true,

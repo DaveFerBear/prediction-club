@@ -71,16 +71,20 @@ export class PolymarketController {
     if (!member.user.polymarketApiSecret) missing.push('polymarketApiSecret');
     if (!member.user.polymarketApiPassphrase) missing.push('polymarketApiPassphrase');
     if (!member.user.polymarketSafeAddress) missing.push('polymarketSafeAddress');
+    if (!member.user.walletAddress) missing.push('walletAddress');
     return missing;
   }
 
-  static buildClient(creds: UserCreds, funderAddress?: string | null) {
+  static buildClient(creds: UserCreds, headerAddress: string, funderAddress?: string | null) {
     if (!CHAINWORKER_SIGNER_KEY) throw new Error('CHAINWORKER_SIGNER_PRIVATE_KEY is not set.');
     if (!POLY_BUILDER_API_KEY) throw new Error('POLY_BUILDER_API_KEY is not set.');
     if (!POLY_BUILDER_SECRET) throw new Error('POLY_BUILDER_SECRET is not set.');
     if (!POLY_BUILDER_PASSPHRASE) throw new Error('POLY_BUILDER_PASSPHRASE is not set.');
 
     const signer = new Wallet(CHAINWORKER_SIGNER_KEY);
+    const headerSigner = {
+      getAddress: async () => headerAddress,
+    } as unknown as Wallet;
     const builderConfig = new BuilderConfig({
       localBuilderCreds: {
         key: POLY_BUILDER_API_KEY,
@@ -92,13 +96,14 @@ export class PolymarketController {
     return new ClobClient(
       POLYMARKET_CLOB_URL,
       POLYMARKET_CHAIN_ID,
-      signer,
+      headerSigner,
       creds,
       undefined,
       funderAddress ?? undefined,
       undefined,
       undefined,
-      builderConfig
+      builderConfig,
+      () => signer
     );
   }
 
@@ -177,10 +182,15 @@ export class PolymarketController {
     };
     console.log('[chainworker] Polymarket creds snapshot', {
       userId: member.userId,
+      walletAddress: member.user.walletAddress,
       funderAddress: member.user.polymarketSafeAddress,
       ...describeCreds(creds),
     });
-    const clobClient = this.buildClient(creds, member.user.polymarketSafeAddress);
+    const clobClient = this.buildClient(
+      creds,
+      member.user.walletAddress,
+      member.user.polymarketSafeAddress
+    );
     const response = await clobClient.createAndPostMarketOrder(
       {
         tokenID: tokenId,
