@@ -25,7 +25,6 @@ export const roundMemberSelect = Prisma.validator<Prisma.PredictionRoundMemberSe
   settledAt: true,
   user: {
     select: {
-      polymarketSafeAddress: true,
       walletAddress: true,
       polymarketApiKeyId: true,
       polymarketApiSecret: true,
@@ -38,7 +37,16 @@ export type PendingRound = Prisma.PredictionRoundGetPayload<{ select: typeof pen
 
 export type RoundMember = Prisma.PredictionRoundMemberGetPayload<{
   select: typeof roundMemberSelect;
-}>;
+}> & {
+  clubWallet: {
+    id: string;
+    walletAddress: string;
+    isDisabled: boolean;
+    turnkeyWalletAccountId: string;
+    turnkeyDelegatedUserId: string;
+    turnkeyPolicyId: string;
+  } | null;
+};
 
 export type MemberPayout = Pick<PredictionRoundMember, 'userId' | 'payoutAmount'> & {
   pnlAmount?: PredictionRoundMember['pnlAmount'];

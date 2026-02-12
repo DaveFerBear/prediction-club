@@ -9,20 +9,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@prediction-club/ui';
-import { useSession } from 'next-auth/react';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
-import { injected } from 'wagmi/connectors';
-import { useSiweSignIn } from '@/hooks';
+import { useApi, useAppSession } from '@/hooks';
 
 export function ProfileDropdownMenu() {
-  const { isConnected, address } = useAccount();
-  const { data: session, status: sessionStatus } = useSession();
-  const { signInWithSiwe, isSigningIn } = useSiweSignIn();
-  const { connect, isPending } = useConnect();
-  const { disconnect } = useDisconnect();
-  const sessionAddress = session?.address?.toLowerCase() ?? null;
-  const walletAddress = address?.toLowerCase() ?? null;
-  const isAuthenticated = !!sessionAddress && sessionAddress === walletAddress;
+  const { fetch: apiFetch } = useApi();
+  const { authenticated, refreshSession } = useAppSession();
+
+  const handleSignOut = async () => {
+    await apiFetch('/api/auth/logout', { method: 'POST' });
+    await refreshSession();
+  };
 
   return (
     <div className="flex items-center gap-2">
@@ -58,24 +54,11 @@ export function ProfileDropdownMenu() {
             <Link href="/clubs/create">Create a club</Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          {isConnected ? (
-            <>
-              {!isAuthenticated && (
-                <DropdownMenuItem
-                  onSelect={() => signInWithSiwe()}
-                  disabled={isSigningIn || sessionStatus === 'loading'}
-                >
-                  {isSigningIn ? 'Signing in...' : 'Sign in'}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onSelect={() => disconnect()}>Disconnect wallet</DropdownMenuItem>
-            </>
+          {authenticated ? (
+            <DropdownMenuItem onSelect={() => void handleSignOut()}>Sign out</DropdownMenuItem>
           ) : (
-            <DropdownMenuItem
-              onSelect={() => connect({ connector: injected() })}
-              disabled={isPending}
-            >
-              {isPending ? 'Connecting...' : 'Connect wallet'}
+            <DropdownMenuItem asChild>
+              <Link href="/profile">Sign in</Link>
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

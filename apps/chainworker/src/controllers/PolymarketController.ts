@@ -67,10 +67,17 @@ function isMarketResolved(market: Record<string, unknown>) {
 export class PolymarketController {
   static missingMemberFields(member: RoundMember): string[] {
     const missing: string[] = [];
+    if (!member.clubWallet) {
+      missing.push('clubWallet');
+      return missing;
+    }
+    if (member.clubWallet.isDisabled) {
+      missing.push('clubWalletDisabled');
+      return missing;
+    }
     if (!member.user.polymarketApiKeyId) missing.push('polymarketApiKeyId');
     if (!member.user.polymarketApiSecret) missing.push('polymarketApiSecret');
     if (!member.user.polymarketApiPassphrase) missing.push('polymarketApiPassphrase');
-    if (!member.user.polymarketSafeAddress) missing.push('polymarketSafeAddress');
     if (!member.user.walletAddress) missing.push('walletAddress');
     return missing;
   }
@@ -163,6 +170,10 @@ export class PolymarketController {
     member: RoundMember;
   }): Promise<MemberOrder> {
     const { tokenId, commitAmount, member } = params;
+    const clubWallet = member.clubWallet;
+    if (!clubWallet || clubWallet.isDisabled) {
+      throw new Error(`Missing active club wallet for user ${member.userId}`);
+    }
     const missing = this.missingMemberFields(member);
     if (missing.length > 0) {
       throw new Error(
@@ -183,14 +194,10 @@ export class PolymarketController {
     console.log('[chainworker] Polymarket creds snapshot', {
       userId: member.userId,
       walletAddress: member.user.walletAddress,
-      funderAddress: member.user.polymarketSafeAddress,
+      funderAddress: clubWallet.walletAddress,
       ...describeCreds(creds),
     });
-    const clobClient = this.buildClient(
-      creds,
-      member.user.walletAddress,
-      member.user.polymarketSafeAddress
-    );
+    const clobClient = this.buildClient(creds, member.user.walletAddress, clubWallet.walletAddress);
     const response = await clobClient.createAndPostMarketOrder(
       {
         tokenID: tokenId,

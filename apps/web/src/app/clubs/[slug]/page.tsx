@@ -10,6 +10,7 @@ import {
   useApplyToClub,
   useClubBalance,
   useClub,
+  useClubWallet,
   useClubApplications,
   usePredictionRounds,
 } from '@/hooks';
@@ -72,6 +73,14 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const isMember =
     !!address &&
     members.some((member) => member.user.walletAddress.toLowerCase() === address.toLowerCase());
+  const {
+    wallet: clubWallet,
+    isLoading: walletLoading,
+    initWallet,
+    refreshWallet,
+    isInitializing: walletInitializing,
+    initError: walletInitError,
+  } = useClubWallet(isMember ? params.slug : undefined);
 
   // ---- stats formatting (page responsibility) ----
   const activeVolumeText = `$${formatUsdAmount(club?.activeCommittedVolume ?? '0')}`;
@@ -111,6 +120,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const [applyMessage, setApplyMessage] = useState('');
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [withdrawMessage, setWithdrawMessage] = useState<string | null>(null);
 
   const {
     applications,
@@ -157,7 +167,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     setApplyError(null);
     setApplySuccess(null);
     if (!isUserAuthenticated) {
-      setApplyError('Connect your wallet to apply.');
+      setApplyError('Sign in to apply.');
       return;
     }
 
@@ -167,6 +177,18 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
       setApplyMessage('');
     } catch (err) {
       setApplyError(err instanceof Error ? err.message : 'Failed to submit application.');
+    }
+  };
+
+  const handleRequestWithdraw = async () => {
+    setWithdrawMessage(null);
+    try {
+      await apiFetch(`/api/clubs/${params.slug}/wallet/withdraw`, {
+        method: 'POST',
+      });
+      setWithdrawMessage('Withdrawal requested.');
+    } catch (err) {
+      setWithdrawMessage(err instanceof Error ? err.message : 'Unable to request withdrawal.');
     }
   };
 
@@ -233,7 +255,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   {isApplying ? 'Submitting...' : 'Apply to Join'}
                 </Button>
                 {!isUserAuthenticated && (
-                  <p className="text-xs text-muted-foreground">Connect your wallet to apply.</p>
+                  <p className="text-xs text-muted-foreground">Sign in to apply.</p>
                 )}
                 {applySuccess && <p className="text-xs text-emerald-600">{applySuccess}</p>}
                 {applyError && <p className="text-xs text-destructive">{applyError}</p>}
@@ -243,6 +265,54 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         </div>
 
         {/* Stats (designed) */}
+        {isMember && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Your Club Wallet</CardTitle>
+              <CardDescription>Wallet used for your activity in this club.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {walletLoading ? <p className="text-sm text-muted-foreground">Loading wallet...</p> : null}
+              {!walletLoading && !clubWallet ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Wallet not initialized yet. Initialize to enable trading.
+                  </p>
+                  <Button size="sm" onClick={() => void initWallet()} disabled={walletInitializing}>
+                    {walletInitializing ? 'Initializing...' : 'Initialize wallet'}
+                  </Button>
+                  {walletInitError ? (
+                    <p className="text-xs text-destructive">{walletInitError.message}</p>
+                  ) : null}
+                </div>
+              ) : null}
+              {clubWallet ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Address</span>
+                    <CopyableAddress address={clubWallet.walletAddress} variant="compact" />
+                  </div>
+                  <div className="text-sm">
+                    Balance: ${formatUsdAmount(clubWallet.balance)} USDC
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => void refreshWallet()}>
+                      Refresh
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void handleRequestWithdraw()}>
+                      Withdraw
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Top up by sending USDC to this wallet address.
+                  </p>
+                  {withdrawMessage ? <p className="text-xs text-muted-foreground">{withdrawMessage}</p> : null}
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="mb-8 grid gap-4 md:grid-cols-5">
           {/* Primary: Active Volume */}
           <div>

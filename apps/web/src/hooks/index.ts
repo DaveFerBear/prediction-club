@@ -1,18 +1,13 @@
 export { useApi, ApiError } from './use-api';
+export { useAppSession } from './use-app-session';
 export { useCreateClub } from './use-create-club';
-export { usePolymarketRelayClient } from './use-polymarket-relay-client';
-export { usePolymarketSafe } from './use-polymarket-safe';
-export { usePolymarketApprovals } from './use-polymarket-approvals';
-export { usePolymarketCreds } from './use-polymarket-creds';
-export { usePolymarketOrders } from './use-polymarket-orders';
-export { useSiweSignIn } from './use-siwe-signin';
 export { useMarketSearch, useMarketDetails, type MarketItem } from './use-market-search';
 export { useCreatePrediction } from './use-create-prediction';
 export { usePolymarketMarketData } from './use-polymarket-market-data';
-export { useSafeBalance } from './use-safe-balance';
 export { useUserBalance } from './use-user-balance';
 export { useApplyToClub } from './use-apply-to-club';
 export { useClubBalance } from './use-club-balance';
+export { useClubWallet } from './use-club-wallet';
 export {
   useClubs,
   usePublicClubs,

@@ -4,14 +4,13 @@ import { useRef } from 'react';
 import Link from 'next/link';
 import { formatUsdAmount } from '@prediction-club/shared';
 import { Button } from '@prediction-club/ui';
-import { useAccount } from 'wagmi';
 import { ProfileDropdownMenu } from './menus/profile-dropdown-menu';
 import { Logo } from './logo';
-import { useUserBalance } from '@/hooks';
+import { useApi, useUserBalance } from '@/hooks';
 
 export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' }) {
   const logoRef = useRef<SVGSVGElement | null>(null);
-  const { address, isConnected } = useAccount();
+  const { address, isAuthenticated } = useApi();
   const { balance } = useUserBalance();
   const balanceDisplay = formatUsdAmount(balance);
 
@@ -49,7 +48,7 @@ export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' 
               <Button variant="ghost">Find a club</Button>
             </Link>
           </div>
-          {isConnected && address && (
+          {isAuthenticated && address && (
             <div className="rounded-md border border-input px-2 py-1 text-right sm:min-w-[120px] sm:text-right">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">
                 Portfolio
@@ -61,7 +60,7 @@ export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' 
               </div>
             </div>
           )}
-          {isConnected && address && (
+          {isAuthenticated && address && (
             <span className="hidden rounded-md border border-input px-2 py-1 text-xs font-mono text-muted-foreground sm:inline-flex">
               {address.slice(0, 6)}...{address.slice(-4)}
             </span>

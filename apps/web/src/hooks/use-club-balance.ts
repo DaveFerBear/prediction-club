@@ -16,7 +16,7 @@ type BalancePayload = {
 };
 
 export function useClubBalance(slug?: string) {
-  const { fetch, isAuthenticated } = useApi();
+  const { fetch } = useApi();
   const key = slug ? `/api/clubs/${slug}/balance` : null;
   const { data, error, isLoading } = useSWR<ApiResponse<BalancePayload>>(key, (url: string) =>
     fetch<ApiResponse<BalancePayload>>(url)
