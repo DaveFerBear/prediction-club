@@ -5,33 +5,59 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Prediction Club                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────┐                                               │
-│  │   Next.js    │                                               │
-│  │   Web App    │                                               │
-│  │              │                                               │
-│  │  - Pages     │                                               │
-│  │  - API       │                                               │
-│  │  - Auth      │                                               │
-│  └──────┬───────┘                                               │
-│         │                                                       │
-│         │                                                       │
-│         ▼                                                       │
-│  ┌──────────────────┐                                          │
-│  │   PostgreSQL     │                                          │
-│  │   (Prisma ORM)   │                                          │
-│  └──────────────────┘                                          │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────┐
+│ Client (Next.js App Router)  │
+│ - Pages + feature components │
+│ - SWR hooks for reads/mutate │
+│ - wagmi wallet integration   │
+└──────────────┬───────────────┘
+               │ HTTP (same app)
+               ▼
+┌──────────────────────────────┐
+│ Next.js Route Handlers (/api)│
+│ - SIWE + NextAuth JWT auth   │
+│ - Validation + API responses │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Domain Controllers           │
+│ - Club/Application flows     │
+│ - Prediction round lifecycle │
+│ - Ledger accounting          │
+└──────────────┬───────────────┘
+               │ Prisma
+               ▼
+┌──────────────────────────────┐
+│ PostgreSQL                   │
+│ - users, clubs, memberships  │
+│ - prediction rounds/members  │
+│ - ledger entries             │
+└──────────────┬───────────────┘
+               │ polling + updates
+               ▼
+┌──────────────────────────────┐
+│ Chainworker (separate app)   │
+│ - executes PENDING rounds    │
+│ - settles COMMITTED rounds   │
+│ - writes order/payout fields │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│ Polymarket APIs              │
+│ - Gamma (discovery/search)   │
+│ - CLOB + builder signing     │
+└──────────────────────────────┘
 ```
 
 ### Key Components
 
-- **Web App**: Next.js app with public pages, dashboard, and club admin
-- **Predictions**: Prediction rounds with market references and ledger entries
+- **Web App (`apps/web`)**: UI + route handlers; authenticated API surface for clubs, applications, predictions, balances, and Polymarket actions.
+- **Domain Layer (`apps/web/src/controllers`)**: Business logic for memberships, prediction round creation, and ledger accounting.
+- **Database (`packages/db`)**: Shared Prisma client/schema used by both web and chainworker.
+- **Chainworker (`apps/chainworker`)**: Background poller that executes pending orders, tracks resolution, and finalizes settlement.
+- **Shared Packages (`packages/shared`, `packages/ui`)**: Shared types/utilities and reusable UI primitives.
 
 ## Repo Structure
 
