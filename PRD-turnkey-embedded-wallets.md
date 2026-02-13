@@ -92,10 +92,10 @@ Current architecture relies on user-managed signing and stored Polymarket API cr
 
 1. Membership approved.
 2. System ensures club wallet exists for `(user, club)`.
-3. If missing:
+3. If missing, synchronously:
    - create wallet account in user sub-org,
    - ensure relayer-compatible setup,
-   - mark wallet ready.
+   - persist `ClubWallet` row only after setup succeeds.
 
 ### 7.3 Top-up Club Wallet
 
@@ -141,13 +141,13 @@ Represents one wallet per `(user, club)`.
 - `turnkeyWalletAccountId`
 - `turnkeyDelegatedUserId`
 - `turnkeyPolicyId` (or policy group id)
-- `status` (`PENDING`, `READY`, `ERROR`, `DISABLED`)
+- `isDisabled` (boolean kill switch)
 - `createdAt`, `updatedAt`
 
 Constraints:
 
 - unique `(userId, clubId)`
-- index `(clubId, status)`
+- index `(clubId, isDisabled)`
 - index `(walletAddress)`
 
 ## 8.3 Existing model updates
@@ -178,16 +178,16 @@ Notes:
 
 - `POST /api/auth/turnkey/callback` (if required by selected Turnkey auth flow)
 - `POST /api/clubs/:slug/wallet/init`  
-  Ensures `(user, club)` wallet exists and is ready.
+  Ensures `(user, club)` wallet exists; if missing, performs synchronous provisioning.
 - `GET /api/clubs/:slug/wallet`  
-  Returns wallet status/address/balance summary for current user.
+  Returns wallet address/balance summary for current user.
 - `POST /api/clubs/:slug/wallet/withdraw`  
   Strict mode request requiring user confirmation flow.
 
 ## 9.2 Existing endpoint behavior updates
 
 - `POST /api/clubs/:slug/predictions`  
-  Validate all active members have `ClubWallet.status=READY`; otherwise fail fast.
+  Validate all active members have a `ClubWallet` row and `isDisabled=false`; otherwise fail fast.
 - `GET /api/clubs/:slug/balance` and user balance endpoints  
   Compute from wallet-scoped ledger entries.
 
@@ -210,7 +210,7 @@ Notes:
 
 ## 10.3 Execution invariants
 
-- Never execute if club wallet status is not `READY`.
+- Never execute if `ClubWallet` does not exist or `isDisabled=true`.
 - Never mark round committed unless every member order is persisted with order id.
 - Settlement remains deterministic and idempotent.
 
@@ -291,6 +291,7 @@ DB resets are acceptable during development until launch schema is finalized.
 1. User can sign up/login with Google and access app session.
 2. User joining 2 clubs has 2 distinct club wallets.
 3. Chainworker can autonomously place orders for READY club wallets.
+3. Chainworker can autonomously place orders for enabled `ClubWallet` records.
 4. Club P&L remains separated by wallet/club.
 5. User can top-up and withdraw from each club wallet.
 6. Manual Polymarket credential input is no longer required in primary flow.
@@ -307,7 +308,7 @@ DB resets are acceptable during development until launch schema is finalized.
 4. Remove NextAuth/SIWE providers/hooks/routes.
 5. Implement `ClubWallet` provisioning service (single module, idempotent).
 6. Refactor chainworker signer abstraction (`SignerProvider`) and swap old global signer path.
-7. Replace profile setup UI with wallet status UI.
+7. Replace profile setup UI with club wallet UI.
 8. Remove old creds endpoints from primary UI paths.
 
 Keep business rules in small controllers/services and avoid page-level orchestration logic.

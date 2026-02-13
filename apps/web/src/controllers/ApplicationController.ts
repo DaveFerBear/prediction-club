@@ -179,23 +179,25 @@ export class ApplicationController {
       throw new ApplicationError('INVALID_STATUS', 'Application is not pending');
     }
 
-    // Approve application and create membership
-    const [updatedApplication, membership] = await prisma.$transaction([
-      prisma.application.update({
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedApplication = await tx.application.update({
         where: { id: applicationId },
         data: { status: 'APPROVED' },
-      }),
-      prisma.clubMember.create({
+      });
+
+      const membership = await tx.clubMember.create({
         data: {
           clubId: club.id,
           userId: application.userId,
           role: 'MEMBER',
           status: 'ACTIVE',
         },
-      }),
-    ]);
+      });
 
-    return { application: updatedApplication, membership };
+      return { updatedApplication, membership };
+    });
+
+    return { application: result.updatedApplication, membership: result.membership };
   }
 }
 

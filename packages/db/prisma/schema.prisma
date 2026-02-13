@@ -16,10 +16,9 @@ model User {
   id                        String   @id @default(cuid())
   email                     String?  @unique
   walletAddress             String   @unique
-  polymarketSafeAddress     String?  @unique
-  polymarketApiKeyId        String?
-  polymarketApiSecret       String?
-  polymarketApiPassphrase   String?
+  turnkeySubOrgId           String?  @unique
+  turnkeyEndUserId          String?
+  primaryWithdrawalAddress  String?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 
@@ -28,6 +27,7 @@ model User {
   applications    Application[]
   predictionRoundMembers   PredictionRoundMember[]
   ledgerEntries           LedgerEntry[]
+  clubWallets             ClubWallet[]
   verifications   Verification[]
   createdClubs    Club[]            @relation("ClubCreatedBy")
   createdPredictionRounds PredictionRound[] @relation("PredictionRoundCreatedBy")
@@ -58,6 +58,7 @@ model Club {
   // Relations
   members       ClubMember[]
   applications  Application[]
+  clubWallets   ClubWallet[]
   predictionRounds       PredictionRound[]
   ledgerEntries          LedgerEntry[]
 
@@ -96,6 +97,46 @@ model ClubMember {
   @@unique([clubId, userId])
   @@index([clubId])
   @@index([userId])
+}
+
+model ClubWallet {
+  id                      String           @id @default(cuid())
+  userId                  String
+  user                    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clubId                  String
+  club                    Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  turnkeyWalletAddress    String           @unique
+  turnkeyWalletAccountId  String
+  turnkeyDelegatedUserId  String
+  turnkeyPolicyId         String
+  polymarketSafeAddress   String?          @unique
+  polymarketApiKeyId      String?
+  polymarketApiSecret     String?
+  polymarketApiPassphrase String?
+  // App-level provisioning state for our orchestration flow (Turnkey signer + Safe + approvals + CLOB creds).
+  // This is not a native Turnkey field and not an on-chain Safe contract field.
+  provisioningStatus      ClubWalletProvisioningStatus @default(PENDING)
+  provisioningError       String?
+  provisionedAt           DateTime?
+  lastProvisioningAttemptAt DateTime?
+  isDisabled              Boolean          @default(false)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  ledgerEntries           LedgerEntry[]
+
+  @@unique([userId, clubId])
+  @@index([clubId, isDisabled])
+  @@index([provisioningStatus])
+  @@index([polymarketSafeAddress])
+  @@index([turnkeyWalletAddress])
+}
+
+enum ClubWalletProvisioningStatus {
+  PENDING
+  PROVISIONING
+  READY
+  FAILED
 }
 
 // ============================================================================
@@ -232,6 +273,8 @@ model PredictionRoundMember {
 model LedgerEntry {
   id                 String           @id @default(cuid())
   safeAddress        String
+  clubWalletId       String?
+  clubWallet         ClubWallet?      @relation(fields: [clubWalletId], references: [id], onDelete: SetNull)
   clubId             String
   club               Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
   userId             String
@@ -246,6 +289,7 @@ model LedgerEntry {
   createdAt          DateTime         @default(now())
 
   @@index([safeAddress])
+  @@index([clubWalletId])
   @@index([clubId])
   @@index([userId])
   @@index([predictionRoundId])

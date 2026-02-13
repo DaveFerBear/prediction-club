@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { useAppSession } from './use-app-session';
 
 interface FetchOptions extends Omit<RequestInit, 'headers'> {
   headers?: Record<string, string>;
@@ -7,11 +7,11 @@ interface FetchOptions extends Omit<RequestInit, 'headers'> {
 
 /**
  * Hook that provides an authenticated fetch function
- * Uses the NextAuth session cookie for auth
+ * Uses first-party app session cookies for auth
  */
 export function useApi() {
-  const { data: session } = useSession();
-  const address = session?.address ?? null;
+  const { authenticated, user } = useAppSession();
+  const address = user?.walletAddress ?? null;
 
   const fetchWithAuth = useCallback(
     async <T>(url: string, options: FetchOptions = {}): Promise<T> => {
@@ -43,7 +43,8 @@ export function useApi() {
 
   return {
     fetch: fetchWithAuth,
-    isAuthenticated: !!address,
+    isAuthenticated: authenticated,
+    user,
     address,
   };
 }

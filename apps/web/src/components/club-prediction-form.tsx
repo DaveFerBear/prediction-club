@@ -19,8 +19,7 @@ import { usePolymarketMarketData } from '@/hooks/use-polymarket-market-data';
 import {
   useMarketDetails,
   useMarketSearch,
-  usePolymarketSafe,
-  useSafeBalance,
+  useClubWallet,
   type ClubDetail,
 } from '@/hooks';
 import type { MarketItem } from '@/hooks/use-market-search';
@@ -289,8 +288,9 @@ export function ClubPredictionForm({
   const { createPrediction } = useCreatePrediction(clubSlug);
   const { fetchMarketDetails } = useMarketDetails();
   const { query, setQuery, searching, error, results, runSearch } = useMarketSearch();
-  const { safeAddress } = usePolymarketSafe();
-  const { balance, balanceDisplay, isLoading: isBalanceLoading } = useSafeBalance(safeAddress);
+  const { wallet: clubWallet, isLoading: isWalletLoading } = useClubWallet(clubSlug);
+  const walletBalanceRaw = clubWallet?.balance ?? '0';
+  const balanceDisplay = formatUsdc(Number(walletBalanceRaw) / 1_000_000);
 
   const members = club.members ?? [];
   const isAdmin = useMemo(() => {
@@ -380,7 +380,7 @@ export function ClubPredictionForm({
   const canPickMarket = !!state.selectedEvent;
   const canPickWinner = !!state.selectedMarket;
   const canPickBet = !!state.selectedOutcome;
-  const maxBalance = balance ? Number(balance) / 1e6 : 0;
+  const maxBalance = Number(walletBalanceRaw) / 1_000_000;
   const minBet = 0.01;
   const sliderMax = maxBalance > minBet ? maxBalance : minBet;
   const numericBet = Number(state.betAmount);
@@ -829,7 +829,7 @@ export function ClubPredictionForm({
                             max={sliderMax}
                             step={0.01}
                             value={[sliderValue]}
-                            disabled={maxBalance <= 0 || isBalanceLoading}
+                            disabled={maxBalance <= 0 || isWalletLoading}
                             onValueChange={(value) => {
                               const nextValue = value[0] ?? minBet;
                               dispatch({
@@ -841,15 +841,15 @@ export function ClubPredictionForm({
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
                             <span>${minBet.toFixed(2)}</span>
                             <span>
-                              {isBalanceLoading
-                                ? 'Checking Safe...'
+                              {isWalletLoading
+                                ? 'Checking wallet...'
                                 : `Available: ${balanceDisplay} USDC`}
                             </span>
                             <span>${formatUsdc(sliderMax)}</span>
                           </div>
-                          {!isBalanceLoading && maxBalance > 0 && (
+                          {!isWalletLoading && maxBalance > 0 && (
                             <div className="text-xs text-muted-foreground">
-                              Committing {commitPercent.toFixed(1)}% of Safe
+                              Committing {commitPercent.toFixed(1)}% of club wallet
                             </div>
                           )}
                         </div>

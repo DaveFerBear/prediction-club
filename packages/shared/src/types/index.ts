@@ -10,10 +10,6 @@ export interface User {
   id: string;
   email: string | null;
   walletAddress: string;
-  polymarketSafeAddress?: string | null;
-  polymarketApiKeyId?: string | null;
-  polymarketApiSecret?: string | null;
-  polymarketApiPassphrase?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

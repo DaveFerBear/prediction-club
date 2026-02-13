@@ -34,16 +34,63 @@ export class ChainWorkerDBController {
   }
 
   static async getRoundMembers(roundId: string): Promise<RoundMember[]> {
-    return prisma.predictionRoundMember.findMany({
+    const members = await prisma.predictionRoundMember.findMany({
       where: { predictionRoundId: roundId },
       select: roundMemberSelect,
     });
+
+    if (members.length === 0) {
+      return [];
+    }
+
+    const round = await prisma.predictionRound.findUnique({
+      where: { id: roundId },
+      select: { clubId: true },
+    });
+    if (!round) {
+      return [];
+    }
+
+    const userIds = members.map((member) => member.userId);
+    const clubWallets = await prisma.clubWallet.findMany({
+      where: {
+        clubId: round.clubId,
+        userId: { in: userIds },
+      },
+      select: {
+        id: true,
+        userId: true,
+        turnkeyWalletAddress: true,
+        polymarketSafeAddress: true,
+        polymarketApiKeyId: true,
+        polymarketApiSecret: true,
+        polymarketApiPassphrase: true,
+        provisioningStatus: true,
+        isDisabled: true,
+        turnkeyWalletAccountId: true,
+        turnkeyDelegatedUserId: true,
+        turnkeyPolicyId: true,
+      },
+    });
+    const walletByUserId = new Map(clubWallets.map((wallet) => [wallet.userId, wallet]));
+
+    return members.map((member) => ({
+      ...member,
+      clubWallet: walletByUserId.get(member.userId) ?? null,
+    }));
   }
 
   static async markRoundCommitted(roundId: string) {
     await prisma.predictionRound.update({
       where: { id: roundId },
       data: { status: 'COMMITTED' },
+    });
+  }
+
+  static async markRoundCancelled(roundId: string) {
+    await prisma.predictionRound.update({
+      where: { id: roundId },
+      data: { status: 'CANCELLED' },
     });
   }
 
@@ -93,6 +140,7 @@ export class ChainWorkerDBController {
 
       const ledgerEntries: Array<{
         safeAddress: string;
+        clubWalletId?: string | null;
         clubId: string;
         userId: string;
         predictionRoundId: string;
@@ -112,12 +160,14 @@ export class ChainWorkerDBController {
           payout.pnlAmount ?? (BigInt(payoutAmount) - BigInt(member.commitAmount)).toString();
 
         if (!existingPayoutUsers.has(member.userId) && BigInt(payoutAmount) > 0n) {
-          const safeAddress = member.user.polymarketSafeAddress;
+          const safeAddress = member.clubWallet?.polymarketSafeAddress;
           if (!safeAddress) {
-            throw new Error(`Missing safe address for user ${member.userId}`);
+            throw new Error(`Missing club wallet for user ${member.userId}`);
           }
+          const clubWalletId = member.clubWallet?.id;
           ledgerEntries.push({
             safeAddress,
+            clubWalletId,
             clubId: round.clubId,
             userId: member.userId,
             predictionRoundId: round.id,

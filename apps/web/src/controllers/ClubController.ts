@@ -74,25 +74,26 @@ export class ClubController {
       throw new ClubError('SLUG_TAKEN', 'This club slug is already taken');
     }
 
-    // Create the club
-    const club = await prisma.club.create({
-      data: {
-        name,
-        slug,
-        description,
-        isPublic,
-        createdByUserId: userId,
-        members: {
-          create: {
-            userId,
-            role: 'ADMIN',
-            status: 'ACTIVE',
+    return prisma.$transaction(async (tx) => {
+      const createdClub = await tx.club.create({
+        data: {
+          name,
+          slug,
+          description,
+          isPublic,
+          createdByUserId: userId,
+          members: {
+            create: {
+              userId,
+              role: 'ADMIN',
+              status: 'ACTIVE',
+            },
           },
         },
-      },
-    });
+      });
 
-    return club;
+      return createdClub;
+    });
   }
 
   /**

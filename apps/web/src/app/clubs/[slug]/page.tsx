@@ -10,6 +10,7 @@ import {
   useApplyToClub,
   useClubBalance,
   useClub,
+  useClubSetupStatus,
   useClubApplications,
   usePredictionRounds,
 } from '@/hooks';
@@ -28,6 +29,8 @@ import {
   Input,
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { ClubSetupChecklist } from '@/components/club-setup-checklist';
+import { ClubDepositPopover } from '@/components/club-deposit-popover';
 import { CopyableAddress } from '@/components/copyable-address';
 import { StatTile } from '@/components/stat-tile';
 import { Activity, Layers, Minus, Sigma, TrendingDown, TrendingUp, Users } from 'lucide-react';
@@ -72,6 +75,10 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const isMember =
     !!address &&
     members.some((member) => member.user.walletAddress.toLowerCase() === address.toLowerCase());
+  const setup = useClubSetupStatus({
+    slug: params.slug,
+    isMember,
+  });
 
   // ---- stats formatting (page responsibility) ----
   const activeVolumeText = `$${formatUsdAmount(club?.activeCommittedVolume ?? '0')}`;
@@ -111,6 +118,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const [applyMessage, setApplyMessage] = useState('');
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [withdrawMessage, setWithdrawMessage] = useState<string | null>(null);
 
   const {
     applications,
@@ -157,7 +165,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     setApplyError(null);
     setApplySuccess(null);
     if (!isUserAuthenticated) {
-      setApplyError('Connect your wallet to apply.');
+      setApplyError('Sign in to apply.');
       return;
     }
 
@@ -167,6 +175,18 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
       setApplyMessage('');
     } catch (err) {
       setApplyError(err instanceof Error ? err.message : 'Failed to submit application.');
+    }
+  };
+
+  const handleRequestWithdraw = async () => {
+    setWithdrawMessage(null);
+    try {
+      await apiFetch(`/api/clubs/${params.slug}/wallet/withdraw`, {
+        method: 'POST',
+      });
+      setWithdrawMessage('Withdrawal requested.');
+    } catch (err) {
+      setWithdrawMessage(err instanceof Error ? err.message : 'Unable to request withdrawal.');
     }
   };
 
@@ -215,12 +235,21 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
             </div>
 
-            {isAdmin ? (
-              <Link href={`/clubs/${club.slug}/predict`}>
-                <Button size="sm">Make prediction</Button>
-              </Link>
-            ) : isMember ? (
-              <Badge variant="secondary">You are a member</Badge>
+            {isMember ? (
+              <div className="flex items-center gap-2">
+                {isAdmin ? (
+                  <Link href={`/clubs/${club.slug}/predict`}>
+                    <Button size="sm">Make prediction</Button>
+                  </Link>
+                ) : (
+                  <Badge variant="secondary">You are a member</Badge>
+                )}
+                <ClubDepositPopover
+                  slug={params.slug}
+                  walletAddress={setup.wallet?.walletAddress ?? null}
+                  canDeposit={setup.authenticated}
+                />
+              </div>
             ) : (
               <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
                 <Input
@@ -233,7 +262,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   {isApplying ? 'Submitting...' : 'Apply to Join'}
                 </Button>
                 {!isUserAuthenticated && (
-                  <p className="text-xs text-muted-foreground">Connect your wallet to apply.</p>
+                  <p className="text-xs text-muted-foreground">Sign in to apply.</p>
                 )}
                 {applySuccess && <p className="text-xs text-emerald-600">{applySuccess}</p>}
                 {applyError && <p className="text-xs text-destructive">{applyError}</p>}
@@ -243,6 +272,86 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         </div>
 
         {/* Stats (designed) */}
+        {isMember && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Your Club Setup</CardTitle>
+              <CardDescription>Wallet provisioning and automation readiness for this club.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ClubSetupChecklist
+                steps={setup.steps}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {isMember && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Club Wallet</CardTitle>
+              <CardDescription>Address, balance, and wallet actions for this club.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {setup.wallet ? (
+                <div className="rounded-md border p-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Address</span>
+                      {setup.wallet.walletAddress ? (
+                        <CopyableAddress address={setup.wallet.walletAddress} variant="compact" />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Provisioning in progress
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Balance</span>{' '}
+                      <span className="font-medium">${formatUsdAmount(setup.wallet.balance)} USDC</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => void setup.refreshWallet()}>
+                      Refresh
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void handleRequestWithdraw()}>
+                      Withdraw
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Top up by sending USDC to this club Safe.
+                    </span>
+                  </div>
+                  {setup.wallet.provisioningStatus === 'FAILED' ? (
+                    <p className="mt-2 text-xs text-destructive">
+                      {setup.wallet.provisioningError ?? 'Wallet provisioning failed. Retry initialize wallet.'}
+                    </p>
+                  ) : null}
+                  {withdrawMessage ? (
+                    <p className="mt-2 text-xs text-muted-foreground">{withdrawMessage}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Initialize a per-club wallet to begin funding and trading.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => void setup.initWallet()}
+                    disabled={setup.walletInitializing}
+                  >
+                    {setup.walletInitializing ? 'Initializing...' : 'Initialize wallet'}
+                  </Button>
+                  {setup.walletInitError ? (
+                    <p className="text-xs text-destructive">{setup.walletInitError.message}</p>
+                  ) : null}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="mb-8 grid gap-4 md:grid-cols-5">
           {/* Primary: Active Volume */}
           <div>

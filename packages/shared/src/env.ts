@@ -12,9 +12,12 @@ export const sharedEnvSchema = z.object({
  * Web app environment schema
  */
 export const webEnvSchema = sharedEnvSchema.extend({
-  // NextAuth
-  NEXTAUTH_URL: z.string().url().optional(),
-  NEXTAUTH_SECRET: z.string().min(32),
+  // App session
+  APP_SESSION_SECRET: z.string().min(32),
+  TURNKEY_ORGANIZATION_ID: z.string().optional(),
+  TURNKEY_API_PUBLIC_KEY: z.string().optional(),
+  TURNKEY_API_PRIVATE_KEY: z.string().optional(),
+  TURNKEY_API_BASE_URL: z.string().url().optional(),
 
   // Chain config
   NEXT_PUBLIC_DEFAULT_CHAIN_ID: z.coerce.number().default(80002),
@@ -26,6 +29,7 @@ export const webEnvSchema = sharedEnvSchema.extend({
 
   // Public URLs
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(),
 });
 
 export type SharedEnv = z.infer<typeof sharedEnvSchema>;

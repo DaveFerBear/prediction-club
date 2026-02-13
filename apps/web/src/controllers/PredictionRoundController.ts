@@ -1,5 +1,6 @@
 import { prisma } from '@prediction-club/db';
 import { ClubController, ClubError } from './ClubController';
+import { ClubWalletController, ClubWalletError } from './ClubWalletController';
 import { LedgerController, LedgerError } from './LedgerController';
 
 export interface CreatePredictionRoundInput {
@@ -49,21 +50,29 @@ export class PredictionRoundController {
     const stakeTotal = (BigInt(commitAmount) * BigInt(activeMembers.length)).toString();
 
     const memberIds = activeMembers.map((member) => member.userId);
-    const memberSafes = await prisma.user.findMany({
-      where: { id: { in: memberIds } },
-      select: {
-        id: true,
-        polymarketSafeAddress: true,
-      },
-    });
-    const safeByUser = new Map(
-      memberSafes.map((member) => [member.id, member.polymarketSafeAddress])
-    );
-    for (const member of activeMembers) {
-      const safeAddress = safeByUser.get(member.userId);
-      if (!safeAddress) {
-        throw new LedgerError('SAFE_NOT_FOUND', 'Member Safe address not available');
+    let clubWalletByUser: Map<
+      string,
+      {
+        id: string;
+        safeAddress: string;
       }
+    >;
+    try {
+      const wallets = await ClubWalletController.requireActiveClubWallets({
+        clubId: club.id,
+        userIds: memberIds,
+      });
+      clubWalletByUser = new Map(
+        Array.from(wallets.entries()).map(([userId, wallet]) => [
+          userId,
+          { id: wallet.id, safeAddress: wallet.polymarketSafeAddress ?? '' },
+        ])
+      );
+    } catch (error) {
+      if (error instanceof ClubWalletError) {
+        throw new LedgerError(error.code, error.message);
+      }
+      throw error;
     }
 
     const predictionRound = await prisma.$transaction(async (tx) => {
@@ -93,7 +102,8 @@ export class PredictionRoundController {
 
       await LedgerController.createEntries(
         activeMembers.map((member) => ({
-          safeAddress: safeByUser.get(member.userId) ?? '',
+          safeAddress: clubWalletByUser.get(member.userId)?.safeAddress ?? '',
+          clubWalletId: clubWalletByUser.get(member.userId)?.id ?? null,
           clubId: club.id,
           userId: member.userId,
           predictionRoundId: created.id,

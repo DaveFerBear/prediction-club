@@ -4,12 +4,15 @@ import type { PrismaClient } from '@prediction-club/db';
 
 const localEnvPath = path.resolve(process.cwd(), '.env');
 const rootEnvPath = path.resolve(process.cwd(), '../../.env');
+const webEnvPath = path.resolve(process.cwd(), '../web/.env');
 loadEnv({ path: localEnvPath });
 loadEnv({ path: rootEnvPath });
+loadEnv({ path: webEnvPath });
 
 const requiredEnvVars = [
   'DATABASE_URL',
-  'CHAINWORKER_SIGNER_PRIVATE_KEY',
+  'TURNKEY_API_PUBLIC_KEY',
+  'TURNKEY_API_PRIVATE_KEY',
   'POLY_BUILDER_API_KEY',
   'POLY_BUILDER_SECRET',
   'POLY_BUILDER_PASSPHRASE',
@@ -74,9 +77,7 @@ async function runOnce() {
     for (const round of executionRounds) {
       if (shutdownState.requested) break;
       if (!round.targetTokenId) {
-        console.error(
-          `[chainworker] Round ${round.id} missing targetTokenId; cannot execute.`
-        );
+        console.error(`[chainworker] Round ${round.id} missing targetTokenId; cannot execute.`);
         continue;
       }
 
@@ -90,13 +91,11 @@ async function runOnce() {
           .filter((entry) => entry.missing.length > 0);
         if (invalidMembers.length > 0) {
           const details = invalidMembers
-            .map(
-              ({ member, missing }) =>
-                `${member.userId} (${missing.join(', ')})`
-            )
+            .map(({ member, missing }) => `${member.userId} (${missing.join(', ')})`)
             .join('; ');
-          console.error(
-            `[chainworker] Round ${round.id} missing required Polymarket fields: ${details}`
+          await ChainWorkerDBController.markRoundCancelled(round.id);
+          console.warn(
+            `[chainworker] Round ${round.id} cancelled due to missing execution prerequisites: ${details}`
           );
           continue;
         }
@@ -148,9 +147,7 @@ async function runOnce() {
         : await PolymarketController.fetchMarketResolution(round.conditionId);
 
       if (!resolution.isResolved) {
-        console.log(
-          `[chainworker] Round ${round.id} unresolved for ${round.conditionId}`
-        );
+        console.log(`[chainworker] Round ${round.id} unresolved for ${round.conditionId}`);
         continue;
       }
 

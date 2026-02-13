@@ -9,13 +9,13 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 │ Client (Next.js App Router)  │
 │ - Pages + feature components │
 │ - SWR hooks for reads/mutate │
-│ - wagmi wallet integration   │
+│ - Turnkey session bootstrap  │
 └──────────────┬───────────────┘
                │ HTTP (same app)
                ▼
 ┌──────────────────────────────┐
 │ Next.js Route Handlers (/api)│
-│ - SIWE + NextAuth JWT auth   │
+│ - App-session cookie auth    │
 │ - Validation + API responses │
 └──────────────┬───────────────┘
                │
@@ -24,6 +24,7 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 │ Domain Controllers           │
 │ - Club/Application flows     │
 │ - Prediction round lifecycle │
+│ - Club wallet provisioning   │
 │ - Ledger accounting          │
 └──────────────┬───────────────┘
                │ Prisma
@@ -31,6 +32,7 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 ┌──────────────────────────────┐
 │ PostgreSQL                   │
 │ - users, clubs, memberships  │
+│ - club_wallets               │
 │ - prediction rounds/members  │
 │ - ledger entries             │
 └──────────────┬───────────────┘
@@ -47,16 +49,16 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 ┌──────────────────────────────┐
 │ Polymarket APIs              │
 │ - Gamma (discovery/search)   │
-│ - CLOB + builder signing     │
+│ - CLOB + relayer execution   │
 └──────────────────────────────┘
 ```
 
 ### Key Components
 
-- **Web App (`apps/web`)**: UI + route handlers; authenticated API surface for clubs, applications, predictions, balances, and Polymarket actions.
+- **Web App (`apps/web`)**: UI + route handlers; app-session auth, club wallet APIs, and authenticated API surface for clubs/applications/predictions.
 - **Domain Layer (`apps/web/src/controllers`)**: Business logic for memberships, prediction round creation, and ledger accounting.
 - **Database (`packages/db`)**: Shared Prisma client/schema used by both web and chainworker.
-- **Chainworker (`apps/chainworker`)**: Background poller that executes pending orders, tracks resolution, and finalizes settlement.
+- **Chainworker (`apps/chainworker`)**: Background poller that executes pending orders, tracks resolution, and finalizes settlement per member club wallet.
 - **Shared Packages (`packages/shared`, `packages/ui`)**: Shared types/utilities and reusable UI primitives.
 
 ## Repo Structure
@@ -149,8 +151,12 @@ The web app will be available at http://localhost:3000
 | Variable                               | Description                        | Required |
 | -------------------------------------- | ---------------------------------- | -------- |
 | `DATABASE_URL`                         | PostgreSQL connection string       | Yes      |
-| `NEXTAUTH_URL`                         | App URL for NextAuth               | Yes      |
-| `NEXTAUTH_SECRET`                      | Secret for NextAuth (min 32 chars) | Yes      |
+| `APP_SESSION_SECRET`                   | Secret for app session cookie (min 32 chars) | Yes      |
+| `TURNKEY_ORGANIZATION_ID`              | Parent Turnkey organization ID     | Yes      |
+| `TURNKEY_API_PUBLIC_KEY`               | Turnkey API public key (P-256)     | Yes      |
+| `TURNKEY_API_PRIVATE_KEY`              | Turnkey API private key            | Yes      |
+| `TURNKEY_API_BASE_URL`                 | Turnkey API base URL               | No       |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID`         | Google OAuth client ID for sign-in | Yes      |
 | `NEXT_PUBLIC_DEFAULT_CHAIN_ID`         | Default chain (80002 for Amoy)     | No       |
 | `NEXT_PUBLIC_POLYGON_RPC_URL`          | Polygon mainnet RPC                | No       |
 | `NEXT_PUBLIC_AMOY_RPC_URL`             | Amoy testnet RPC                   | No       |
@@ -164,7 +170,6 @@ Important: `docker --env-file` does not strip quotes. Avoid quoting values in th
 | -------------------------------- | ------------------------------------------- | -------- |
 | `DATABASE_URL`                   | Postgres connection string                  | Yes      |
 | `CHAINWORKER_SIGNER_PRIVATE_KEY` | Signing key used by the chainworker         | Yes      |
-| `CHAINWORKER_SIGNER_ADDRESS`     | Address derived from the signer private key | Yes      |
 | `POLY_BUILDER_API_KEY`           | Polymarket builder API key                  | Yes      |
 | `POLY_BUILDER_SECRET`            | Polymarket builder API secret               | Yes      |
 | `POLY_BUILDER_PASSPHRASE`        | Polymarket builder API passphrase           | Yes      |
@@ -249,11 +254,11 @@ gcloud compute ssh chainworker --project cad-ai-439508
 - ✅ API routes (clubs, applications, predictions)
 - ✅ UI pages (landing, dashboard, club public, club admin)
 - ✅ Ledger entries for club balances and prediction rounds
+- ✅ App-session auth endpoints for Turnkey identity linking
+- ✅ Google-based sign-in UI linked to Turnkey login endpoint
 
 ### Stubbed / TODO
 
-- 🔲 Authentication (NextAuth configured but not wired)
-- 🔲 Wallet connection (wagmi configured but not integrated)
 - 🔲 Polymarket order execution (relay/CLOB orders)
 - 🔲 Real-time updates (would need WebSocket or polling)
 - 🔲 Club discovery/ranking
@@ -264,9 +269,10 @@ gcloud compute ssh chainworker --project cad-ai-439508
 
 Key models:
 
-- **User**: Wallet address, email, verification status
+- **User**: Turnkey identity linkage, wallet address compatibility, app auth identity
 - **Club**: Name, manager, visibility, metadata
 - **ClubMember**: Role (ADMIN/MEMBER), status
+- **ClubWallet**: One wallet per `(user, club)` for isolated accounting and execution context
 - **Application**: Membership applications
 - **PredictionRound**: Prediction rounds with market reference
 - **PredictionRoundMember**: Individual participation, PnL tracking

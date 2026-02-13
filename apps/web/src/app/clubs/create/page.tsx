@@ -13,8 +13,6 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { useApi, useCreateClub } from '@/hooks';
-import { useConnect } from 'wagmi';
-import { injected } from 'wagmi/connectors';
 
 const slugifyName = (value: string) =>
   value
@@ -28,7 +26,6 @@ const slugifyName = (value: string) =>
 export default function CreateClubPage() {
   const router = useRouter();
   const { isAuthenticated } = useApi();
-  const { connect, isPending: isConnecting } = useConnect();
   const { createClub, isCreating, error: createClubError } = useCreateClub();
   const [error, setError] = useState<string | null>(null);
   const [slugTouched, setSlugTouched] = useState(false);
@@ -55,7 +52,7 @@ export default function CreateClubPage() {
     e.preventDefault();
 
     if (!isAuthenticated) {
-      connect({ connector: injected() });
+      setError('Sign in is required before creating a club.');
       return;
     }
 
@@ -161,16 +158,14 @@ export default function CreateClubPage() {
                 <Button
                   type="submit"
                   className="flex-1"
-                  disabled={!formData.name.trim() || isCreating || isConnecting}
+                  disabled={!formData.name.trim() || isCreating}
                 >
                   {isCreating ? 'Creating...' : 'Create Club'}
                 </Button>
               </div>
 
               {!isAuthenticated && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Connect your wallet to create a club.
-                </p>
+                <p className="text-xs text-muted-foreground text-center">Sign in to create a club.</p>
               )}
             </form>
           </CardContent>

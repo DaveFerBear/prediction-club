@@ -391,12 +391,10 @@ async function ensureUsers() {
       where: { walletAddress: user.walletAddress },
       update: {
         email: user.email,
-        polymarketSafeAddress: user.safeAddress,
       },
       create: {
         email: user.email,
         walletAddress: user.walletAddress,
-        polymarketSafeAddress: user.safeAddress,
       },
     });
     results.set(user.walletAddress, record.id);
