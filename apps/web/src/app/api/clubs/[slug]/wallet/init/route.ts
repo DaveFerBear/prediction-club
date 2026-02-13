@@ -31,6 +31,8 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
         walletAddress: wallet.walletAddress,
         isDisabled: wallet.isDisabled,
         createdAt: wallet.createdAt,
+        automationReady:
+          wallet.turnkeyDelegatedUserId.trim().length > 0 && wallet.turnkeyPolicyId.trim().length > 0,
         balance: '0',
       },
     });

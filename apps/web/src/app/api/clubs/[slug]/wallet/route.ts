@@ -30,6 +30,8 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
       select: {
         id: true,
         walletAddress: true,
+        turnkeyDelegatedUserId: true,
+        turnkeyPolicyId: true,
         isDisabled: true,
         createdAt: true,
       },
@@ -53,7 +55,12 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
 
     return apiResponse({
       wallet: {
-        ...wallet,
+        id: wallet.id,
+        walletAddress: wallet.walletAddress,
+        isDisabled: wallet.isDisabled,
+        createdAt: wallet.createdAt,
+        automationReady:
+          wallet.turnkeyDelegatedUserId.trim().length > 0 && wallet.turnkeyPolicyId.trim().length > 0,
         balance,
       },
     });
@@ -68,4 +75,3 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     return serverError();
   }
 }
-

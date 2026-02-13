@@ -8,6 +8,7 @@ export { useUserBalance } from './use-user-balance';
 export { useApplyToClub } from './use-apply-to-club';
 export { useClubBalance } from './use-club-balance';
 export { useClubWallet } from './use-club-wallet';
+export { useClubSetupStatus } from './use-club-setup-status';
 export {
   useClubs,
   usePublicClubs,

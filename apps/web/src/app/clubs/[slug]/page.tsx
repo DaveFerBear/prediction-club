@@ -10,7 +10,7 @@ import {
   useApplyToClub,
   useClubBalance,
   useClub,
-  useClubWallet,
+  useClubSetupStatus,
   useClubApplications,
   usePredictionRounds,
 } from '@/hooks';
@@ -29,6 +29,7 @@ import {
   Input,
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { ClubSetupChecklist } from '@/components/club-setup-checklist';
 import { CopyableAddress } from '@/components/copyable-address';
 import { StatTile } from '@/components/stat-tile';
 import { Activity, Layers, Minus, Sigma, TrendingDown, TrendingUp, Users } from 'lucide-react';
@@ -73,14 +74,10 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const isMember =
     !!address &&
     members.some((member) => member.user.walletAddress.toLowerCase() === address.toLowerCase());
-  const {
-    wallet: clubWallet,
-    isLoading: walletLoading,
-    initWallet,
-    refreshWallet,
-    isInitializing: walletInitializing,
-    initError: walletInitError,
-  } = useClubWallet(isMember ? params.slug : undefined);
+  const setup = useClubSetupStatus({
+    slug: params.slug,
+    isMember,
+  });
 
   // ---- stats formatting (page responsibility) ----
   const activeVolumeText = `$${formatUsdAmount(club?.activeCommittedVolume ?? '0')}`;
@@ -268,47 +265,21 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         {isMember && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Your Club Wallet</CardTitle>
-              <CardDescription>Wallet used for your activity in this club.</CardDescription>
+              <CardTitle>Your Club Setup</CardTitle>
+              <CardDescription>Wallet and automation status for this club.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {walletLoading ? <p className="text-sm text-muted-foreground">Loading wallet...</p> : null}
-              {!walletLoading && !clubWallet ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Wallet not initialized yet. Initialize to enable trading.
-                  </p>
-                  <Button size="sm" onClick={() => void initWallet()} disabled={walletInitializing}>
-                    {walletInitializing ? 'Initializing...' : 'Initialize wallet'}
-                  </Button>
-                  {walletInitError ? (
-                    <p className="text-xs text-destructive">{walletInitError.message}</p>
-                  ) : null}
-                </div>
-              ) : null}
-              {clubWallet ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Address</span>
-                    <CopyableAddress address={clubWallet.walletAddress} variant="compact" />
-                  </div>
-                  <div className="text-sm">
-                    Balance: ${formatUsdAmount(clubWallet.balance)} USDC
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => void refreshWallet()}>
-                      Refresh
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => void handleRequestWithdraw()}>
-                      Withdraw
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Top up by sending USDC to this wallet address.
-                  </p>
-                  {withdrawMessage ? <p className="text-xs text-muted-foreground">{withdrawMessage}</p> : null}
-                </div>
-              ) : null}
+            <CardContent>
+              <ClubSetupChecklist
+                steps={setup.steps}
+                wallet={setup.wallet}
+                canInitializeWallet={setup.authenticated && isMember && !setup.wallet}
+                isInitializingWallet={setup.walletInitializing}
+                walletInitError={setup.walletInitError}
+                onInitializeWallet={setup.initWallet}
+                onRefreshWallet={setup.refreshWallet}
+                onWithdraw={handleRequestWithdraw}
+                withdrawMessage={withdrawMessage}
+              />
             </CardContent>
           </Card>
         )}

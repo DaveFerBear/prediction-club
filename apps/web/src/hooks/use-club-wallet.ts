@@ -9,10 +9,13 @@ type ClubWalletPayload = {
     id: string;
     walletAddress: string;
     isDisabled: boolean;
+    automationReady: boolean;
     createdAt: string;
     balance: string;
   } | null;
 };
+
+export type ClubWalletSummary = NonNullable<ClubWalletPayload['wallet']>;
 
 const clubWalletKey = (slug: string) => `/api/clubs/${slug}/wallet`;
 
