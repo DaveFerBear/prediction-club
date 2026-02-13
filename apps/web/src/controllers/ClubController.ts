@@ -1,6 +1,5 @@
 import { prisma } from '@prediction-club/db';
 import { slugify } from '@prediction-club/shared';
-import { ClubWalletController, ClubWalletError } from './ClubWalletController';
 
 export interface CreateClubInput {
   name: string;
@@ -75,44 +74,26 @@ export class ClubController {
       throw new ClubError('SLUG_TAKEN', 'This club slug is already taken');
     }
 
-    let club;
-    try {
-      club = await prisma.$transaction(async (tx) => {
-        const createdClub = await tx.club.create({
-          data: {
-            name,
-            slug,
-            description,
-            isPublic,
-            createdByUserId: userId,
-            members: {
-              create: {
-                userId,
-                role: 'ADMIN',
-                status: 'ACTIVE',
-              },
+    return prisma.$transaction(async (tx) => {
+      const createdClub = await tx.club.create({
+        data: {
+          name,
+          slug,
+          description,
+          isPublic,
+          createdByUserId: userId,
+          members: {
+            create: {
+              userId,
+              role: 'ADMIN',
+              status: 'ACTIVE',
             },
           },
-        });
-
-        await ClubWalletController.ensureClubWallet(
-          {
-            clubId: createdClub.id,
-            userId,
-          },
-          tx
-        );
-
-        return createdClub;
+        },
       });
-    } catch (error) {
-      if (error instanceof ClubWalletError) {
-        throw new ClubError(error.code, error.message);
-      }
-      throw error;
-    }
 
-    return club;
+      return createdClub;
+    });
   }
 
   /**

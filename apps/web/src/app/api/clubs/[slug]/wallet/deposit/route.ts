@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createPublicClient, decodeFunctionData, erc20Abi, http } from 'viem';
-import { polygon, polygonAmoy } from 'viem/chains';
+import { decodeFunctionData, erc20Abi } from 'viem';
 import { z } from 'zod';
 import { ClubController, ClubError, LedgerController } from '@/controllers';
 import {
@@ -13,7 +12,7 @@ import {
   validationError,
 } from '@/lib/api';
 import { AuthError, requireAuth } from '@/lib/auth';
-import { POLYMARKET_CHAIN_ID, getUsdcTokenAddress } from '@/lib/polymarket';
+import { POLYMARKET_CHAIN_ID, createPolymarketPublicClient, getUsdcTokenAddress } from '@/lib/polymarket';
 import { prisma } from '@prediction-club/db';
 
 const txHashPattern = /^0x[a-fA-F0-9]{64}$/;
@@ -35,26 +34,6 @@ function normalizeAddress(address: string): `0x${string}` {
   return address.toLowerCase() as `0x${string}`;
 }
 
-function createChainClient() {
-  if (POLYMARKET_CHAIN_ID === polygon.id) {
-    const rpcUrl = process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
-    return createPublicClient({
-      chain: polygon,
-      transport: rpcUrl ? http(rpcUrl) : http(),
-    });
-  }
-
-  if (POLYMARKET_CHAIN_ID === polygonAmoy.id) {
-    const rpcUrl = process.env.NEXT_PUBLIC_AMOY_RPC_URL;
-    return createPublicClient({
-      chain: polygonAmoy,
-      transport: rpcUrl ? http(rpcUrl) : http(),
-    });
-  }
-
-  throw new Error(`Unsupported chain id ${POLYMARKET_CHAIN_ID}`);
-}
-
 async function verifyDepositTransfer(input: {
   txHash: string;
   amount: string;
@@ -65,7 +44,7 @@ async function verifyDepositTransfer(input: {
     throw new Error('USDC token address is not configured for this chain');
   }
 
-  const publicClient = createChainClient();
+  const publicClient = createPolymarketPublicClient();
   const txHash = input.txHash as `0x${string}`;
   const [transaction, receipt] = await Promise.all([
     publicClient.getTransaction({ hash: txHash }),

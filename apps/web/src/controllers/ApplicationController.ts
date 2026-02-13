@@ -1,6 +1,5 @@
 import { prisma } from '@prediction-club/db';
 import { ClubController } from './ClubController';
-import { ClubWalletController, ClubWalletError } from './ClubWalletController';
 
 export interface ApplyInput {
   clubSlug: string;
@@ -180,40 +179,25 @@ export class ApplicationController {
       throw new ApplicationError('INVALID_STATUS', 'Application is not pending');
     }
 
-    try {
-      const result = await prisma.$transaction(async (tx) => {
-        const updatedApplication = await tx.application.update({
-          where: { id: applicationId },
-          data: { status: 'APPROVED' },
-        });
-
-        const membership = await tx.clubMember.create({
-          data: {
-            clubId: club.id,
-            userId: application.userId,
-            role: 'MEMBER',
-            status: 'ACTIVE',
-          },
-        });
-
-        await ClubWalletController.ensureClubWallet(
-          {
-            clubId: club.id,
-            userId: application.userId,
-          },
-          tx
-        );
-
-        return { updatedApplication, membership };
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedApplication = await tx.application.update({
+        where: { id: applicationId },
+        data: { status: 'APPROVED' },
       });
 
-      return { application: result.updatedApplication, membership: result.membership };
-    } catch (error) {
-      if (error instanceof ClubWalletError) {
-        throw new ApplicationError(error.code, error.message);
-      }
-      throw error;
-    }
+      const membership = await tx.clubMember.create({
+        data: {
+          clubId: club.id,
+          userId: application.userId,
+          role: 'MEMBER',
+          status: 'ACTIVE',
+        },
+      });
+
+      return { updatedApplication, membership };
+    });
+
+    return { application: result.updatedApplication, membership: result.membership };
   }
 }
 

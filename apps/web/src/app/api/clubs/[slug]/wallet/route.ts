@@ -8,6 +8,7 @@ import {
   unauthorizedError,
 } from '@/lib/api';
 import { AuthError, requireAuth } from '@/lib/auth';
+import { getClubWalletTradingStatus } from '@/lib/club-wallet-trading';
 import { prisma } from '@prediction-club/db';
 
 export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
@@ -30,8 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
       select: {
         id: true,
         walletAddress: true,
-        turnkeyDelegatedUserId: true,
-        turnkeyPolicyId: true,
+        turnkeyWalletAccountId: true,
         isDisabled: true,
         createdAt: true,
       },
@@ -53,14 +53,24 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     });
     const balance = ledgerEntries.reduce((sum, entry) => sum + BigInt(entry.amount), 0n).toString();
 
+    let tradingReady = false;
+    try {
+      const tradingStatus = await getClubWalletTradingStatus({
+        walletAddress: wallet.walletAddress,
+      });
+      tradingReady = tradingStatus.ready;
+    } catch (error) {
+      console.warn('Unable to load club wallet trading status:', error);
+    }
+
     return apiResponse({
       wallet: {
         id: wallet.id,
         walletAddress: wallet.walletAddress,
         isDisabled: wallet.isDisabled,
+        turnkeyWalletAccountId: wallet.turnkeyWalletAccountId,
         createdAt: wallet.createdAt,
-        automationReady:
-          wallet.turnkeyDelegatedUserId.trim().length > 0 && wallet.turnkeyPolicyId.trim().length > 0,
+        automationReady: tradingReady,
         balance,
       },
     });

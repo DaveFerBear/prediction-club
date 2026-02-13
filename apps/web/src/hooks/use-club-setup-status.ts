@@ -61,9 +61,9 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
     id: 'automation',
     label: 'Automation authorized',
     hint: automationReady
-      ? 'Delegated trading policy is attached.'
+      ? 'USDC and CTF approvals are active for Polymarket.'
       : walletReady
-        ? 'Provisioning delegated signer and policy.'
+        ? 'Enable trading to approve Polymarket contracts.'
         : 'Requires club wallet first.',
     active: authenticated && input.isMember && walletReady,
     status:
@@ -102,8 +102,10 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
     walletLoading: walletState.isLoading,
     walletInitializing: walletState.isInitializing,
     walletInitError: walletState.initError,
+    walletEnableTradingError: walletState.enableTradingError,
     initWallet: walletState.initWallet,
+    enableTrading: walletState.enableTrading,
     refreshWallet: walletState.refreshWallet,
+    walletTradingEnabling: walletState.isEnablingTrading,
   };
 }
-

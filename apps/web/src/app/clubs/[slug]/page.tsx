@@ -119,6 +119,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [withdrawMessage, setWithdrawMessage] = useState<string | null>(null);
+  const [enableTradingMessage, setEnableTradingMessage] = useState<string | null>(null);
 
   const {
     applications,
@@ -187,6 +188,20 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
       setWithdrawMessage('Withdrawal requested.');
     } catch (err) {
       setWithdrawMessage(err instanceof Error ? err.message : 'Unable to request withdrawal.');
+    }
+  };
+
+  const handleEnableTrading = async () => {
+    setEnableTradingMessage(null);
+    try {
+      const txHashes = await setup.enableTrading();
+      if (txHashes.length === 0) {
+        setEnableTradingMessage('Trading approvals were already active.');
+        return;
+      }
+      setEnableTradingMessage(`Submitted ${txHashes.length} approval transaction(s).`);
+    } catch (err) {
+      setEnableTradingMessage(err instanceof Error ? err.message : 'Unable to enable trading.');
     }
   };
 
@@ -276,12 +291,40 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Your Club Setup</CardTitle>
-              <CardDescription>Wallet and automation status for this club.</CardDescription>
+              <CardDescription>Wallet and trading readiness for this club.</CardDescription>
             </CardHeader>
             <CardContent>
               <ClubSetupChecklist
                 steps={setup.steps}
               />
+              {setup.wallet && !setup.wallet.automationReady ? (
+                <div className="mt-4 rounded-md border p-3">
+                  <p className="text-sm">
+                    Enable trading submits one-time approval transactions from your Turnkey club
+                    wallet. No browser signature is required.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => void handleEnableTrading()}
+                      disabled={setup.walletTradingEnabling}
+                    >
+                      {setup.walletTradingEnabling ? 'Enabling...' : 'Enable trading'}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Required once per club wallet.
+                    </span>
+                  </div>
+                  {setup.walletEnableTradingError ? (
+                    <p className="mt-2 text-xs text-destructive">
+                      {setup.walletEnableTradingError.message}
+                    </p>
+                  ) : null}
+                  {enableTradingMessage ? (
+                    <p className="mt-2 text-xs text-muted-foreground">{enableTradingMessage}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         )}

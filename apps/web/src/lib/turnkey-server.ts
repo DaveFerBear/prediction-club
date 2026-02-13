@@ -28,6 +28,8 @@ type OidcIdentity = {
   email?: string;
 };
 
+const TURNKEY_SIGN_ACTIVITY_TYPE = 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2';
+
 class TurnkeyRequestError extends Error {
   constructor(
     message: string,
@@ -247,6 +249,54 @@ function deepFindStringValue(input: unknown, keyName: string): string | null {
   return null;
 }
 
+function deepFindObjectValue(input: unknown, keyName: string): Record<string, unknown> | null {
+  if (!input || typeof input !== 'object') return null;
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const found = deepFindObjectValue(item, keyName);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (key === keyName && value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    const nested = deepFindObjectValue(value, keyName);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function deepFindNumericValue(input: unknown, keyName: string): number | null {
+  if (!input || typeof input !== 'object') return null;
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const found = deepFindNumericValue(item, keyName);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (key === keyName) {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string' && value.trim().length > 0) {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+    const nested = deepFindNumericValue(value, keyName);
+    if (nested !== null) return nested;
+  }
+
+  return null;
+}
+
 function deepFindStringArray(input: unknown, keyName: string): string[] {
   if (!input || typeof input !== 'object') return [];
   if (Array.isArray(input)) {
@@ -271,6 +321,91 @@ function deepFindStringArray(input: unknown, keyName: string): string[] {
     found.push(...deepFindStringArray(value, keyName));
   }
   return found;
+}
+
+function normalizeHex(value: string, expectedLength?: number): `0x${string}` {
+  const raw = value.startsWith('0x') ? value.slice(2) : value;
+  if (!/^[0-9a-fA-F]+$/u.test(raw)) {
+    throw new Error('Invalid hex value in Turnkey signature');
+  }
+  const normalized = expectedLength ? raw.padStart(expectedLength, '0') : raw;
+  return `0x${normalized.toLowerCase()}`;
+}
+
+function extractTurnkeySignature(response: unknown): `0x${string}` {
+  const signRawPayloadResult = deepFindObjectValue(response, 'signRawPayloadResult');
+  if (signRawPayloadResult) {
+    const rRaw = deepFindStringValue(signRawPayloadResult, 'r');
+    const sRaw = deepFindStringValue(signRawPayloadResult, 's');
+    const vRaw = deepFindNumericValue(signRawPayloadResult, 'v');
+
+    if (rRaw && sRaw && vRaw !== null) {
+      const r = normalizeHex(rRaw, 64);
+      const s = normalizeHex(sRaw, 64);
+      const v = vRaw >= 27 ? vRaw : vRaw + 27;
+      const vHex = normalizeHex(v.toString(16), 2).slice(2);
+      return `${r}${s.slice(2)}${vHex}` as `0x${string}`;
+    }
+  }
+
+  const signature = deepFindStringValue(response, 'signature');
+  if (signature && /^(0x)?[0-9a-fA-F]{130}$/u.test(signature)) {
+    return normalizeHex(signature);
+  }
+
+  const rRaw = deepFindStringValue(response, 'r');
+  const sRaw = deepFindStringValue(response, 's');
+  const vRaw = deepFindNumericValue(response, 'v');
+  if (!rRaw || !sRaw || vRaw === null) {
+    throw new Error('Turnkey sign_raw_payload response missing signature fields');
+  }
+  const r = normalizeHex(rRaw, 64);
+  const s = normalizeHex(sRaw, 64);
+  const v = vRaw >= 27 ? vRaw : vRaw + 27;
+  const vHex = normalizeHex(v.toString(16), 2).slice(2);
+  return `${r}${s.slice(2)}${vHex}` as `0x${string}`;
+}
+
+export async function signDigestWithTurnkey(input: {
+  organizationId: string;
+  signWithCandidates: string[];
+  digestHex: string;
+}): Promise<`0x${string}`> {
+  const payloadHex = input.digestHex.startsWith('0x') ? input.digestHex.slice(2) : input.digestHex;
+  let lastError: unknown = null;
+
+  for (const signWith of input.signWithCandidates) {
+    const paramVariants: Array<Record<string, unknown>> = [
+      {
+        signWith,
+        payload: payloadHex,
+        encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+        hashFunction: 'HASH_FUNCTION_NO_OP',
+      },
+      {
+        signWith,
+        payload: `0x${payloadHex}`,
+        encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+        hashFunction: 'HASH_FUNCTION_NO_OP',
+      },
+    ];
+
+    for (const parameters of paramVariants) {
+      try {
+        const response = await turnkeyPost<Record<string, unknown>>('/public/v1/submit/sign_raw_payload', {
+          type: TURNKEY_SIGN_ACTIVITY_TYPE,
+          timestampMs: nowTimestampMs(),
+          organizationId: input.organizationId,
+          parameters,
+        });
+        return extractTurnkeySignature(response);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+
+  throw lastError ?? new Error('Turnkey sign_raw_payload failed');
 }
 
 function parseJwtPayload(token: string): Record<string, unknown> {

@@ -8,6 +8,7 @@ type ClubWalletPayload = {
   wallet: {
     id: string;
     walletAddress: string;
+    turnkeyWalletAccountId: string;
     isDisabled: boolean;
     automationReady: boolean;
     createdAt: string;
@@ -41,6 +42,20 @@ export function useClubWallet(slug?: string) {
     }
   );
 
+  const enableTradingMutation = useSWRMutation<
+    ApiResponse<{ wallet: ClubWalletSummary; txHashes: string[] }>,
+    Error,
+    string | null,
+    void
+  >(slug ? `/api/clubs/${slug}/wallet/enable-trading` : null, (url: string | null) => {
+    if (!url) {
+      throw new Error('Missing club slug');
+    }
+    return fetch<ApiResponse<{ wallet: ClubWalletSummary; txHashes: string[] }>>(url, {
+      method: 'POST',
+    });
+  });
+
   const initWallet = async () => {
     if (!slug) {
       throw new Error('Missing club slug');
@@ -54,13 +69,25 @@ export function useClubWallet(slug?: string) {
     await mutate(clubWalletKey(slug));
   };
 
+  const enableTrading = async () => {
+    if (!slug) {
+      throw new Error('Missing club slug');
+    }
+    const response = await enableTradingMutation.trigger();
+    await mutate(clubWalletKey(slug));
+    return response.data.txHashes ?? [];
+  };
+
   return {
     wallet: query.data?.data?.wallet ?? null,
     isLoading: query.isLoading,
     error: query.error,
     initWallet,
+    enableTrading,
     refreshWallet,
     isInitializing: initMutation.isMutating,
+    isEnablingTrading: enableTradingMutation.isMutating,
     initError: initMutation.error,
+    enableTradingError: enableTradingMutation.error,
   };
 }
