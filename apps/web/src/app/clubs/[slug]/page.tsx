@@ -30,6 +30,7 @@ import {
 } from '@prediction-club/ui';
 import { Header } from '@/components/header';
 import { ClubSetupChecklist } from '@/components/club-setup-checklist';
+import { ClubDepositPopover } from '@/components/club-deposit-popover';
 import { CopyableAddress } from '@/components/copyable-address';
 import { StatTile } from '@/components/stat-tile';
 import { Activity, Layers, Minus, Sigma, TrendingDown, TrendingUp, Users } from 'lucide-react';
@@ -234,12 +235,21 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
             </div>
 
-            {isAdmin ? (
-              <Link href={`/clubs/${club.slug}/predict`}>
-                <Button size="sm">Make prediction</Button>
-              </Link>
-            ) : isMember ? (
-              <Badge variant="secondary">You are a member</Badge>
+            {isMember ? (
+              <div className="flex items-center gap-2">
+                {isAdmin ? (
+                  <Link href={`/clubs/${club.slug}/predict`}>
+                    <Button size="sm">Make prediction</Button>
+                  </Link>
+                ) : (
+                  <Badge variant="secondary">You are a member</Badge>
+                )}
+                <ClubDepositPopover
+                  slug={params.slug}
+                  walletAddress={setup.wallet?.walletAddress ?? null}
+                  canDeposit={setup.authenticated}
+                />
+              </div>
             ) : (
               <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
                 <Input
