@@ -16,12 +16,7 @@ import {
 } from '@prediction-club/ui';
 import { useCreatePrediction } from '@/hooks/use-create-prediction';
 import { usePolymarketMarketData } from '@/hooks/use-polymarket-market-data';
-import {
-  useMarketDetails,
-  useMarketSearch,
-  useClubWallet,
-  type ClubDetail,
-} from '@/hooks';
+import { useMarketDetails, useMarketSearch, useClubWallet, type ClubDetail } from '@/hooks';
 import type { MarketItem } from '@/hooks/use-market-search';
 
 type PredictionFormState = {
@@ -468,7 +463,7 @@ export function ClubPredictionForm({
       });
 
       if (response?.success) {
-        router.push(`/clubs/${clubSlug}#predictions`);
+        router.push(`/clubs/${clubSlug}`);
         return;
       }
 

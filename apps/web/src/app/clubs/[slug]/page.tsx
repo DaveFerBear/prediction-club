@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { formatUsdAmount } from '@prediction-club/shared';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
 import { useSWRConfig } from 'swr';
 import {
   useApi,
@@ -32,8 +32,22 @@ import { Header } from '@/components/header';
 import { ClubSetupChecklist } from '@/components/club-setup-checklist';
 import { ClubDepositPopover } from '@/components/club-deposit-popover';
 import { CopyableAddress } from '@/components/copyable-address';
-import { StatTile } from '@/components/stat-tile';
-import { Activity, Layers, Minus, Sigma, TrendingDown, TrendingUp, Users } from 'lucide-react';
+import { ClubActionPanel } from '@/components/club/ClubActionPanel';
+import { AdminConsoleSection } from '@/components/club/AdminConsoleSection';
+import { ClubHeroPanel } from '@/components/club/ClubHeroPanel';
+import { ClubMetricsPanel } from '@/components/club/ClubMetricsPanel';
+import { ClubTreasuryCard } from '@/components/club/ClubTreasuryCard';
+import { PredictionRoundListItem } from '@/components/club/PredictionRoundListItem';
+
+const clubPageVars = {
+  '--club-bg-accent': 'linear-gradient(135deg, #f7f9fc 0%, #f2f6ff 100%)',
+  '--club-border-strong': '#d7e0f0',
+  '--club-border-soft': '#e7ecf5',
+  '--club-text-primary': '#0f172a',
+  '--club-text-secondary': '#475569',
+  '--club-success': '#15803d',
+  '--club-danger': '#b91c1c',
+} as CSSProperties;
 
 export default function ClubPublicPage({ params }: { params: { slug: string } }) {
   const { fetch: apiFetch, address } = useApi();
@@ -54,7 +68,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const performance = club?.performance ?? null;
   const hasActivity = performance?.hasWindowActivity ?? false;
 
-  // if you later fetch perf separately, wire this up; for now it’s “not loading”.
   const perfLoading = false;
 
   const members = club?.members ?? [];
@@ -80,7 +93,8 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     isMember,
   });
 
-  // ---- stats formatting (page responsibility) ----
+  const membershipLabel = isMember ? (isAdmin ? 'Admin member' : 'Member') : null;
+
   const activeVolumeText = `$${formatUsdAmount(club?.activeCommittedVolume ?? '0')}`;
 
   const returnPct = perfLoading || !hasActivity ? null : (performance?.simpleReturn ?? 0) * 100;
@@ -94,20 +108,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           ? 'down'
           : 'neutral';
 
-  const ReturnIcon =
-    returnTone === 'up' ? TrendingUp : returnTone === 'down' ? TrendingDown : Minus;
-
-  const returnPillClass =
-    returnTone === 'up'
-      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-      : returnTone === 'down'
-        ? 'border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300'
-        : 'border-border/60 bg-muted text-muted-foreground';
-
-  const returnPillLabel =
-    returnTone === 'up' ? 'Up 30d' : returnTone === 'down' ? 'Down 30d' : 'Flat (30d)';
-
-  // ---- edit/apply state ----
   const [clubName, setClubName] = useState('');
   const [clubDescription, setClubDescription] = useState('');
   const [clubPublic, setClubPublic] = useState(false);
@@ -135,6 +135,12 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     setClubDescription(club.description ?? '');
     setClubPublic(club.isPublic);
   }, [club]);
+
+  const nextSetupAction = useMemo(() => {
+    const nextIncomplete = setup.steps.find((step) => step.status !== 'complete');
+    if (!nextIncomplete) return 'Ready for autonomous execution.';
+    return `Next required step: ${nextIncomplete.label}.`;
+  }, [setup.steps]);
 
   const handleSaveClub = async (event: FormEvent) => {
     event.preventDefault();
@@ -219,274 +225,143 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     );
   }
 
+  const heroExposureContent = balanceLoading ? (
+    <div className="py-8 text-sm text-[color:var(--club-text-secondary)]">Loading exposure...</div>
+  ) : exposureSeries.length === 0 ? (
+    <div className="py-8 text-sm text-[color:var(--club-text-secondary)]">No activity yet to chart.</div>
+  ) : (
+    <ChartExposure data={exposureSeries} showHeader={false} showFooter={false} compact seamless />
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container py-8">
-        {/* Club Header + Primary Action */}
-        <div className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-3xl font-bold">{club.name}</h1>
-              <Badge variant="secondary">{club.isPublic ? 'Public' : 'Private'}</Badge>
-              {isMember ? (
-                <Badge variant="outline">{isAdmin ? 'Admin member' : 'Member'}</Badge>
-              ) : null}
-            </div>
-            <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
-          </div>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>{isMember ? 'Next action' : 'Join this club'}</CardTitle>
-              <CardDescription>
-                {isMember
-                  ? 'Use your club treasury to participate in autonomous trading rounds.'
-                  : 'Apply to join this club and start participating in rounds.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {isMember ? (
-                <>
-                  <p className="text-xs text-muted-foreground">
-                    {setup.ready
-                      ? 'Treasury is funded and ready for autonomous execution.'
-                      : 'Complete setup and funding to become trading-ready.'}
-                  </p>
-                  {isAdmin ? (
+      <main className="container space-y-8 py-8" style={clubPageVars}>
+        <ClubHeroPanel
+          clubName={club.name}
+          description={club.description || 'No description'}
+          isPublic={club.isPublic}
+          membershipLabel={membershipLabel}
+          descriptionContent={heroExposureContent}
+          actionPanel={
+            isMember ? (
+              <ClubActionPanel
+                title="Next action"
+                description="Use your club treasury to participate in autonomous trading rounds."
+                helperText={
+                  setup.ready
+                    ? 'Treasury is funded and ready for autonomous execution.'
+                    : 'Complete setup and funding to become trading-ready.'
+                }
+                primaryAction={
+                  isAdmin ? (
                     <Link href={`/clubs/${club.slug}/predict`} className="block">
                       <Button className="w-full">Make prediction</Button>
                     </Link>
-                  ) : null}
-                  <ClubDepositPopover
-                    slug={params.slug}
-                    walletAddress={setup.wallet?.walletAddress ?? null}
-                    canDeposit={setup.authenticated}
-                    triggerLabel="Deposit into club"
-                    triggerVariant={isAdmin ? 'outline' : 'default'}
-                    triggerSize={isAdmin ? 'sm' : 'default'}
-                    triggerClassName="w-full justify-center"
-                  />
-                </>
-              ) : (
-                <>
-                  <Input
-                    value={applyMessage}
-                    onChange={(e) => setApplyMessage(e.target.value)}
-                    placeholder="Message (optional)"
-                    className="h-9 bg-muted text-sm"
-                  />
+                  ) : (
+                    <ClubDepositPopover
+                      slug={params.slug}
+                      walletAddress={setup.wallet?.walletAddress ?? null}
+                      canDeposit={setup.authenticated}
+                      triggerLabel="Deposit into club"
+                      triggerVariant="default"
+                      triggerSize="default"
+                      triggerClassName="w-full justify-center"
+                    />
+                  )
+                }
+                secondaryAction={
+                  isAdmin ? (
+                    <ClubDepositPopover
+                      slug={params.slug}
+                      walletAddress={setup.wallet?.walletAddress ?? null}
+                      canDeposit={setup.authenticated}
+                      triggerLabel="Deposit into club"
+                      triggerVariant="outline"
+                      triggerSize="sm"
+                      triggerClassName="w-full justify-center"
+                    />
+                  ) : undefined
+                }
+              />
+            ) : (
+              <ClubActionPanel
+                title="Join this club"
+                description="Apply to join this club and start participating in rounds."
+                primaryAction={
                   <Button type="button" onClick={handleApply} disabled={isApplying} className="w-full">
                     {isApplying ? 'Submitting...' : 'Apply to Join'}
                   </Button>
-                  {!isUserAuthenticated ? (
-                    <p className="text-xs text-muted-foreground">Sign in to apply.</p>
-                  ) : null}
-                  {applySuccess ? <p className="text-xs text-emerald-600">{applySuccess}</p> : null}
-                  {applyError ? <p className="text-xs text-destructive">{applyError}</p> : null}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                }
+              >
+                <Input
+                  value={applyMessage}
+                  onChange={(e) => setApplyMessage(e.target.value)}
+                  placeholder="Message (optional)"
+                  className="h-9 bg-muted text-sm"
+                />
+                {!isUserAuthenticated ? (
+                  <p className="text-xs text-muted-foreground">Sign in to apply.</p>
+                ) : null}
+                {applySuccess ? <p className="text-xs text-emerald-600">{applySuccess}</p> : null}
+                {applyError ? <p className="text-xs text-destructive">{applyError}</p> : null}
+              </ClubActionPanel>
+            )
+          }
+        />
 
-        {/* Stats (designed) */}
-        {isMember && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Your Club Setup</CardTitle>
-              <CardDescription>
-                Keep this setup unchanged while you progress from sign-in to trading readiness.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ClubSetupChecklist steps={setup.steps} />
-            </CardContent>
-          </Card>
-        )}
+        {isMember ? (
+          <section className="grid gap-4 lg:grid-cols-2">
+            <Card className="h-full border-[color:var(--club-border-soft)] shadow-sm">
+              <CardHeader>
+                <CardTitle>Your Club Setup</CardTitle>
+                <CardDescription>
+                  Keep this setup unchanged while you progress from sign-in to trading readiness.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="rounded-lg border border-[color:var(--club-border-soft)] bg-white px-3 py-2 text-sm text-[color:var(--club-text-secondary)]">
+                  {nextSetupAction}
+                </p>
+                <ClubSetupChecklist steps={setup.steps} />
+              </CardContent>
+            </Card>
 
-        {isMember && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Club Treasury</CardTitle>
-              <CardDescription>
-                Safe address, treasury balance, and wallet actions for this club.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {setup.wallet ? (
-                <div className="rounded-md border p-3 text-sm">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Treasury Safe</span>
-                      {setup.wallet.walletAddress ? (
-                        <CopyableAddress address={setup.wallet.walletAddress} variant="compact" />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Provisioning in progress
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Treasury balance</span>{' '}
-                      <span className="font-medium">
-                        ${formatUsdAmount(setup.wallet.balance)} USDC
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => void setup.refreshWallet()}>
-                      Refresh
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void handleRequestWithdraw()}
-                    >
-                      Withdraw
-                    </Button>
-                    <span className="text-xs text-muted-foreground">
-                      Use the Deposit into club action above to top up treasury.
-                    </span>
-                  </div>
-                  {setup.wallet.provisioningStatus === 'FAILED' ? (
-                    <p className="mt-2 text-xs text-destructive">
-                      {setup.wallet.provisioningError ??
-                        'Wallet provisioning failed. Retry initialize wallet.'}
-                    </p>
-                  ) : null}
-                  {withdrawMessage ? (
-                    <p className="mt-2 text-xs text-muted-foreground">{withdrawMessage}</p>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Initialize a per-club wallet to begin funding and trading.
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={() => void setup.initWallet()}
-                    disabled={setup.walletInitializing}
-                  >
-                    {setup.walletInitializing ? 'Initializing...' : 'Initialize wallet'}
-                  </Button>
-                  {setup.walletInitError ? (
-                    <p className="text-xs text-destructive">{setup.walletInitError.message}</p>
-                  ) : null}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="mb-8 grid gap-4 md:grid-cols-5">
-          {/* Primary: Active Volume */}
-          <div>
-            <StatTile
-              label="USDC in active rounds"
-              icon={Sigma}
-              emphasize
-              value={<span>{activeVolumeText}</span>}
-              subValue={<span className="text-muted-foreground">Committed capital</span>}
+            <ClubTreasuryCard
+              wallet={setup.wallet}
+              onInitWallet={setup.initWallet}
+              onRefreshWallet={setup.refreshWallet}
+              onWithdraw={handleRequestWithdraw}
+              walletInitializing={setup.walletInitializing}
+              walletInitError={setup.walletInitError}
+              withdrawMessage={withdrawMessage}
             />
-          </div>
+          </section>
+        ) : null}
 
-          {/* Primary: 30d Return */}
-          <div>
-            <StatTile
-              label="30d Return"
-              icon={Activity}
-              emphasize
-              value={
-                perfLoading ? (
-                  '—'
-                ) : !hasActivity ? (
-                  <span className="text-muted-foreground">—</span>
-                ) : (
-                  <span className="tabular-nums">{returnPct!.toFixed(1)}%</span>
-                )
-              }
-              right={null}
-              subValue={
-                <span
-                  className={[
-                    'inline-flex items-center gap-1.5 rounded-full border px-2 py-1',
-                    'text-xs font-medium',
-                    returnPillClass,
-                  ].join(' ')}
-                >
-                  <ReturnIcon className="h-3.5 w-3.5" />
-                  {perfLoading ? '—' : returnPillLabel}
-                </span>
-              }
-            />
-          </div>
-
-          {/* Secondary */}
-          <div>
-            <StatTile
-              label="Members"
-              icon={Users}
-              value={club._count.members}
-              subValue={<span>Active participants</span>}
-            />
-          </div>
-
-          <div>
-            <StatTile
-              label="Active Predictions"
-              icon={Layers}
-              value={activePredictionRounds.length}
-              subValue={<span>Open rounds</span>}
-            />
-          </div>
-
-          <div>
-            <StatTile
-              label="Total Predictions"
-              icon={Layers}
-              value={club._count.predictionRounds}
-              subValue={<span>All-time</span>}
-            />
-          </div>
-        </div>
+        <ClubMetricsPanel
+          activeVolumeText={activeVolumeText}
+          returnPct={returnPct}
+          perfLoading={perfLoading}
+          hasActivity={hasActivity}
+          returnTone={returnTone}
+          membersCount={club._count.members}
+          activePredictionsCount={activePredictionRounds.length}
+          totalPredictionsCount={club._count.predictionRounds}
+        />
 
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Performance + Predictions */}
-          <div className="lg:col-span-2 space-y-6">
-            <div>
-              <h2 className="mb-4 text-xl font-semibold">Club Performance</h2>
-              {balanceLoading ? (
-                <Card>
-                  <CardContent className="py-8 text-center">
-                    <p className="text-muted-foreground">Loading exposure...</p>
-                  </CardContent>
-                </Card>
-              ) : exposureSeries.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center">
-                    <p className="text-muted-foreground">No activity yet to chart.</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <ChartExposure
-                  title="Treasury vs In-Market"
-                  description="All-time"
-                  data={exposureSeries}
-                  footerText="Treasury + open market positions"
-                  footerSubtext="Based on ledger entries for this club"
-                />
-              )}
-            </div>
-
-            <div className="scroll-mt-24">
-              <h2 className="mb-4 text-xl font-semibold">Predictions</h2>
+          <div className="space-y-6 lg:col-span-2">
+            <section>
+              <h2 className="mb-4 text-2xl font-semibold text-[color:var(--club-text-primary)]">
+                Predictions
+              </h2>
               {predictionRounds.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center">
-                    <p className="text-muted-foreground">No predictions yet</p>
+                <Card className="border-[color:var(--club-border-soft)] shadow-sm">
+                  <CardContent className="py-10 text-center">
+                    <div className="text-4xl">📈</div>
+                    <p className="mt-3 text-muted-foreground">No predictions yet</p>
                     {isAdmin ? (
                       <Link href={`/clubs/${club.slug}/predict`} className="mt-4 inline-block">
                         <Button size="sm">Make first prediction</Button>
@@ -497,49 +372,21 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               ) : (
                 <div className="space-y-4">
                   {predictionRounds.map((predictionRound) => (
-                    <Card key={predictionRound.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg">
-                            {predictionRound.marketTitle || 'Untitled Market'}
-                          </CardTitle>
-                          <Badge
-                            variant={
-                              predictionRound.status === 'COMMITTED' ||
-                              predictionRound.status === 'PENDING'
-                                ? 'default'
-                                : 'secondary'
-                            }
-                          >
-                            {predictionRound.status}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Total Stake</span>
-                          <span>${formatUsdAmount(predictionRound.stakeTotal)} USDC</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Participants</span>
-                          <span>{predictionRound._count.members}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Created</span>
-                          <span>{new Date(predictionRound.createdAt).toLocaleDateString()}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <PredictionRoundListItem
+                      key={predictionRound.id}
+                      round={predictionRound}
+                      clubSlug={club.slug}
+                      isAdmin={isAdmin}
+                    />
                   ))}
                 </div>
               )}
-            </div>
+            </section>
           </div>
 
-          {/* Members */}
-          <div>
-            <h2 className="mb-4 text-xl font-semibold">Members</h2>
-            <Card>
+          <section>
+            <h2 className="mb-4 text-2xl font-semibold text-[color:var(--club-text-primary)]">Members</h2>
+            <Card className="border-[color:var(--club-border-soft)] bg-white shadow-sm">
               <CardContent className="py-4">
                 {club.members.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No members yet</p>
@@ -553,106 +400,44 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                           </AvatarFallback>
                         </Avatar>
 
-                        <div className="flex-1">
+                        <div className="min-w-0 flex-1">
                           <CopyableAddress address={member.user.walletAddress} variant="compact" />
-                          {member.user.email && (
-                            <p className="text-xs text-muted-foreground">{member.user.email}</p>
-                          )}
+                          {member.user.email ? (
+                            <p className="truncate text-xs text-muted-foreground">{member.user.email}</p>
+                          ) : null}
                         </div>
 
-                        {member.role === 'ADMIN' && (
+                        {member.role === 'ADMIN' ? (
                           <Badge variant="outline" className="text-xs">
                             Admin
                           </Badge>
-                        )}
+                        ) : null}
                       </div>
                     ))}
                   </div>
                 )}
               </CardContent>
             </Card>
-          </div>
+          </section>
         </div>
 
-        {isAdmin && (
-          <div className="mt-10 space-y-8">
-            <div>
-              <h2 className="text-xl font-semibold">Admin</h2>
-              <p className="text-sm text-muted-foreground">
-                Review member access and update club settings.
-              </p>
-            </div>
-            <div className="grid gap-8 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Pending Applications</CardTitle>
-                  <CardDescription>Approve new members.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {appsLoading ? (
-                    <p className="text-sm text-muted-foreground">Loading applications...</p>
-                  ) : appsError ? (
-                    <p className="text-sm text-destructive">{appsError.message}</p>
-                  ) : applications.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No pending applications.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {applications.map((app) => (
-                        <div key={app.id} className="rounded-lg border p-4">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-medium">
-                                {app.user.email || (
-                                  <CopyableAddress
-                                    address={app.user.walletAddress}
-                                    variant="inline"
-                                  />
-                                )}
-                              </p>
-                              {app.user.email && (
-                                <CopyableAddress
-                                  address={app.user.walletAddress}
-                                  variant="compact"
-                                  className="text-muted-foreground"
-                                />
-                              )}
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(app.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-
-                          {app.message && (
-                            <p className="mt-2 text-sm text-muted-foreground">
-                              &ldquo;{app.message}&rdquo;
-                            </p>
-                          )}
-
-                          <div className="mt-3 flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => approve(app.id)}
-                              disabled={approvingId === app.id}
-                            >
-                              {approvingId === app.id ? 'Approving...' : 'Approve'}
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
+        {isAdmin ? (
+          <AdminConsoleSection
+            applications={applications}
+            appsLoading={appsLoading}
+            appsError={appsError ?? undefined}
+            approvingId={approvingId}
+            onApprove={approve}
+            settingsPanel={
+              <Card className="border-[color:var(--club-border-soft)] bg-white shadow-sm">
                 <CardHeader>
                   <CardTitle>Edit Club Details</CardTitle>
                   <CardDescription>Update name, description, and visibility.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSaveClub} className="space-y-4">
-                    {clubSaveError && <p className="text-sm text-destructive">{clubSaveError}</p>}
-                    {clubSaveSuccess && <p className="text-sm text-green-600">{clubSaveSuccess}</p>}
+                    {clubSaveError ? <p className="text-sm text-destructive">{clubSaveError}</p> : null}
+                    {clubSaveSuccess ? <p className="text-sm text-green-600">{clubSaveSuccess}</p> : null}
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Club name</label>
@@ -683,9 +468,9 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   </form>
                 </CardContent>
               </Card>
-            </div>
-          </div>
-        )}
+            }
+          />
+        ) : null}
       </main>
     </div>
   );
