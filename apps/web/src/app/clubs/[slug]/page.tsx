@@ -28,6 +28,7 @@ import {
   AvatarFallback,
   Input,
 } from '@prediction-club/ui';
+import { CheckCircle2 } from 'lucide-react';
 import { Header } from '@/components/header';
 import { ClubSetupChecklist } from '@/components/club-setup-checklist';
 import { ClubDepositPopover } from '@/components/club-deposit-popover';
@@ -322,13 +323,19 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           <section className="grid gap-4 lg:grid-cols-2">
             <Card className="h-full border-[color:var(--club-border-soft)] shadow-sm">
               <CardHeader>
-                <CardTitle>Your Club Setup</CardTitle>
-                <CardDescription>
-                  Keep this setup unchanged while you progress from sign-in to trading readiness.
-                </CardDescription>
+                <CardTitle className="flex items-center gap-3">
+                  <span>Your Club Setup</span>
+                  {setup.ready ? (
+                    <CheckCircle2
+                      className="h-7 w-7 text-[color:var(--club-success)]"
+                      aria-label="Setup complete"
+                    />
+                  ) : null}
+                </CardTitle>
+                <CardDescription>Complete this checklist to enable autonomous trading.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="rounded-lg border border-[color:var(--club-border-soft)] bg-white px-3 py-2 text-sm text-[color:var(--club-text-secondary)]">
+                <p className="rounded-lg border border-[color:var(--club-border-soft)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--club-text-primary)]">
                   {nextSetupAction}
                 </p>
                 <ClubSetupChecklist steps={setup.steps} />
