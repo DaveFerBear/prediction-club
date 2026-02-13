@@ -20,6 +20,7 @@ const POLY_BUILDER_SECRET = process.env.POLY_BUILDER_SECRET || '';
 const POLY_BUILDER_PASSPHRASE = process.env.POLY_BUILDER_PASSPHRASE || '';
 const DEBUG_TURNKEY = process.env.CHAINWORKER_DEBUG_TURNKEY === 'true';
 const TURNKEY_SIGN_ACTIVITY_TYPE = 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2';
+const POLYMARKET_SAFE_SIGNATURE_TYPE = 2; // SignatureType.POLY_GNOSIS_SAFE
 
 type UserCreds = {
   key: string;
@@ -643,7 +644,7 @@ export class PolymarketController {
       POLYMARKET_CHAIN_ID,
       params.signer as never,
       params.creds,
-      undefined,
+      POLYMARKET_SAFE_SIGNATURE_TYPE,
       params.funderAddress,
       undefined,
       undefined,
