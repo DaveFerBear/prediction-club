@@ -384,6 +384,23 @@ async function listUsers(organizationId: string): Promise<TurnkeyUser[]> {
   return response.users ?? [];
 }
 
+function selectEndUser(users: TurnkeyUser[], email?: string): TurnkeyUser | null {
+  if (users.length === 0) return null;
+
+  if (email) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const emailMatch = users.find(
+      (user) => user.userEmail?.trim().toLowerCase() === normalizedEmail
+    );
+    if (emailMatch) return emailMatch;
+  }
+
+  const emailBackedUser = users.find((user) => typeof user.userEmail === 'string');
+  if (emailBackedUser) return emailBackedUser;
+
+  return users[0];
+}
+
 async function listWalletAccounts(organizationId: string): Promise<TurnkeyWalletAccount[]> {
   const response = await turnkeyPost<{ accounts?: TurnkeyWalletAccount[] }>(
     '/public/v1/query/list_wallet_accounts',
@@ -447,7 +464,8 @@ export async function resolveTurnkeyIdentityFromOidcToken(
   }
 
   const users = await listUsers(turnkeySubOrgId);
-  const turnkeyEndUserId = users[0]?.userId;
+  const selectedUser = selectEndUser(users, email);
+  const turnkeyEndUserId = selectedUser?.userId;
   if (!turnkeyEndUserId) {
     throw new Error('Turnkey sub-organization does not contain a user');
   }

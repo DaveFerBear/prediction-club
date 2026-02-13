@@ -65,7 +65,13 @@ export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' 
               {address.slice(0, 6)}...{address.slice(-4)}
             </span>
           )}
-          <ProfileDropdownMenu />
+          {isAuthenticated ? (
+            <ProfileDropdownMenu />
+          ) : (
+            <Link href="/profile">
+              <Button size="sm">Sign in</Button>
+            </Link>
+          )}
         </nav>
       </div>
     </header>
