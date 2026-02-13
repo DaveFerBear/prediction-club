@@ -11,9 +11,28 @@ import {
 } from '@prediction-club/ui';
 import { useApi, useAppSession } from '@/hooks';
 
+function hashString(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function gradientFromEmail(email: string | null | undefined): string {
+  const normalized = (email ?? 'guest').trim().toLowerCase();
+  const hash = hashString(normalized);
+  const hueA = hash % 360;
+  const hueB = (hash >>> 9) % 360;
+  const angle = (hash >>> 18) % 360;
+  return `linear-gradient(${angle}deg, hsl(${hueA} 78% 56%), hsl(${hueB} 72% 48%))`;
+}
+
 export function ProfileDropdownMenu() {
   const { fetch: apiFetch } = useApi();
-  const { authenticated, refreshSession } = useAppSession();
+  const { authenticated, user, refreshSession } = useAppSession();
+  const avatarGradient = gradientFromEmail(user?.email);
 
   const handleSignOut = async () => {
     await apiFetch('/api/auth/logout', { method: 'POST' });
@@ -38,9 +57,24 @@ export function ProfileDropdownMenu() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64 p-2">
-          <DropdownMenuItem asChild>
-            <Link href="/profile">Profile</Link>
-          </DropdownMenuItem>
+          {authenticated && (
+            <>
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <div
+                  aria-hidden="true"
+                  className="h-8 w-8 shrink-0 rounded-full border border-border"
+                  style={{ backgroundImage: avatarGradient }}
+                />
+                <div className="min-w-0 text-sm font-medium text-foreground">
+                  <p className="truncate">{user?.email ?? 'No email'}</p>
+                </div>
+              </Link>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem asChild>
             <Link href="/dashboard">My clubs</Link>
           </DropdownMenuItem>

@@ -1,6 +1,7 @@
 import { BuilderConfig } from '@polymarket/builder-signing-sdk';
 import { ClobClient, OrderType, Side } from '@polymarket/clob-client';
-import { Wallet } from 'ethers';
+import { createPrivateKey, createSign } from 'crypto';
+import { utils } from 'ethers';
 import type {
   RoundMember,
   MemberPayout,
@@ -11,16 +12,34 @@ import type {
 const POLYMARKET_CLOB_URL = process.env.POLYMARKET_CLOB_URL || 'https://clob.polymarket.com';
 const POLYMARKET_CHAIN_ID = Number(process.env.POLYMARKET_CHAIN_ID ?? 137);
 const ALLOW_ZERO_PAYOUTS = process.env.CHAINWORKER_ALLOW_ZERO_PAYOUTS === 'true';
-const CHAINWORKER_SIGNER_KEY = process.env.CHAINWORKER_SIGNER_PRIVATE_KEY || '';
+const TURNKEY_BASE_URL = process.env.TURNKEY_API_BASE_URL || 'https://api.turnkey.com';
+const TURNKEY_API_PUBLIC_KEY = process.env.TURNKEY_API_PUBLIC_KEY;
+const TURNKEY_API_PRIVATE_KEY = process.env.TURNKEY_API_PRIVATE_KEY;
 const POLY_BUILDER_API_KEY = process.env.POLY_BUILDER_API_KEY || '';
 const POLY_BUILDER_SECRET = process.env.POLY_BUILDER_SECRET || '';
 const POLY_BUILDER_PASSPHRASE = process.env.POLY_BUILDER_PASSPHRASE || '';
+const TURNKEY_SIGN_ACTIVITY_TYPES = [
+  'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2',
+  'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD',
+] as const;
 
 type UserCreds = {
   key: string;
   secret: string;
   passphrase: string;
 };
+
+type TypedDataDomain = {
+  name?: string;
+  version?: string;
+  chainId?: number;
+  verifyingContract?: string;
+  salt?: string;
+};
+
+const P256_MODULUS = BigInt('0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff');
+const P256_A = P256_MODULUS - 3n;
+const P256_B = BigInt('0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b');
 
 function redact(value: string, keep = 4) {
   if (!value) return '<empty>';
@@ -42,6 +61,341 @@ function describeCreds(creds: UserCreds) {
 export type MarketResolution = { isResolved: boolean } & SettledMarketResolution;
 
 const CONDITION_ID_PATTERN = /0x[a-fA-F0-9]{64}/;
+
+function bufferToBase64Url(buffer: Buffer): string {
+  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function stringToBase64Url(value: string): string {
+  return bufferToBase64Url(Buffer.from(value, 'utf8'));
+}
+
+function hexToBuffer(value: string): Buffer {
+  const sanitized = value.startsWith('0x') ? value.slice(2) : value;
+  if (sanitized.length === 0 || sanitized.length % 2 !== 0 || /[^a-fA-F0-9]/u.test(sanitized)) {
+    throw new Error('Invalid hex value');
+  }
+  return Buffer.from(sanitized, 'hex');
+}
+
+function bigintTo32Bytes(value: bigint): Buffer {
+  const hex = value.toString(16).padStart(64, '0');
+  return Buffer.from(hex, 'hex');
+}
+
+function modPow(base: bigint, exponent: bigint, modulus: bigint): bigint {
+  let result = 1n;
+  let current = base % modulus;
+  let exp = exponent;
+
+  while (exp > 0n) {
+    if ((exp & 1n) === 1n) {
+      result = (result * current) % modulus;
+    }
+    current = (current * current) % modulus;
+    exp >>= 1n;
+  }
+
+  return result;
+}
+
+function modSqrt(value: bigint, modulus: bigint): bigint {
+  const q = (modulus + 1n) >> 2n;
+  const root = modPow(value % modulus, q, modulus);
+  if ((root * root) % modulus !== value % modulus) {
+    throw new Error('Failed to compute modular square root');
+  }
+  return root;
+}
+
+function decodeCompressedP256PublicKey(compressedPublicKeyHex: string): { x: Buffer; y: Buffer } {
+  const point = hexToBuffer(compressedPublicKeyHex);
+  if (point.length !== 33) {
+    throw new Error('Expected compressed P-256 public key');
+  }
+
+  const prefix = point[0];
+  if (prefix !== 0x02 && prefix !== 0x03) {
+    throw new Error('Invalid compressed public key prefix');
+  }
+
+  const x = BigInt(`0x${point.subarray(1).toString('hex')}`);
+  const rhs = ((x * x + P256_A) * x + P256_B) % P256_MODULUS;
+  let y = modSqrt(rhs, P256_MODULUS);
+  const shouldBeOdd = prefix === 0x03;
+  const isOdd = (y & 1n) === 1n;
+  if (isOdd !== shouldBeOdd) {
+    y = (P256_MODULUS - y) % P256_MODULUS;
+  }
+
+  return {
+    x: bigintTo32Bytes(x),
+    y: bigintTo32Bytes(y),
+  };
+}
+
+function getTurnkeySigningKey() {
+  if (!TURNKEY_API_PRIVATE_KEY || !TURNKEY_API_PUBLIC_KEY) {
+    throw new Error('TURNKEY_API_PUBLIC_KEY and TURNKEY_API_PRIVATE_KEY are required');
+  }
+
+  if (TURNKEY_API_PRIVATE_KEY.includes('BEGIN')) {
+    return createPrivateKey(TURNKEY_API_PRIVATE_KEY);
+  }
+
+  const privateKey = hexToBuffer(TURNKEY_API_PRIVATE_KEY);
+  const { x, y } = decodeCompressedP256PublicKey(TURNKEY_API_PUBLIC_KEY);
+  const jwk: import('crypto').JsonWebKey = {
+    kty: 'EC',
+    crv: 'P-256',
+    x: bufferToBase64Url(x),
+    y: bufferToBase64Url(y),
+    d: bufferToBase64Url(privateKey),
+    ext: true,
+    key_ops: ['sign'],
+  };
+  return createPrivateKey({ format: 'jwk', key: jwk });
+}
+
+function createTurnkeyStamp(payload: string): string {
+  if (!TURNKEY_API_PUBLIC_KEY) {
+    throw new Error('TURNKEY_API_PUBLIC_KEY is not configured');
+  }
+
+  const signer = createSign('sha256');
+  signer.update(payload);
+  signer.end();
+  const signature = signer.sign({ key: getTurnkeySigningKey(), dsaEncoding: 'der' }).toString('hex');
+  return stringToBase64Url(
+    JSON.stringify({
+      publicKey: TURNKEY_API_PUBLIC_KEY,
+      scheme: 'SIGNATURE_SCHEME_TK_API_P256',
+      signature,
+    })
+  );
+}
+
+function getErrorMessage(responseBody: unknown): string {
+  if (!responseBody || typeof responseBody !== 'object') {
+    return 'Unknown Turnkey error';
+  }
+
+  const candidate = responseBody as Record<string, unknown>;
+  if (typeof candidate.error === 'string') return candidate.error;
+  if (typeof candidate.message === 'string') return candidate.message;
+  if (candidate.error && typeof candidate.error === 'object') {
+    const nested = candidate.error as Record<string, unknown>;
+    if (typeof nested.message === 'string') return nested.message;
+  }
+  return 'Unknown Turnkey error';
+}
+
+async function turnkeyPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const payload = JSON.stringify(body);
+  const response = await fetch(`${TURNKEY_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Stamp': createTurnkeyStamp(payload),
+    },
+    body: payload,
+  });
+
+  const json = (await response.json()) as unknown;
+  if (!response.ok) {
+    const message = getErrorMessage(json);
+    throw new Error(`Turnkey request failed: ${message}`);
+  }
+  return json as T;
+}
+
+function deepFindStringValue(input: unknown, keyName: string): string | null {
+  if (!input || typeof input !== 'object') return null;
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const found = deepFindStringValue(item, keyName);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (key === keyName && typeof value === 'string' && value.length > 0) {
+      return value;
+    }
+    const nested = deepFindStringValue(value, keyName);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function deepFindObjectValue(input: unknown, keyName: string): Record<string, unknown> | null {
+  if (!input || typeof input !== 'object') return null;
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const found = deepFindObjectValue(item, keyName);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (key === keyName && value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    const nested = deepFindObjectValue(value, keyName);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function deepFindNumericValue(input: unknown, keyName: string): number | null {
+  if (!input || typeof input !== 'object') return null;
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const found = deepFindNumericValue(item, keyName);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (key === keyName && typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (key === keyName && typeof value === 'string' && value.length > 0) {
+      const parsed = value.startsWith('0x') || value.startsWith('0X') ? parseInt(value, 16) : Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    const nested = deepFindNumericValue(value, keyName);
+    if (nested !== null) return nested;
+  }
+
+  return null;
+}
+
+function normalizeHex(value: string, expectedLength?: number): string {
+  const raw = value.startsWith('0x') ? value.slice(2) : value;
+  if (!/^[0-9a-fA-F]+$/u.test(raw)) {
+    throw new Error('Invalid hex value in Turnkey signature');
+  }
+  const normalized = expectedLength ? raw.padStart(expectedLength, '0') : raw;
+  return `0x${normalized.toLowerCase()}`;
+}
+
+function extractTurnkeySignature(response: unknown): string {
+  const signRawPayloadResult = deepFindObjectValue(response, 'signRawPayloadResult');
+  if (signRawPayloadResult) {
+    const rRaw = deepFindStringValue(signRawPayloadResult, 'r');
+    const sRaw = deepFindStringValue(signRawPayloadResult, 's');
+    const vRaw = deepFindNumericValue(signRawPayloadResult, 'v');
+
+    if (rRaw && sRaw && vRaw !== null) {
+      const r = normalizeHex(rRaw, 64);
+      const s = normalizeHex(sRaw, 64);
+      const v = vRaw >= 27 ? vRaw : vRaw + 27;
+      return utils.joinSignature({ r, s, v });
+    }
+  }
+
+  const signature = deepFindStringValue(response, 'signature');
+  if (signature && /^(0x)?[0-9a-fA-F]{130}$/u.test(signature)) {
+    return normalizeHex(signature);
+  }
+  const rRaw = deepFindStringValue(response, 'r');
+  const sRaw = deepFindStringValue(response, 's');
+  const vRaw = deepFindNumericValue(response, 'v');
+
+  if (!rRaw || !sRaw || vRaw === null) {
+    throw new Error('Turnkey sign_raw_payload response missing signature fields');
+  }
+
+  const r = normalizeHex(rRaw, 64);
+  const s = normalizeHex(sRaw, 64);
+  const v = vRaw >= 27 ? vRaw : vRaw + 27;
+  return utils.joinSignature({ r, s, v });
+}
+
+async function signDigestWithTurnkey(input: {
+  organizationId: string;
+  walletAccountId: string;
+  digestHex: string;
+}): Promise<string> {
+  const payloadHex = input.digestHex.startsWith('0x') ? input.digestHex.slice(2) : input.digestHex;
+  const paramVariants: Array<Record<string, unknown>> = [
+    {
+      signWith: input.walletAccountId,
+      payload: payloadHex,
+      encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+      hashFunction: 'HASH_FUNCTION_NO_OP',
+    },
+    {
+      signWith: input.walletAccountId,
+      payload: payloadHex,
+      payloadEncoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+      hashFunction: 'HASH_FUNCTION_NO_OP',
+    },
+    {
+      signWith: input.walletAccountId,
+      payload: `0x${payloadHex}`,
+      encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+      hashFunction: 'HASH_FUNCTION_NO_OP',
+    },
+  ];
+  let lastError: unknown = null;
+
+  for (const activityType of TURNKEY_SIGN_ACTIVITY_TYPES) {
+    for (const parameters of paramVariants) {
+      try {
+        const response = await turnkeyPost<Record<string, unknown>>(
+          '/public/v1/submit/sign_raw_payload',
+          {
+            type: activityType,
+            timestampMs: Date.now().toString(),
+            organizationId: input.organizationId,
+            parameters,
+          }
+        );
+        return extractTurnkeySignature(response);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+
+  throw lastError ?? new Error('Turnkey sign_raw_payload failed');
+}
+
+class TurnkeySigner {
+  constructor(
+    private readonly organizationId: string,
+    private readonly walletAccountId: string,
+    private readonly walletAddress: string
+  ) {}
+
+  async getAddress(): Promise<string> {
+    return this.walletAddress;
+  }
+
+  async _signTypedData(
+    domain: TypedDataDomain,
+    types: Record<string, Array<{ name: string; type: string }>>,
+    value: Record<string, unknown>
+  ): Promise<string> {
+    const digest = utils._TypedDataEncoder.hash(domain, types, value);
+    return signDigestWithTurnkey({
+      organizationId: this.organizationId,
+      walletAccountId: this.walletAccountId,
+      digestHex: digest,
+    });
+  }
+}
 
 function parseResolvedAt(value: unknown): Date | null {
   if (value instanceof Date) return value;
@@ -65,6 +419,8 @@ function isMarketResolved(market: Record<string, unknown>) {
 }
 
 export class PolymarketController {
+  private static readonly credsByWallet = new Map<string, Promise<UserCreds>>();
+
   static missingMemberFields(member: RoundMember): string[] {
     const missing: string[] = [];
     if (!member.clubWallet) {
@@ -75,23 +431,21 @@ export class PolymarketController {
       missing.push('clubWalletDisabled');
       return missing;
     }
-    if (!member.user.polymarketApiKeyId) missing.push('polymarketApiKeyId');
-    if (!member.user.polymarketApiSecret) missing.push('polymarketApiSecret');
-    if (!member.user.polymarketApiPassphrase) missing.push('polymarketApiPassphrase');
-    if (!member.user.walletAddress) missing.push('walletAddress');
+    if (!member.user.turnkeySubOrgId) missing.push('turnkeySubOrgId');
+    if (!member.clubWallet.turnkeyWalletAccountId) missing.push('turnkeyWalletAccountId');
+    if (!member.clubWallet.walletAddress) missing.push('clubWalletAddress');
     return missing;
   }
 
-  static buildClient(creds: UserCreds, headerAddress: string, funderAddress?: string | null) {
-    if (!CHAINWORKER_SIGNER_KEY) throw new Error('CHAINWORKER_SIGNER_PRIVATE_KEY is not set.');
+  static buildClient(params: {
+    signer: TurnkeySigner;
+    creds?: UserCreds;
+    funderAddress: string;
+  }) {
     if (!POLY_BUILDER_API_KEY) throw new Error('POLY_BUILDER_API_KEY is not set.');
     if (!POLY_BUILDER_SECRET) throw new Error('POLY_BUILDER_SECRET is not set.');
     if (!POLY_BUILDER_PASSPHRASE) throw new Error('POLY_BUILDER_PASSPHRASE is not set.');
 
-    const signer = new Wallet(CHAINWORKER_SIGNER_KEY);
-    const headerSigner = {
-      getAddress: async () => headerAddress,
-    } as unknown as Wallet;
     const builderConfig = new BuilderConfig({
       localBuilderCreds: {
         key: POLY_BUILDER_API_KEY,
@@ -103,15 +457,72 @@ export class PolymarketController {
     return new ClobClient(
       POLYMARKET_CLOB_URL,
       POLYMARKET_CHAIN_ID,
-      headerSigner,
-      creds,
+      params.signer as never,
+      params.creds,
       undefined,
-      funderAddress ?? undefined,
+      params.funderAddress,
       undefined,
       undefined,
       builderConfig,
-      () => signer
+      () => params.signer as never
     );
+  }
+
+  static buildTurnkeySigner(member: RoundMember): TurnkeySigner {
+    const clubWallet = member.clubWallet;
+    if (!clubWallet || clubWallet.isDisabled) {
+      throw new Error(`Missing active club wallet for user ${member.userId}`);
+    }
+    if (!member.user.turnkeySubOrgId) {
+      throw new Error(`Missing Turnkey sub-org for user ${member.userId}`);
+    }
+
+    return new TurnkeySigner(
+      member.user.turnkeySubOrgId,
+      clubWallet.turnkeyWalletAccountId,
+      clubWallet.walletAddress
+    );
+  }
+
+  static getCredsCacheKey(member: RoundMember): string {
+    const clubWallet = member.clubWallet;
+    return `${member.user.turnkeySubOrgId}:${clubWallet?.turnkeyWalletAccountId}:${clubWallet?.walletAddress}`;
+  }
+
+  static async getOrCreatePolymarketCreds(
+    member: RoundMember,
+    signer: TurnkeySigner
+  ): Promise<UserCreds> {
+    const cacheKey = this.getCredsCacheKey(member);
+    const cached = this.credsByWallet.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const createPromise = (async () => {
+      const clubWallet = member.clubWallet;
+      if (!clubWallet) {
+        throw new Error(`Missing club wallet for user ${member.userId}`);
+      }
+
+      const l1Client = this.buildClient({
+        signer,
+        funderAddress: clubWallet.walletAddress,
+      });
+      const creds = await l1Client.createOrDeriveApiKey();
+      if (!creds.key || !creds.secret || !creds.passphrase) {
+        throw new Error(`Polymarket API key derivation returned incomplete creds for ${member.userId}`);
+      }
+      return creds;
+    })();
+
+    this.credsByWallet.set(cacheKey, createPromise);
+    try {
+      return await createPromise;
+    } catch (error) {
+      this.credsByWallet.delete(cacheKey);
+      throw error;
+    }
   }
 
   static async fetchMarketResolution(conditionId: string): Promise<MarketResolution> {
@@ -186,18 +597,19 @@ export class PolymarketController {
       throw new Error(`Invalid commit amount for user ${member.userId}`);
     }
 
-    const creds = {
-      key: member.user.polymarketApiKeyId!,
-      secret: member.user.polymarketApiSecret!,
-      passphrase: member.user.polymarketApiPassphrase!,
-    };
+    const signer = this.buildTurnkeySigner(member);
+    const creds = await this.getOrCreatePolymarketCreds(member, signer);
     console.log('[chainworker] Polymarket creds snapshot', {
       userId: member.userId,
-      walletAddress: member.user.walletAddress,
-      funderAddress: clubWallet.walletAddress,
+      turnkeySubOrgId: member.user.turnkeySubOrgId,
+      walletAddress: clubWallet.walletAddress,
       ...describeCreds(creds),
     });
-    const clobClient = this.buildClient(creds, member.user.walletAddress, clubWallet.walletAddress);
+    const clobClient = this.buildClient({
+      signer,
+      creds,
+      funderAddress: clubWallet.walletAddress,
+    });
     const response = await clobClient.createAndPostMarketOrder(
       {
         tokenID: tokenId,

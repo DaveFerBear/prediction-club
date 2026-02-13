@@ -82,6 +82,13 @@ export class ChainWorkerDBController {
     });
   }
 
+  static async markRoundCancelled(roundId: string) {
+    await prisma.predictionRound.update({
+      where: { id: roundId },
+      data: { status: 'CANCELLED' },
+    });
+  }
+
   static async updateMemberOrder(memberId: string, order: MemberOrder) {
     await prisma.predictionRoundMember.update({
       where: { id: memberId },

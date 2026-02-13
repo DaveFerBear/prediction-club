@@ -25,10 +25,7 @@ export const roundMemberSelect = Prisma.validator<Prisma.PredictionRoundMemberSe
   settledAt: true,
   user: {
     select: {
-      walletAddress: true,
-      polymarketApiKeyId: true,
-      polymarketApiSecret: true,
-      polymarketApiPassphrase: true,
+      turnkeySubOrgId: true,
     },
   },
 });

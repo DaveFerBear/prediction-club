@@ -1,12 +1,10 @@
 const fs = require('fs');
 const path = require('path');
-const { Wallet } = require('ethers');
 
 const cwd = process.cwd();
-const forceRotate = process.argv.includes('--force');
-
 const chainworkerEnvPath = path.resolve(cwd, '.env');
 const rootEnvPath = path.resolve(cwd, '../../.env');
+const webEnvPath = path.resolve(cwd, '../web/.env');
 
 function parseEnvFile(content) {
   const env = new Map();
@@ -48,9 +46,9 @@ function readEnv(pathname) {
 function writeEnv(pathname, env) {
   const orderedKeys = [
     'DATABASE_URL',
-    'CHAINWORKER_SIGNER_PRIVATE_KEY',
-    'CHAINWORKER_SIGNER_ADDRESS',
-    'CHAINWORKER_SIGNER_GENERATED_AT',
+    'TURNKEY_API_PUBLIC_KEY',
+    'TURNKEY_API_PRIVATE_KEY',
+    'TURNKEY_API_BASE_URL',
     'CHAINWORKER_POLL_INTERVAL_MS',
     'CHAINWORKER_BATCH_SIZE',
     'POLYMARKET_CLOB_URL',
@@ -70,53 +68,48 @@ function writeEnv(pathname, env) {
   fs.writeFileSync(pathname, `${lines.join('\n')}\n`, 'utf8');
 }
 
+function copyIfMissing(env, source, key) {
+  if (!env.has(key) && source.has(key)) {
+    env.set(key, source.get(key) || '');
+  }
+}
+
+function setDefault(env, key, value) {
+  if (!env.has(key)) {
+    env.set(key, value);
+  }
+}
+
 function main() {
   const chainworkerEnv = readEnv(chainworkerEnvPath);
   const rootEnv = readEnv(rootEnvPath);
+  const webEnv = readEnv(webEnvPath);
 
-  if (!chainworkerEnv.has('DATABASE_URL') && rootEnv.has('DATABASE_URL')) {
-    chainworkerEnv.set('DATABASE_URL', rootEnv.get('DATABASE_URL') || '');
-  }
+  copyIfMissing(chainworkerEnv, rootEnv, 'DATABASE_URL');
+  copyIfMissing(chainworkerEnv, rootEnv, 'TURNKEY_API_PUBLIC_KEY');
+  copyIfMissing(chainworkerEnv, rootEnv, 'TURNKEY_API_PRIVATE_KEY');
+  copyIfMissing(chainworkerEnv, rootEnv, 'TURNKEY_API_BASE_URL');
+  copyIfMissing(chainworkerEnv, rootEnv, 'POLY_BUILDER_API_KEY');
+  copyIfMissing(chainworkerEnv, rootEnv, 'POLY_BUILDER_SECRET');
+  copyIfMissing(chainworkerEnv, rootEnv, 'POLY_BUILDER_PASSPHRASE');
+  copyIfMissing(chainworkerEnv, webEnv, 'DATABASE_URL');
+  copyIfMissing(chainworkerEnv, webEnv, 'TURNKEY_API_PUBLIC_KEY');
+  copyIfMissing(chainworkerEnv, webEnv, 'TURNKEY_API_PRIVATE_KEY');
+  copyIfMissing(chainworkerEnv, webEnv, 'TURNKEY_API_BASE_URL');
+  copyIfMissing(chainworkerEnv, webEnv, 'POLY_BUILDER_API_KEY');
+  copyIfMissing(chainworkerEnv, webEnv, 'POLY_BUILDER_SECRET');
+  copyIfMissing(chainworkerEnv, webEnv, 'POLY_BUILDER_PASSPHRASE');
 
-  const existingKey = chainworkerEnv.get('CHAINWORKER_SIGNER_PRIVATE_KEY');
-  const wallet =
-    existingKey && !forceRotate
-      ? new Wallet(existingKey)
-      : Wallet.createRandom();
-  const nowIso = new Date().toISOString();
-
-  chainworkerEnv.set('CHAINWORKER_SIGNER_PRIVATE_KEY', wallet.privateKey);
-  chainworkerEnv.set('CHAINWORKER_SIGNER_ADDRESS', wallet.address);
-  if (!existingKey || forceRotate || !chainworkerEnv.get('CHAINWORKER_SIGNER_GENERATED_AT')) {
-    chainworkerEnv.set('CHAINWORKER_SIGNER_GENERATED_AT', nowIso);
-  }
-
-  if (!chainworkerEnv.has('CHAINWORKER_POLL_INTERVAL_MS')) {
-    chainworkerEnv.set('CHAINWORKER_POLL_INTERVAL_MS', '30000');
-  }
-  if (!chainworkerEnv.has('CHAINWORKER_BATCH_SIZE')) {
-    chainworkerEnv.set('CHAINWORKER_BATCH_SIZE', '25');
-  }
-  if (!chainworkerEnv.has('POLYMARKET_CLOB_URL')) {
-    chainworkerEnv.set('POLYMARKET_CLOB_URL', 'https://clob.polymarket.com');
-  }
-  if (!chainworkerEnv.has('POLYMARKET_CHAIN_ID')) {
-    chainworkerEnv.set('POLYMARKET_CHAIN_ID', '137');
-  }
-  if (!chainworkerEnv.has('CHAINWORKER_ALLOW_ZERO_PAYOUTS')) {
-    chainworkerEnv.set('CHAINWORKER_ALLOW_ZERO_PAYOUTS', 'false');
-  }
+  setDefault(chainworkerEnv, 'TURNKEY_API_BASE_URL', 'https://api.turnkey.com');
+  setDefault(chainworkerEnv, 'CHAINWORKER_POLL_INTERVAL_MS', '30000');
+  setDefault(chainworkerEnv, 'CHAINWORKER_BATCH_SIZE', '25');
+  setDefault(chainworkerEnv, 'POLYMARKET_CLOB_URL', 'https://clob.polymarket.com');
+  setDefault(chainworkerEnv, 'POLYMARKET_CHAIN_ID', '137');
+  setDefault(chainworkerEnv, 'CHAINWORKER_ALLOW_ZERO_PAYOUTS', 'false');
 
   writeEnv(chainworkerEnvPath, chainworkerEnv);
-
-  const action = existingKey && !forceRotate ? 'Kept existing' : 'Generated new';
-  console.log(`${action} chainworker signer key.`);
-  console.log(`Signer address: ${wallet.address}`);
-  console.log(`Signer generated at: ${chainworkerEnv.get('CHAINWORKER_SIGNER_GENERATED_AT')}`);
   console.log(`Wrote: ${chainworkerEnvPath}`);
-  if (existingKey && !forceRotate) {
-    console.log('Use --force to rotate the signer private key.');
-  }
+  console.log('Filled missing values from root .env when available.');
 }
 
 main();
