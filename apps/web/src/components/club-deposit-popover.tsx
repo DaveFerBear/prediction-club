@@ -16,8 +16,20 @@ export function ClubDepositPopover(props: {
   slug: string;
   walletAddress: string | null;
   canDeposit: boolean;
+  triggerLabel?: string;
+  triggerVariant?: 'default' | 'outline' | 'secondary' | 'ghost';
+  triggerSize?: 'default' | 'sm' | 'lg' | 'icon';
+  triggerClassName?: string;
 }) {
-  const { slug, walletAddress, canDeposit } = props;
+  const {
+    slug,
+    walletAddress,
+    canDeposit,
+    triggerLabel = 'Deposit into club',
+    triggerVariant = 'outline',
+    triggerSize = 'sm',
+    triggerClassName,
+  } = props;
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('10');
   const { state, isBusy, submitDeposit, reset } = useClubWalletDeposit(slug);
@@ -42,8 +54,13 @@ export function ClubDepositPopover(props: {
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <Button size="sm" variant="outline" disabled={!canDeposit}>
-          Deposit into club
+        <Button
+          size={triggerSize}
+          variant={triggerVariant}
+          disabled={!canDeposit}
+          className={triggerClassName}
+        >
+          {triggerLabel}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-3">

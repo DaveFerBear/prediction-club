@@ -224,51 +224,71 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
       <Header />
 
       <main className="container py-8">
-        {/* Club Header */}
-        <div className="mb-8">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-3xl font-bold">{club.name}</h1>
-                <Badge variant="secondary">{club.isPublic ? 'Public' : 'Private'}</Badge>
-              </div>
-              <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
+        {/* Club Header + Primary Action */}
+        <div className="mb-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-3xl font-bold">{club.name}</h1>
+              <Badge variant="secondary">{club.isPublic ? 'Public' : 'Private'}</Badge>
+              {isMember ? (
+                <Badge variant="outline">{isAdmin ? 'Admin member' : 'Member'}</Badge>
+              ) : null}
             </div>
-
-            {isMember ? (
-              <div className="flex items-center gap-2">
-                {isAdmin ? (
-                  <Link href={`/clubs/${club.slug}/predict`}>
-                    <Button size="sm">Make prediction</Button>
-                  </Link>
-                ) : (
-                  <Badge variant="secondary">You are a member</Badge>
-                )}
-                <ClubDepositPopover
-                  slug={params.slug}
-                  walletAddress={setup.wallet?.walletAddress ?? null}
-                  canDeposit={setup.authenticated}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
-                <Input
-                  value={applyMessage}
-                  onChange={(e) => setApplyMessage(e.target.value)}
-                  placeholder="Message (optional)"
-                  className="sm:w-64 h-9 bg-muted border border-border/60 text-sm"
-                />
-                <Button type="button" onClick={handleApply} disabled={isApplying} variant="default">
-                  {isApplying ? 'Submitting...' : 'Apply to Join'}
-                </Button>
-                {!isUserAuthenticated && (
-                  <p className="text-xs text-muted-foreground">Sign in to apply.</p>
-                )}
-                {applySuccess && <p className="text-xs text-emerald-600">{applySuccess}</p>}
-                {applyError && <p className="text-xs text-destructive">{applyError}</p>}
-              </div>
-            )}
+            <p className="mt-2 text-muted-foreground">{club.description || 'No description'}</p>
           </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>{isMember ? 'Next action' : 'Join this club'}</CardTitle>
+              <CardDescription>
+                {isMember
+                  ? 'Use your club treasury to participate in autonomous trading rounds.'
+                  : 'Apply to join this club and start participating in rounds.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {isMember ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {setup.ready
+                      ? 'Treasury is funded and ready for autonomous execution.'
+                      : 'Complete setup and funding to become trading-ready.'}
+                  </p>
+                  {isAdmin ? (
+                    <Link href={`/clubs/${club.slug}/predict`} className="block">
+                      <Button className="w-full">Make prediction</Button>
+                    </Link>
+                  ) : null}
+                  <ClubDepositPopover
+                    slug={params.slug}
+                    walletAddress={setup.wallet?.walletAddress ?? null}
+                    canDeposit={setup.authenticated}
+                    triggerLabel="Deposit into club"
+                    triggerVariant={isAdmin ? 'outline' : 'default'}
+                    triggerSize={isAdmin ? 'sm' : 'default'}
+                    triggerClassName="w-full justify-center"
+                  />
+                </>
+              ) : (
+                <>
+                  <Input
+                    value={applyMessage}
+                    onChange={(e) => setApplyMessage(e.target.value)}
+                    placeholder="Message (optional)"
+                    className="h-9 bg-muted text-sm"
+                  />
+                  <Button type="button" onClick={handleApply} disabled={isApplying} className="w-full">
+                    {isApplying ? 'Submitting...' : 'Apply to Join'}
+                  </Button>
+                  {!isUserAuthenticated ? (
+                    <p className="text-xs text-muted-foreground">Sign in to apply.</p>
+                  ) : null}
+                  {applySuccess ? <p className="text-xs text-emerald-600">{applySuccess}</p> : null}
+                  {applyError ? <p className="text-xs text-destructive">{applyError}</p> : null}
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Stats (designed) */}
@@ -276,12 +296,12 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Your Club Setup</CardTitle>
-              <CardDescription>Wallet provisioning and automation readiness for this club.</CardDescription>
+              <CardDescription>
+                Keep this setup unchanged while you progress from sign-in to trading readiness.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <ClubSetupChecklist
-                steps={setup.steps}
-              />
+              <ClubSetupChecklist steps={setup.steps} />
             </CardContent>
           </Card>
         )}
@@ -289,15 +309,17 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
         {isMember && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Club Wallet</CardTitle>
-              <CardDescription>Address, balance, and wallet actions for this club.</CardDescription>
+              <CardTitle>Club Treasury</CardTitle>
+              <CardDescription>
+                Safe address, treasury balance, and wallet actions for this club.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {setup.wallet ? (
                 <div className="rounded-md border p-3 text-sm">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Address</span>
+                      <span className="text-muted-foreground">Treasury Safe</span>
                       {setup.wallet.walletAddress ? (
                         <CopyableAddress address={setup.wallet.walletAddress} variant="compact" />
                       ) : (
@@ -307,24 +329,31 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                       )}
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Balance</span>{' '}
-                      <span className="font-medium">${formatUsdAmount(setup.wallet.balance)} USDC</span>
+                      <span className="text-muted-foreground">Treasury balance</span>{' '}
+                      <span className="font-medium">
+                        ${formatUsdAmount(setup.wallet.balance)} USDC
+                      </span>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="outline" onClick={() => void setup.refreshWallet()}>
                       Refresh
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => void handleRequestWithdraw()}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleRequestWithdraw()}
+                    >
                       Withdraw
                     </Button>
                     <span className="text-xs text-muted-foreground">
-                      Top up by sending USDC to this club Safe.
+                      Use the Deposit into club action above to top up treasury.
                     </span>
                   </div>
                   {setup.wallet.provisioningStatus === 'FAILED' ? (
                     <p className="mt-2 text-xs text-destructive">
-                      {setup.wallet.provisioningError ?? 'Wallet provisioning failed. Retry initialize wallet.'}
+                      {setup.wallet.provisioningError ??
+                        'Wallet provisioning failed. Retry initialize wallet.'}
                     </p>
                   ) : null}
                   {withdrawMessage ? (
@@ -356,11 +385,11 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           {/* Primary: Active Volume */}
           <div>
             <StatTile
-              label="Active Volume"
+              label="USDC in active rounds"
               icon={Sigma}
               emphasize
               value={<span>{activeVolumeText}</span>}
-              subValue={<span className="text-muted-foreground">USDC committed</span>}
+              subValue={<span className="text-muted-foreground">Committed capital</span>}
             />
           </div>
 
@@ -443,21 +472,26 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                 </Card>
               ) : (
                 <ChartExposure
-                  title="Wallet vs In-Market"
+                  title="Treasury vs In-Market"
                   description="All-time"
                   data={exposureSeries}
-                  footerText="Wallet + open market positions"
+                  footerText="Treasury + open market positions"
                   footerSubtext="Based on ledger entries for this club"
                 />
               )}
             </div>
 
-            <section id="predictions" className="scroll-mt-24">
+            <div className="scroll-mt-24">
               <h2 className="mb-4 text-xl font-semibold">Predictions</h2>
               {predictionRounds.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center">
                     <p className="text-muted-foreground">No predictions yet</p>
+                    {isAdmin ? (
+                      <Link href={`/clubs/${club.slug}/predict`} className="mt-4 inline-block">
+                        <Button size="sm">Make first prediction</Button>
+                      </Link>
+                    ) : null}
                   </CardContent>
                 </Card>
               ) : (
@@ -490,12 +524,16 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                           <span className="text-muted-foreground">Participants</span>
                           <span>{predictionRound._count.members}</span>
                         </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Created</span>
+                          <span>{new Date(predictionRound.createdAt).toLocaleDateString()}</span>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
               )}
-            </section>
+            </div>
           </div>
 
           {/* Members */}
@@ -538,6 +576,12 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
 
         {isAdmin && (
           <div className="mt-10 space-y-8">
+            <div>
+              <h2 className="text-xl font-semibold">Admin</h2>
+              <p className="text-sm text-muted-foreground">
+                Review member access and update club settings.
+              </p>
+            </div>
             <div className="grid gap-8 lg:grid-cols-2">
               <Card>
                 <CardHeader>
