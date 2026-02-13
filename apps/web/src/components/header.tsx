@@ -43,11 +43,6 @@ export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' 
           Prediction Club
         </Link>
         <nav className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 sm:flex">
-            <Link href="/clubs">
-              <Button variant="ghost">Find a club</Button>
-            </Link>
-          </div>
           {isAuthenticated && address && (
             <div className="rounded-md border border-input px-2 py-1 text-right sm:min-w-[120px] sm:text-right">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground sm:hidden">

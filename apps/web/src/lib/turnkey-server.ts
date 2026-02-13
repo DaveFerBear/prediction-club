@@ -287,6 +287,23 @@ function parseJwtPayload(token: string): Record<string, unknown> {
   }
 }
 
+function buildSubOrgName(input: { name?: string; email?: string }): string {
+  const fallback = 'Prediction Club User Sub-Org';
+  const rawName = input.name?.trim();
+  const emailLocal = input.email?.trim().toLowerCase().split('@')[0];
+
+  if (rawName && emailLocal) {
+    return `${rawName} (${emailLocal}) Sub-Org`;
+  }
+  if (rawName) {
+    return `${rawName} Sub-Org`;
+  }
+  if (emailLocal) {
+    return `${emailLocal} Sub-Org`;
+  }
+  return fallback;
+}
+
 async function listSubOrgIdsByOidcToken(oidcToken: string): Promise<string[]> {
   const response = await turnkeyPost<{ organizationIds?: string[] }>(
     '/public/v1/query/list_suborgs',
@@ -322,6 +339,7 @@ async function createSubOrganizationWithGoogle(oidcToken: string): Promise<strin
       : typeof tokenPayload.email === 'string'
         ? tokenPayload.email
         : 'Prediction Club User';
+  const subOrgName = buildSubOrgName({ name, email });
 
   const response = await turnkeyPost<Record<string, unknown>>(
     '/public/v1/submit/create_sub_organization',
@@ -330,7 +348,7 @@ async function createSubOrganizationWithGoogle(oidcToken: string): Promise<strin
       timestampMs: nowTimestampMs(),
       organizationId: TURNKEY_ORGANIZATION_ID,
       parameters: {
-        subOrganizationName: `${name} Sub-Org`,
+        subOrganizationName: subOrgName,
         rootUsers: [
           {
             userName: name,
