@@ -281,15 +281,62 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
             <CardContent>
               <ClubSetupChecklist
                 steps={setup.steps}
-                wallet={setup.wallet}
-                canInitializeWallet={setup.authenticated && isMember && !setup.wallet}
-                isInitializingWallet={setup.walletInitializing}
-                walletInitError={setup.walletInitError}
-                onInitializeWallet={setup.initWallet}
-                onRefreshWallet={setup.refreshWallet}
-                onWithdraw={handleRequestWithdraw}
-                withdrawMessage={withdrawMessage}
               />
+            </CardContent>
+          </Card>
+        )}
+
+        {isMember && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Club Wallet</CardTitle>
+              <CardDescription>Address, balance, and wallet actions for this club.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {setup.wallet ? (
+                <div className="rounded-md border p-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Address</span>
+                      <CopyableAddress address={setup.wallet.walletAddress} variant="compact" />
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Balance</span>{' '}
+                      <span className="font-medium">${formatUsdAmount(setup.wallet.balance)} USDC</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => void setup.refreshWallet()}>
+                      Refresh
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void handleRequestWithdraw()}>
+                      Withdraw
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Top up by sending USDC to this club wallet.
+                    </span>
+                  </div>
+                  {withdrawMessage ? (
+                    <p className="mt-2 text-xs text-muted-foreground">{withdrawMessage}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Initialize a per-club wallet to begin funding and trading.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => void setup.initWallet()}
+                    disabled={setup.walletInitializing}
+                  >
+                    {setup.walletInitializing ? 'Initializing...' : 'Initialize wallet'}
+                  </Button>
+                  {setup.walletInitError ? (
+                    <p className="text-xs text-destructive">{setup.walletInitError.message}</p>
+                  ) : null}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

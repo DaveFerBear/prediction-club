@@ -18,10 +18,8 @@ const TURNKEY_API_PRIVATE_KEY = process.env.TURNKEY_API_PRIVATE_KEY;
 const POLY_BUILDER_API_KEY = process.env.POLY_BUILDER_API_KEY || '';
 const POLY_BUILDER_SECRET = process.env.POLY_BUILDER_SECRET || '';
 const POLY_BUILDER_PASSPHRASE = process.env.POLY_BUILDER_PASSPHRASE || '';
-const TURNKEY_SIGN_ACTIVITY_TYPES = [
-  'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2',
-  'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD',
-] as const;
+const DEBUG_TURNKEY = process.env.CHAINWORKER_DEBUG_TURNKEY === 'true';
+const TURNKEY_SIGN_ACTIVITY_TYPE = 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2';
 
 type UserCreds = {
   key: string;
@@ -61,6 +59,7 @@ function describeCreds(creds: UserCreds) {
 export type MarketResolution = { isResolved: boolean } & SettledMarketResolution;
 
 const CONDITION_ID_PATTERN = /0x[a-fA-F0-9]{64}/;
+const privateKeyIdByWalletKey = new Map<string, Promise<string>>();
 
 function bufferToBase64Url(buffer: Buffer): string {
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -165,7 +164,9 @@ function createTurnkeyStamp(payload: string): string {
   const signer = createSign('sha256');
   signer.update(payload);
   signer.end();
-  const signature = signer.sign({ key: getTurnkeySigningKey(), dsaEncoding: 'der' }).toString('hex');
+  const signature = signer
+    .sign({ key: getTurnkeySigningKey(), dsaEncoding: 'der' })
+    .toString('hex');
   return stringToBase64Url(
     JSON.stringify({
       publicKey: TURNKEY_API_PUBLIC_KEY,
@@ -205,7 +206,14 @@ async function turnkeyPost<T>(path: string, body: Record<string, unknown>): Prom
   const json = (await response.json()) as unknown;
   if (!response.ok) {
     const message = getErrorMessage(json);
-    throw new Error(`Turnkey request failed: ${message}`);
+    const details = (() => {
+      try {
+        return JSON.stringify(json);
+      } catch {
+        return '[unserializable-response]';
+      }
+    })();
+    throw new Error(`Turnkey request failed: ${message} :: ${details}`);
   }
   return json as T;
 }
@@ -270,7 +278,8 @@ function deepFindNumericValue(input: unknown, keyName: string): number | null {
       return value;
     }
     if (key === keyName && typeof value === 'string' && value.length > 0) {
-      const parsed = value.startsWith('0x') || value.startsWith('0X') ? parseInt(value, 16) : Number(value);
+      const parsed =
+        value.startsWith('0x') || value.startsWith('0X') ? parseInt(value, 16) : Number(value);
       if (Number.isFinite(parsed)) return parsed;
     }
     const nested = deepFindNumericValue(value, keyName);
@@ -278,6 +287,166 @@ function deepFindNumericValue(input: unknown, keyName: string): number | null {
   }
 
   return null;
+}
+
+function normalizeAddress(address: string): string {
+  return address.trim().toLowerCase();
+}
+
+function collectObjects(input: unknown): Record<string, unknown>[] {
+  if (!input || typeof input !== 'object') return [];
+  if (Array.isArray(input)) {
+    return input.flatMap((item) => collectObjects(item));
+  }
+
+  const record = input as Record<string, unknown>;
+  const nested = Object.values(record).flatMap((value) => collectObjects(value));
+  return [record, ...nested];
+}
+
+function collectAddresses(input: unknown): string[] {
+  if (!input || typeof input !== 'object') return [];
+  if (Array.isArray(input)) {
+    return input.flatMap((item) => collectAddresses(item));
+  }
+
+  const record = input as Record<string, unknown>;
+  const found: string[] = [];
+
+  for (const [key, value] of Object.entries(record)) {
+    if (key === 'address' && typeof value === 'string') {
+      found.push(normalizeAddress(value));
+      continue;
+    }
+    if (key === 'addresses') {
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (typeof entry === 'string') {
+            found.push(normalizeAddress(entry));
+          } else if (entry && typeof entry === 'object') {
+            const nestedAddress = (entry as Record<string, unknown>).address;
+            if (typeof nestedAddress === 'string') {
+              found.push(normalizeAddress(nestedAddress));
+            }
+          }
+        }
+      }
+      continue;
+    }
+    found.push(...collectAddresses(value));
+  }
+
+  return found;
+}
+
+function findPrivateKeyIdFromWalletAccounts(input: {
+  response: unknown;
+  walletAddress: string;
+  walletAccountId: string;
+}): string | null {
+  const normalizedWalletAddress = normalizeAddress(input.walletAddress);
+  for (const record of collectObjects(input.response)) {
+    const privateKeyId = typeof record.privateKeyId === 'string' ? record.privateKeyId.trim() : '';
+    if (!privateKeyId) continue;
+
+    const recordWalletAccountId =
+      typeof record.walletAccountId === 'string' ? record.walletAccountId.trim() : '';
+    if (recordWalletAccountId && recordWalletAccountId === input.walletAccountId) {
+      return privateKeyId;
+    }
+
+    const addresses = collectAddresses(record);
+    if (addresses.includes(normalizedWalletAddress)) {
+      return privateKeyId;
+    }
+  }
+  return null;
+}
+
+function findPrivateKeyIdFromPrivateKeys(input: {
+  response: unknown;
+  walletAddress: string;
+  walletAccountId: string;
+}): string | null {
+  const normalizedWalletAddress = normalizeAddress(input.walletAddress);
+  for (const record of collectObjects(input.response)) {
+    const privateKeyId = typeof record.privateKeyId === 'string' ? record.privateKeyId.trim() : '';
+    if (!privateKeyId) continue;
+
+    const recordWalletAccountId =
+      typeof record.walletAccountId === 'string' ? record.walletAccountId.trim() : '';
+    if (recordWalletAccountId && recordWalletAccountId === input.walletAccountId) {
+      return privateKeyId;
+    }
+
+    const addresses = collectAddresses(record);
+    if (addresses.includes(normalizedWalletAddress)) {
+      return privateKeyId;
+    }
+  }
+  return null;
+}
+
+async function resolvePrivateKeyId(input: {
+  organizationId: string;
+  walletAddress: string;
+  walletAccountId: string;
+}): Promise<string> {
+  const cacheKey = `${input.organizationId}:${normalizeAddress(input.walletAddress)}`;
+  const cached = privateKeyIdByWalletKey.get(cacheKey);
+  if (cached) return cached;
+
+  const resolver = (async () => {
+    const walletAccountsResponse = await turnkeyPost<Record<string, unknown>>(
+      '/public/v1/query/list_wallet_accounts',
+      {
+        organizationId: input.organizationId,
+      }
+    );
+    const fromWalletAccounts = findPrivateKeyIdFromWalletAccounts({
+      response: walletAccountsResponse,
+      walletAddress: input.walletAddress,
+      walletAccountId: input.walletAccountId,
+    });
+    if (fromWalletAccounts) return fromWalletAccounts;
+
+    const privateKeysResponse = await turnkeyPost<Record<string, unknown>>(
+      '/public/v1/query/list_private_keys',
+      {
+        organizationId: input.organizationId,
+      }
+    );
+    const fromPrivateKeys = findPrivateKeyIdFromPrivateKeys({
+      response: privateKeysResponse,
+      walletAddress: input.walletAddress,
+      walletAccountId: input.walletAccountId,
+    });
+    if (fromPrivateKeys) return fromPrivateKeys;
+
+    if (DEBUG_TURNKEY) {
+      console.error('[chainworker] Turnkey private key resolution miss', {
+        organizationId: input.organizationId,
+        walletAddress: input.walletAddress,
+        walletAccountId: input.walletAccountId,
+        walletAccountsTopLevelKeys: Object.keys(walletAccountsResponse),
+        privateKeysTopLevelKeys: Object.keys(privateKeysResponse),
+        walletAccountsSample: JSON.stringify(walletAccountsResponse).slice(0, 1200),
+        privateKeysSample: JSON.stringify(privateKeysResponse).slice(0, 1200),
+      });
+    }
+
+    throw new Error(
+      `Could not resolve privateKeyId for wallet ${input.walletAddress} in organization ${input.organizationId}`
+    );
+  })();
+
+  privateKeyIdByWalletKey.set(cacheKey, resolver);
+  try {
+    return await resolver;
+  } catch (error) {
+    privateKeyIdByWalletKey.delete(cacheKey);
+    throw error;
+  }
 }
 
 function normalizeHex(value: string, expectedLength?: number): string {
@@ -324,39 +493,33 @@ function extractTurnkeySignature(response: unknown): string {
 
 async function signDigestWithTurnkey(input: {
   organizationId: string;
-  walletAccountId: string;
+  signWithCandidates: string[];
   digestHex: string;
 }): Promise<string> {
   const payloadHex = input.digestHex.startsWith('0x') ? input.digestHex.slice(2) : input.digestHex;
-  const paramVariants: Array<Record<string, unknown>> = [
-    {
-      signWith: input.walletAccountId,
-      payload: payloadHex,
-      encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
-      hashFunction: 'HASH_FUNCTION_NO_OP',
-    },
-    {
-      signWith: input.walletAccountId,
-      payload: payloadHex,
-      payloadEncoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
-      hashFunction: 'HASH_FUNCTION_NO_OP',
-    },
-    {
-      signWith: input.walletAccountId,
-      payload: `0x${payloadHex}`,
-      encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
-      hashFunction: 'HASH_FUNCTION_NO_OP',
-    },
-  ];
   let lastError: unknown = null;
+  for (const signWith of input.signWithCandidates) {
+    const paramVariants: Array<Record<string, unknown>> = [
+      {
+        signWith,
+        payload: payloadHex,
+        encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+        hashFunction: 'HASH_FUNCTION_NO_OP',
+      },
+      {
+        signWith,
+        payload: `0x${payloadHex}`,
+        encoding: 'PAYLOAD_ENCODING_HEXADECIMAL',
+        hashFunction: 'HASH_FUNCTION_NO_OP',
+      },
+    ];
 
-  for (const activityType of TURNKEY_SIGN_ACTIVITY_TYPES) {
     for (const parameters of paramVariants) {
       try {
         const response = await turnkeyPost<Record<string, unknown>>(
           '/public/v1/submit/sign_raw_payload',
           {
-            type: activityType,
+            type: TURNKEY_SIGN_ACTIVITY_TYPE,
             timestampMs: Date.now().toString(),
             organizationId: input.organizationId,
             parameters,
@@ -365,6 +528,16 @@ async function signDigestWithTurnkey(input: {
         return extractTurnkeySignature(response);
       } catch (error) {
         lastError = error;
+        if (DEBUG_TURNKEY) {
+          console.warn('[chainworker] Turnkey sign attempt failed', {
+            organizationId: input.organizationId,
+            signWith,
+            has0xPayload:
+              typeof parameters.payload === 'string' && parameters.payload.startsWith('0x'),
+            encodingField: 'encoding' in parameters ? 'encoding' : 'payloadEncoding',
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
   }
@@ -389,9 +562,19 @@ class TurnkeySigner {
     value: Record<string, unknown>
   ): Promise<string> {
     const digest = utils._TypedDataEncoder.hash(domain, types, value);
+    const checksummedAddress = (() => {
+      try {
+        return utils.getAddress(this.walletAddress);
+      } catch {
+        return this.walletAddress;
+      }
+    })();
+    const signWithCandidates = Array.from(
+      new Set([checksummedAddress, this.walletAddress, this.walletAccountId])
+    );
     return signDigestWithTurnkey({
       organizationId: this.organizationId,
-      walletAccountId: this.walletAccountId,
+      signWithCandidates,
       digestHex: digest,
     });
   }
@@ -437,11 +620,7 @@ export class PolymarketController {
     return missing;
   }
 
-  static buildClient(params: {
-    signer: TurnkeySigner;
-    creds?: UserCreds;
-    funderAddress: string;
-  }) {
+  static buildClient(params: { signer: TurnkeySigner; creds?: UserCreds; funderAddress: string }) {
     if (!POLY_BUILDER_API_KEY) throw new Error('POLY_BUILDER_API_KEY is not set.');
     if (!POLY_BUILDER_SECRET) throw new Error('POLY_BUILDER_SECRET is not set.');
     if (!POLY_BUILDER_PASSPHRASE) throw new Error('POLY_BUILDER_PASSPHRASE is not set.');
@@ -511,7 +690,9 @@ export class PolymarketController {
       });
       const creds = await l1Client.createOrDeriveApiKey();
       if (!creds.key || !creds.secret || !creds.passphrase) {
-        throw new Error(`Polymarket API key derivation returned incomplete creds for ${member.userId}`);
+        throw new Error(
+          `Polymarket API key derivation returned incomplete creds for ${member.userId}`
+        );
       }
       return creds;
     })();
@@ -620,9 +801,19 @@ export class PolymarketController {
       OrderType.FOK
     );
 
+    const responseError =
+      (typeof response?.error === 'string' ? response.error : null) ??
+      (typeof response?.data?.error === 'string' ? response.data.error : null) ??
+      null;
+
     const orderId = response?.orderID;
     if (!orderId) {
-      throw new Error(`Missing order ID for user ${member.userId}`);
+      if (responseError) {
+        throw new Error(`Order placement rejected for user ${member.userId}: ${responseError}`);
+      }
+      throw new Error(
+        `Missing order ID for user ${member.userId}. Response: ${JSON.stringify(response).slice(0, 500)}`
+      );
     }
 
     let orderDetails:
