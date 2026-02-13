@@ -54,7 +54,7 @@ export class PredictionRoundController {
       string,
       {
         id: string;
-        walletAddress: string;
+        safeAddress: string;
       }
     >;
     try {
@@ -65,7 +65,7 @@ export class PredictionRoundController {
       clubWalletByUser = new Map(
         Array.from(wallets.entries()).map(([userId, wallet]) => [
           userId,
-          { id: wallet.id, walletAddress: wallet.walletAddress },
+          { id: wallet.id, safeAddress: wallet.polymarketSafeAddress ?? '' },
         ])
       );
     } catch (error) {
@@ -102,7 +102,7 @@ export class PredictionRoundController {
 
       await LedgerController.createEntries(
         activeMembers.map((member) => ({
-          safeAddress: clubWalletByUser.get(member.userId)?.walletAddress ?? '',
+          safeAddress: clubWalletByUser.get(member.userId)?.safeAddress ?? '',
           clubWalletId: clubWalletByUser.get(member.userId)?.id ?? null,
           clubId: club.id,
           userId: member.userId,

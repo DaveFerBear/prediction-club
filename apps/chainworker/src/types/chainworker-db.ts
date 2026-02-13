@@ -37,7 +37,12 @@ export type RoundMember = Prisma.PredictionRoundMemberGetPayload<{
 }> & {
   clubWallet: {
     id: string;
-    walletAddress: string;
+    turnkeyWalletAddress: string;
+    polymarketSafeAddress: string | null;
+    polymarketApiKeyId: string | null;
+    polymarketApiSecret: string | null;
+    polymarketApiPassphrase: string | null;
+    provisioningStatus: 'PENDING' | 'PROVISIONING' | 'READY' | 'FAILED';
     isDisabled: boolean;
     turnkeyWalletAccountId: string;
     turnkeyDelegatedUserId: string;

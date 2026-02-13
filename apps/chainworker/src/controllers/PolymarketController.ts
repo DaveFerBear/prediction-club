@@ -602,8 +602,6 @@ function isMarketResolved(market: Record<string, unknown>) {
 }
 
 export class PolymarketController {
-  private static readonly credsByWallet = new Map<string, Promise<UserCreds>>();
-
   static missingMemberFields(member: RoundMember): string[] {
     const missing: string[] = [];
     if (!member.clubWallet) {
@@ -615,8 +613,15 @@ export class PolymarketController {
       return missing;
     }
     if (!member.user.turnkeySubOrgId) missing.push('turnkeySubOrgId');
+    if (member.clubWallet.provisioningStatus !== 'READY') {
+      missing.push(`clubWalletProvisioningStatus:${member.clubWallet.provisioningStatus}`);
+    }
     if (!member.clubWallet.turnkeyWalletAccountId) missing.push('turnkeyWalletAccountId');
-    if (!member.clubWallet.walletAddress) missing.push('clubWalletAddress');
+    if (!member.clubWallet.turnkeyWalletAddress) missing.push('turnkeyWalletAddress');
+    if (!member.clubWallet.polymarketSafeAddress) missing.push('polymarketSafeAddress');
+    if (!member.clubWallet.polymarketApiKeyId) missing.push('polymarketApiKeyId');
+    if (!member.clubWallet.polymarketApiSecret) missing.push('polymarketApiSecret');
+    if (!member.clubWallet.polymarketApiPassphrase) missing.push('polymarketApiPassphrase');
     return missing;
   }
 
@@ -659,51 +664,33 @@ export class PolymarketController {
     return new TurnkeySigner(
       member.user.turnkeySubOrgId,
       clubWallet.turnkeyWalletAccountId,
-      clubWallet.walletAddress
+      clubWallet.turnkeyWalletAddress
     );
   }
 
-  static getCredsCacheKey(member: RoundMember): string {
+  static getStoredPolymarketCreds(member: RoundMember): UserCreds {
     const clubWallet = member.clubWallet;
-    return `${member.user.turnkeySubOrgId}:${clubWallet?.turnkeyWalletAccountId}:${clubWallet?.walletAddress}`;
+    if (
+      !clubWallet?.polymarketApiKeyId ||
+      !clubWallet?.polymarketApiSecret ||
+      !clubWallet?.polymarketApiPassphrase
+    ) {
+      throw new Error(`Missing stored Polymarket creds for user ${member.userId}`);
+    }
+
+    return {
+      key: clubWallet.polymarketApiKeyId,
+      secret: clubWallet.polymarketApiSecret,
+      passphrase: clubWallet.polymarketApiPassphrase,
+    };
   }
 
-  static async getOrCreatePolymarketCreds(
-    member: RoundMember,
-    signer: TurnkeySigner
-  ): Promise<UserCreds> {
-    const cacheKey = this.getCredsCacheKey(member);
-    const cached = this.credsByWallet.get(cacheKey);
-    if (cached) {
-      return cached;
+  static getFunderAddress(member: RoundMember): string {
+    const safeAddress = member.clubWallet?.polymarketSafeAddress;
+    if (!safeAddress) {
+      throw new Error(`Missing Polymarket Safe address for user ${member.userId}`);
     }
-
-    const createPromise = (async () => {
-      const clubWallet = member.clubWallet;
-      if (!clubWallet) {
-        throw new Error(`Missing club wallet for user ${member.userId}`);
-      }
-
-      const l1Client = this.buildClient({
-        signer,
-        funderAddress: clubWallet.walletAddress,
-      });
-      const creds = await l1Client.createOrDeriveApiKey();
-      if (!creds.key || !creds.secret || !creds.passphrase) {
-        throw new Error(
-          `Polymarket API key derivation returned incomplete creds for ${member.userId}`
-        );
-      }
-      return creds;
-    })();
-
-    this.credsByWallet.set(cacheKey, createPromise);
-    try {
-      return await createPromise;
-    } catch (error) {
-      this.credsByWallet.delete(cacheKey);
-      throw error;
-    }
+    return safeAddress;
   }
 
   static async fetchMarketResolution(conditionId: string): Promise<MarketResolution> {
@@ -779,17 +766,19 @@ export class PolymarketController {
     }
 
     const signer = this.buildTurnkeySigner(member);
-    const creds = await this.getOrCreatePolymarketCreds(member, signer);
+    const creds = this.getStoredPolymarketCreds(member);
+    const funderAddress = this.getFunderAddress(member);
     console.log('[chainworker] Polymarket creds snapshot', {
       userId: member.userId,
       turnkeySubOrgId: member.user.turnkeySubOrgId,
-      walletAddress: clubWallet.walletAddress,
+      walletAddress: clubWallet.turnkeyWalletAddress,
+      safeAddress: funderAddress,
       ...describeCreds(creds),
     });
     const clobClient = this.buildClient({
       signer,
       creds,
-      funderAddress: clubWallet.walletAddress,
+      funderAddress,
     });
     const response = await clobClient.createAndPostMarketOrder(
       {

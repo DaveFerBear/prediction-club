@@ -109,7 +109,8 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
       },
       select: {
         id: true,
-        walletAddress: true,
+        polymarketSafeAddress: true,
+        provisioningStatus: true,
         isDisabled: true,
       },
     });
@@ -118,6 +119,13 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
     }
     if (wallet.isDisabled) {
       return apiError('WALLET_DISABLED', 'Club wallet is disabled', 400);
+    }
+    if (!wallet.polymarketSafeAddress || wallet.provisioningStatus !== 'READY') {
+      return apiError(
+        'WALLET_NOT_READY',
+        'Club wallet provisioning is not complete. Re-initialize wallet and retry.',
+        400
+      );
     }
 
     const existing = await prisma.ledgerEntry.findFirst({
@@ -138,11 +146,11 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
     await verifyDepositTransfer({
       txHash: parsed.data.txHash,
       amount: parsed.data.amount,
-      clubWalletAddress: wallet.walletAddress,
+      clubWalletAddress: wallet.polymarketSafeAddress,
     });
 
     await LedgerController.recordDeposit({
-      safeAddress: wallet.walletAddress,
+      safeAddress: wallet.polymarketSafeAddress,
       clubId: club.id,
       userId: user.id,
       amount: parsed.data.amount,

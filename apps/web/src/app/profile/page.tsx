@@ -24,7 +24,10 @@ type ClubWalletSummary = {
     name: string;
     slug: string;
   };
-  walletAddress: string;
+  walletAddress: string | null;
+  turnkeyWalletAddress: string;
+  provisioningStatus: 'PENDING' | 'PROVISIONING' | 'READY' | 'FAILED';
+  provisioningError: string | null;
   isDisabled: boolean;
   balance: string;
   createdAt: string;
@@ -254,7 +257,18 @@ export default function ProfilePage() {
                       <div className="mt-3 space-y-2 text-sm">
                         <div>
                           <div className="text-muted-foreground">Address</div>
-                          <CopyableAddress address={wallet.walletAddress} variant="compact" />
+                          {wallet.walletAddress ? (
+                            <CopyableAddress address={wallet.walletAddress} variant="compact" />
+                          ) : (
+                            <div className="text-xs text-muted-foreground">Not provisioned yet</div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-muted-foreground">Provisioning</div>
+                          <div>{wallet.provisioningStatus}</div>
+                          {wallet.provisioningError ? (
+                            <div className="text-xs text-destructive">{wallet.provisioningError}</div>
+                          ) : null}
                         </div>
                         <div>
                           <div className="text-muted-foreground">Balance</div>

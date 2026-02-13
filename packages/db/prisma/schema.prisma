@@ -19,10 +19,6 @@ model User {
   turnkeySubOrgId           String?  @unique
   turnkeyEndUserId          String?
   primaryWithdrawalAddress  String?
-  polymarketSafeAddress     String?  @unique
-  polymarketApiKeyId        String?
-  polymarketApiSecret       String?
-  polymarketApiPassphrase   String?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 
@@ -109,10 +105,20 @@ model ClubWallet {
   user                    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   clubId                  String
   club                    Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  walletAddress           String           @unique
+  turnkeyWalletAddress    String           @unique
   turnkeyWalletAccountId  String
   turnkeyDelegatedUserId  String
   turnkeyPolicyId         String
+  polymarketSafeAddress   String?          @unique
+  polymarketApiKeyId      String?
+  polymarketApiSecret     String?
+  polymarketApiPassphrase String?
+  // App-level provisioning state for our orchestration flow (Turnkey signer + Safe + approvals + CLOB creds).
+  // This is not a native Turnkey field and not an on-chain Safe contract field.
+  provisioningStatus      ClubWalletProvisioningStatus @default(PENDING)
+  provisioningError       String?
+  provisionedAt           DateTime?
+  lastProvisioningAttemptAt DateTime?
   isDisabled              Boolean          @default(false)
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
@@ -121,7 +127,16 @@ model ClubWallet {
 
   @@unique([userId, clubId])
   @@index([clubId, isDisabled])
-  @@index([walletAddress])
+  @@index([provisioningStatus])
+  @@index([polymarketSafeAddress])
+  @@index([turnkeyWalletAddress])
+}
+
+enum ClubWalletProvisioningStatus {
+  PENDING
+  PROVISIONING
+  READY
+  FAILED
 }
 
 // ============================================================================

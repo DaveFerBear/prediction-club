@@ -5,7 +5,7 @@ import { useClubWallet } from './use-club-wallet';
 export type ClubSetupStepStatus = 'idle' | 'in-progress' | 'complete';
 
 export type ClubSetupStep = {
-  id: 'signed-in' | 'club-wallet' | 'automation' | 'funded' | 'ready';
+  id: 'signed-in' | 'club-wallet' | 'funded' | 'ready';
   label: string;
   hint: string;
   active: boolean;
@@ -18,9 +18,11 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
     authenticated && input.isMember && input.slug ? input.slug : undefined
   );
   const wallet = walletState.wallet;
+  const walletProvisioningStatus = wallet?.provisioningStatus;
+  const walletProvisioningError = wallet?.provisioningError;
 
   const walletReady = Boolean(wallet && !wallet.isDisabled);
-  const automationReady = Boolean(wallet && !wallet.isDisabled && wallet.automationReady);
+  const provisioningReady = Boolean(wallet && !wallet.isDisabled && wallet.provisioningStatus === 'READY');
   const funded = useMemo(() => {
     if (!wallet) return false;
     try {
@@ -40,36 +42,23 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
 
   const walletStep: ClubSetupStep = {
     id: 'club-wallet',
-    label: 'Club wallet ready',
-    hint: walletReady
-      ? 'Wallet initialized for this club.'
-      : walletState.isInitializing
+    label: 'Club wallet provisioned',
+    hint: !walletReady
+      ? walletState.isInitializing
         ? 'Initializing wallet...'
-        : 'Initialize your per-club wallet.',
+        : 'Initialize your per-club wallet.'
+      : walletProvisioningStatus === 'PROVISIONING'
+        ? 'Provisioning Safe + approvals + CLOB credentials...'
+        : walletProvisioningStatus === 'FAILED'
+          ? walletProvisioningError ?? 'Provisioning failed. Retry initialize wallet.'
+          : walletProvisioningStatus === 'READY'
+            ? 'Safe and trading credentials are ready.'
+            : 'Waiting to provision.',
     active: authenticated && input.isMember,
     status:
       !authenticated || !input.isMember
         ? 'idle'
-        : walletReady
-          ? 'complete'
-          : walletState.isLoading || walletState.isInitializing
-            ? 'in-progress'
-            : 'idle',
-  };
-
-  const automationStep: ClubSetupStep = {
-    id: 'automation',
-    label: 'Automation authorized',
-    hint: automationReady
-      ? 'USDC and CTF approvals are active for Polymarket.'
-      : walletReady
-        ? 'Enable trading to approve Polymarket contracts.'
-        : 'Requires club wallet first.',
-    active: authenticated && input.isMember && walletReady,
-    status:
-      !walletReady
-        ? 'idle'
-        : automationReady
+        : provisioningReady
           ? 'complete'
           : walletState.isLoading || walletState.isInitializing
             ? 'in-progress'
@@ -78,13 +67,13 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
 
   const fundedStep: ClubSetupStep = {
     id: 'funded',
-    label: 'Wallet funded',
+    label: 'Safe funded',
     hint: funded ? 'Balance detected.' : 'Send USDC to your club wallet.',
-    active: authenticated && input.isMember && walletReady,
+    active: authenticated && input.isMember && provisioningReady,
     status: funded ? 'complete' : 'idle',
   };
 
-  const ready = authenticated && walletReady && automationReady && funded;
+  const ready = authenticated && provisioningReady && funded;
   const readyStep: ClubSetupStep = {
     id: 'ready',
     label: 'Ready to trade',
@@ -94,7 +83,7 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
   };
 
   return {
-    steps: [signedInStep, walletStep, automationStep, fundedStep, readyStep] as ClubSetupStep[],
+    steps: [signedInStep, walletStep, fundedStep, readyStep] as ClubSetupStep[],
     ready,
     authenticated,
     isMember: input.isMember,
@@ -102,10 +91,7 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
     walletLoading: walletState.isLoading,
     walletInitializing: walletState.isInitializing,
     walletInitError: walletState.initError,
-    walletEnableTradingError: walletState.enableTradingError,
     initWallet: walletState.initWallet,
-    enableTrading: walletState.enableTrading,
     refreshWallet: walletState.refreshWallet,
-    walletTradingEnabling: walletState.isEnablingTrading,
   };
 }

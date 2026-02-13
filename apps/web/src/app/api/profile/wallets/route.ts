@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const addresses = wallets.map((wallet) => wallet.walletAddress);
+    const addresses = wallets
+      .map((wallet) => wallet.polymarketSafeAddress)
+      .filter((address): address is string => Boolean(address));
     const entries =
       addresses.length === 0
         ? []
@@ -46,9 +48,14 @@ export async function GET(request: NextRequest) {
       wallets: wallets.map((wallet) => ({
         id: wallet.id,
         club: wallet.club,
-        walletAddress: wallet.walletAddress,
+        walletAddress: wallet.polymarketSafeAddress,
+        turnkeyWalletAddress: wallet.turnkeyWalletAddress,
+        provisioningStatus: wallet.provisioningStatus,
+        provisioningError: wallet.provisioningError,
         isDisabled: wallet.isDisabled,
-        balance: (balanceByAddress.get(wallet.walletAddress) ?? 0n).toString(),
+        balance: wallet.polymarketSafeAddress
+          ? (balanceByAddress.get(wallet.polymarketSafeAddress) ?? 0n).toString()
+          : '0',
         createdAt: wallet.createdAt,
       })),
     });
@@ -60,4 +67,3 @@ export async function GET(request: NextRequest) {
     return serverError();
   }
 }
-

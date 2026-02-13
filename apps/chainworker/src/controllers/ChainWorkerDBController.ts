@@ -60,7 +60,12 @@ export class ChainWorkerDBController {
       select: {
         id: true,
         userId: true,
-        walletAddress: true,
+        turnkeyWalletAddress: true,
+        polymarketSafeAddress: true,
+        polymarketApiKeyId: true,
+        polymarketApiSecret: true,
+        polymarketApiPassphrase: true,
+        provisioningStatus: true,
         isDisabled: true,
         turnkeyWalletAccountId: true,
         turnkeyDelegatedUserId: true,
@@ -155,7 +160,7 @@ export class ChainWorkerDBController {
           payout.pnlAmount ?? (BigInt(payoutAmount) - BigInt(member.commitAmount)).toString();
 
         if (!existingPayoutUsers.has(member.userId) && BigInt(payoutAmount) > 0n) {
-          const safeAddress = member.clubWallet?.walletAddress;
+          const safeAddress = member.clubWallet?.polymarketSafeAddress;
           if (!safeAddress) {
             throw new Error(`Missing club wallet for user ${member.userId}`);
           }

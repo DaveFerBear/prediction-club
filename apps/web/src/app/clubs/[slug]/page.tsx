@@ -119,7 +119,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [withdrawMessage, setWithdrawMessage] = useState<string | null>(null);
-  const [enableTradingMessage, setEnableTradingMessage] = useState<string | null>(null);
 
   const {
     applications,
@@ -188,20 +187,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
       setWithdrawMessage('Withdrawal requested.');
     } catch (err) {
       setWithdrawMessage(err instanceof Error ? err.message : 'Unable to request withdrawal.');
-    }
-  };
-
-  const handleEnableTrading = async () => {
-    setEnableTradingMessage(null);
-    try {
-      const txHashes = await setup.enableTrading();
-      if (txHashes.length === 0) {
-        setEnableTradingMessage('Trading approvals were already active.');
-        return;
-      }
-      setEnableTradingMessage(`Submitted ${txHashes.length} approval transaction(s).`);
-    } catch (err) {
-      setEnableTradingMessage(err instanceof Error ? err.message : 'Unable to enable trading.');
     }
   };
 
@@ -291,40 +276,12 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Your Club Setup</CardTitle>
-              <CardDescription>Wallet and trading readiness for this club.</CardDescription>
+              <CardDescription>Wallet provisioning and automation readiness for this club.</CardDescription>
             </CardHeader>
             <CardContent>
               <ClubSetupChecklist
                 steps={setup.steps}
               />
-              {setup.wallet && !setup.wallet.automationReady ? (
-                <div className="mt-4 rounded-md border p-3">
-                  <p className="text-sm">
-                    Enable trading submits one-time approval transactions from your Turnkey club
-                    wallet. No browser signature is required.
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => void handleEnableTrading()}
-                      disabled={setup.walletTradingEnabling}
-                    >
-                      {setup.walletTradingEnabling ? 'Enabling...' : 'Enable trading'}
-                    </Button>
-                    <span className="text-xs text-muted-foreground">
-                      Required once per club wallet.
-                    </span>
-                  </div>
-                  {setup.walletEnableTradingError ? (
-                    <p className="mt-2 text-xs text-destructive">
-                      {setup.walletEnableTradingError.message}
-                    </p>
-                  ) : null}
-                  {enableTradingMessage ? (
-                    <p className="mt-2 text-xs text-muted-foreground">{enableTradingMessage}</p>
-                  ) : null}
-                </div>
-              ) : null}
             </CardContent>
           </Card>
         )}
@@ -341,7 +298,13 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">Address</span>
-                      <CopyableAddress address={setup.wallet.walletAddress} variant="compact" />
+                      {setup.wallet.walletAddress ? (
+                        <CopyableAddress address={setup.wallet.walletAddress} variant="compact" />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Provisioning in progress
+                        </span>
+                      )}
                     </div>
                     <div>
                       <span className="text-muted-foreground">Balance</span>{' '}
@@ -356,9 +319,14 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
                       Withdraw
                     </Button>
                     <span className="text-xs text-muted-foreground">
-                      Top up by sending USDC to this club wallet.
+                      Top up by sending USDC to this club Safe.
                     </span>
                   </div>
+                  {setup.wallet.provisioningStatus === 'FAILED' ? (
+                    <p className="mt-2 text-xs text-destructive">
+                      {setup.wallet.provisioningError ?? 'Wallet provisioning failed. Retry initialize wallet.'}
+                    </p>
+                  ) : null}
                   {withdrawMessage ? (
                     <p className="mt-2 text-xs text-muted-foreground">{withdrawMessage}</p>
                   ) : null}
