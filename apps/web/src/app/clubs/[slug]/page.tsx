@@ -75,7 +75,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     (round) => round.status === 'COMMITTED' || round.status === 'PENDING'
   );
 
-  const exposureSeries = useMemo(() => buildExposureSeries(clubHistory), [clubHistory]);
+  const exposureSeries = useMemo(() => buildExposureSeries(clubHistory, 7), [clubHistory]);
 
   const isAdmin = useMemo(() => {
     if (!address) return false;
@@ -230,7 +230,14 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
   ) : exposureSeries.length === 0 ? (
     <div className="py-8 text-sm text-[color:var(--club-text-secondary)]">No activity yet to chart.</div>
   ) : (
-    <ChartExposure data={exposureSeries} showHeader={false} showFooter={false} compact seamless />
+    <ChartExposure
+      data={exposureSeries}
+      showHeader={false}
+      showFooter={false}
+      compact
+      seamless
+      windowBadgeLabel="Past 7 days"
+    />
   );
 
   return (

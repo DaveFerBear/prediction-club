@@ -1,6 +1,7 @@
 'use client';
 
 import { useId } from 'react';
+import { format } from 'date-fns';
 import {
   Legend,
   ResponsiveContainer,
@@ -13,12 +14,7 @@ import {
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@prediction-club/ui';
 import { TrendingUp } from 'lucide-react';
 import { formatUsdAmount } from '@prediction-club/shared';
-
-type ExposurePoint = {
-  label: string;
-  wallet: number;
-  market: number;
-};
+import type { ExposurePoint } from '@/lib/exposure';
 
 type Props = {
   data: ExposurePoint[];
@@ -30,6 +26,7 @@ type Props = {
   showFooter?: boolean;
   compact?: boolean;
   seamless?: boolean;
+  windowBadgeLabel?: string;
 };
 
 function currency(value: number) {
@@ -52,6 +49,7 @@ export function ChartExposure({
   showFooter = true,
   compact = false,
   seamless = false,
+  windowBadgeLabel,
 }: Props) {
   const chartId = useId();
   const isHero = compact && seamless && !showHeader && !showFooter;
@@ -105,6 +103,11 @@ export function ChartExposure({
                 />
                 <span>Wallet</span>
               </div>
+              {windowBadgeLabel ? (
+                <div className="inline-flex items-center rounded-full border border-slate-300/80 bg-white/70 px-2 py-0.5 text-xs font-medium text-slate-700 shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
+                  {windowBadgeLabel}
+                </div>
+              ) : null}
             </div>
           ) : null}
           <ResponsiveContainer width="100%" height="100%">
@@ -130,20 +133,22 @@ export function ChartExposure({
                 />
               )}
               <XAxis
-                dataKey="label"
+                dataKey="timestamp"
+                type="number"
+                scale="time"
+                domain={['dataMin', 'dataMax']}
                 hide={isHero}
                 tickLine={false}
                 axisLine={false}
                 tickMargin={isHero ? 10 : 6}
                 minTickGap={28}
-                interval={0}
-                tickFormatter={(value: string, index: number) =>
-                  isHero && index !== 0 && index !== data.length - 1 ? '' : value
-                }
+                tickCount={6}
+                tickFormatter={(value: number) => format(new Date(value), 'MMM d')}
                 tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
               />
               <Tooltip
                 cursor={isHero ? { stroke: 'rgba(71, 85, 105, 0.25)', strokeWidth: 1 } : { strokeDasharray: '3 3' }}
+                labelFormatter={(label: number) => format(new Date(label), 'MMM d')}
                 formatter={(value: number, name: string) => [
                   currency(value),
                   name === 'wallet' ? 'Wallet' : 'In markets',
