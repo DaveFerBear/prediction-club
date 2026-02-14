@@ -22,7 +22,9 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
   const walletProvisioningError = wallet?.provisioningError;
 
   const walletReady = Boolean(wallet && !wallet.isDisabled);
-  const provisioningReady = Boolean(wallet && !wallet.isDisabled && wallet.provisioningStatus === 'READY');
+  const provisioningReady = Boolean(
+    wallet && !wallet.isDisabled && wallet.provisioningStatus === 'READY'
+  );
   const funded = useMemo(() => {
     if (!wallet) return false;
     try {
@@ -50,7 +52,7 @@ export function useClubSetupStatus(input: { slug?: string; isMember: boolean }) 
       : walletProvisioningStatus === 'PROVISIONING'
         ? 'Provisioning Safe + approvals + CLOB credentials...'
         : walletProvisioningStatus === 'FAILED'
-          ? walletProvisioningError ?? 'Provisioning failed. Retry initialize wallet.'
+          ? (walletProvisioningError ?? 'Provisioning failed. Retry initialize wallet.')
           : walletProvisioningStatus === 'READY'
             ? 'Safe and trading credentials are ready.'
             : 'Waiting to provision.',
