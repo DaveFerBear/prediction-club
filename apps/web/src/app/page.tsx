@@ -69,8 +69,8 @@ export default function HomePage() {
                   Trade Predictions Together
                 </h1>
                 <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
-                  Create, discover, and join prediction clubs to trade on Polymarket together.
-                  Everyone keeps custody in their own Safe.
+                  Create, discover, and join prediction clubs on Polymarket. <br /> Simple setup &
+                  coordinated execution.
                 </p>
                 <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
                   <Link href="/clubs/create">
@@ -145,8 +145,8 @@ export default function HomePage() {
                   Built for coordinated conviction
                 </h2>
                 <p className="mt-4 text-base text-muted-foreground">
-                  A club needs clarity on custody, execution, and incentives. The stack is built to
-                  keep funds sovereign while making group decisions easy to act on.
+                  A club needs clear execution and incentives. Prediction Club makes group decisions
+                  easy to act on while keeping funds separate for each member.
                 </p>
               </div>
 
@@ -157,10 +157,10 @@ export default function HomePage() {
                       <ShieldCheckIcon className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold">Self-Custody</h3>
+                      <h3 className="text-lg font-semibold">Full Custody & Control</h3>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        Each member funds and maintains custody of their safe, with no on-chain
-                        pooling.
+                        Each member uses their own Safe. Funds stay separate for full control and
+                        clear P&Ls.
                       </p>
                     </div>
                   </div>
@@ -188,7 +188,8 @@ export default function HomePage() {
                     <div>
                       <h3 className="text-lg font-semibold">Zero Platform Fees</h3>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        Order execution and safe creation with zero gas and no platform fees.
+                        Safe creation and order execution are designed to feel seamless, with zero
+                        gas and no platform fees.
                       </p>
                     </div>
                   </div>
@@ -211,7 +212,11 @@ export default function HomePage() {
             >
               Polygon
             </a>
-            . Powered by prediction markets.
+            . Powered by{' '}
+            <Link href="https://polymarket.com" target="_blank" rel="noreferrer">
+              Polymarket
+            </Link>{' '}
+            prediction markets.
           </div>
           <a
             href="https://x.com/prediction_club"
