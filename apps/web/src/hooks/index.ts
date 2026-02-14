@@ -10,6 +10,11 @@ export { useClubBalance } from './use-club-balance';
 export { useClubWallet } from './use-club-wallet';
 export { useClubSetupStatus } from './use-club-setup-status';
 export {
+  useHomeData,
+  type HomeDataPayload,
+  type HomeClubItem,
+} from './use-home-data';
+export {
   useClubs,
   usePublicClubs,
   useClub,
