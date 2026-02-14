@@ -1,38 +1,50 @@
 # Prediction Club
 
-A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a single actor on Polygon.
+A SaaS platform for "prediction clubs" that coordinate Polymarket trading on Polygon using
+Turnkey-managed EOAs and per-club Polymarket Safes.
 
 ## Architecture Overview
 
 ```
 ┌──────────────────────────────┐
 │ Client (Next.js App Router)  │
-│ - Pages + feature components │
+│ - pages + feature components │
 │ - SWR hooks for reads/mutate │
-│ - Turnkey session bootstrap  │
+│ - Google OIDC -> Turnkey     │
 └──────────────┬───────────────┘
                │ HTTP (same app)
                ▼
 ┌──────────────────────────────┐
 │ Next.js Route Handlers (/api)│
-│ - App-session cookie auth    │
-│ - Validation + API responses │
+│ - app-session cookie auth    │
+│ - validation + API responses │
 └──────────────┬───────────────┘
                │
                ▼
 ┌──────────────────────────────┐
 │ Domain Controllers           │
-│ - Club/Application flows     │
-│ - Prediction round lifecycle │
-│ - Club wallet provisioning   │
-│ - Ledger accounting          │
-└──────────────┬───────────────┘
-               │ Prisma
-               ▼
+│ - clubs/applications         │
+│ - prediction lifecycle       │
+│ - club wallet provisioning   │
+│   (Turnkey wallet + Safe)    │
+│ - ledger accounting          │
+└───────┬──────────┬───────────┘
+        │          │
+        │          ├───────────────────────┐
+        │          ▼                       ▼
+        │   ┌─────────────────────┐  ┌─────────────────────┐
+        │   │ Turnkey API         │  │ Polymarket APIs     │
+        │   │ - sub-org users     │  │ - relayer (safe ops)│
+        │   │ - wallet accounts   │  │ - CLOB (orders/keys)│
+        │   │ - digest signatures │  │ - Gamma (discovery) │
+        │   └─────────────────────┘  └─────────────────────┘
+        │
+        │ Prisma
+        ▼
 ┌──────────────────────────────┐
 │ PostgreSQL                   │
 │ - users, clubs, memberships  │
-│ - club_wallets               │
+│ - club_wallets (+ safe/creds)│
 │ - prediction rounds/members  │
 │ - ledger entries             │
 └──────────────┬───────────────┘
@@ -42,24 +54,49 @@ A SaaS platform for "prediction clubs" that coordinate Polymarket trading as a s
 │ Chainworker (separate app)   │
 │ - executes PENDING rounds    │
 │ - settles COMMITTED rounds   │
-│ - writes order/payout fields │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│ Polymarket APIs              │
-│ - Gamma (discovery/search)   │
-│ - CLOB + relayer execution   │
+│ - uses Turnkey signer + Safe │
 └──────────────────────────────┘
 ```
 
 ### Key Components
 
 - **Web App (`apps/web`)**: UI + route handlers; app-session auth, club wallet APIs, and authenticated API surface for clubs/applications/predictions.
-- **Domain Layer (`apps/web/src/controllers`)**: Business logic for memberships, prediction round creation, and ledger accounting.
+- **Domain Layer (`apps/web/src/controllers`)**: Business logic for memberships, prediction round creation, wallet provisioning, and ledger accounting.
 - **Database (`packages/db`)**: Shared Prisma client/schema used by both web and chainworker.
-- **Chainworker (`apps/chainworker`)**: Background poller that executes pending orders, tracks resolution, and finalizes settlement per member club wallet.
+- **Chainworker (`apps/chainworker`)**: Background poller that executes pending orders via CLOB and settles resolved rounds using per-club wallet context.
 - **Shared Packages (`packages/shared`, `packages/ui`)**: Shared types/utilities and reusable UI primitives.
+
+### Wallet & Signing Flow (Current)
+
+1. **User sign-in (Google -> Turnkey)**  
+   On profile sign-in, Google OIDC is exchanged for a Turnkey identity. We persist:
+   - `User.turnkeySubOrgId`
+   - `User.turnkeyEndUserId`
+
+2. **Per-user, per-club wallet provisioning (`POST /api/clubs/[slug]/wallet/init`)**  
+   `ClubWalletController.ensureClubWallet` does this:
+   - Creates a **Turnkey EOA wallet account** for that `(user, club)` if missing.
+   - Derives/deploys the **Polymarket Safe** for that EOA (relayer client).
+   - Executes one-time approval txs via relayer for required Polymarket spenders/operators.
+   - Derives CLOB API creds and stores them on `ClubWallet`:
+     - `polymarketApiKeyId`
+     - `polymarketApiSecret`
+     - `polymarketApiPassphrase`
+   - Marks `ClubWallet.provisioningStatus` as `READY` (or `FAILED` with `provisioningError`).
+
+3. **Funding model**  
+   Club treasury address shown in UI is the **Safe address** (`ClubWallet.polymarketSafeAddress`).
+   Deposits/withdrawals are modeled in ledger entries per `(user, club, safeAddress)`.
+
+4. **Order execution (chainworker)**  
+   For each `PENDING` prediction round member:
+   - Uses Turnkey (`sign_raw_payload`) to sign CLOB EIP-712 payloads with the club Turnkey wallet key.
+   - Uses stored club-wallet CLOB creds.
+   - Uses Safe address as `funderAddress`.
+   - Posts market BUY orders; writes order metadata to `PredictionRoundMember`.
+
+5. **Settlement (chainworker)**  
+   For `COMMITTED` rounds, polls resolution and writes payouts + PnL, then appends ledger `PAYOUT` entries.
 
 ## Repo Structure
 
@@ -105,12 +142,7 @@ yarn install
 
 ### 2. Environment Setup
 
-```bash
-# Copy environment files
-cp apps/web/.env.example apps/web/.env
-
-# Edit with your values (see Environment Variables section)
-```
+Create `apps/web/.env` and `apps/chainworker/.env`, then fill required vars below.
 
 ### 3. Start Database
 
@@ -158,6 +190,12 @@ The web app will be available at http://localhost:3000
 | `TURNKEY_API_BASE_URL`                 | Turnkey API base URL               | No       |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`         | Google OAuth client ID for sign-in | Yes      |
 | `NEXT_PUBLIC_DEFAULT_CHAIN_ID`         | Default chain (80002 for Amoy)     | No       |
+| `POLYMARKET_RELAYER_URL`               | Polymarket relayer base URL        | Yes      |
+| `POLY_BUILDER_API_KEY`                 | Polymarket builder API key         | Yes      |
+| `POLY_BUILDER_SECRET`                  | Polymarket builder API secret      | Yes      |
+| `POLY_BUILDER_PASSPHRASE`              | Polymarket builder API passphrase  | Yes      |
+| `POLYGON_RPC_URL`                      | Server-side Polygon RPC URL        | Recommended |
+| `AMOY_RPC_URL`                         | Server-side Amoy RPC URL           | Optional |
 | `NEXT_PUBLIC_POLYGON_RPC_URL`          | Polygon mainnet RPC                | No       |
 | `NEXT_PUBLIC_AMOY_RPC_URL`             | Amoy testnet RPC                   | No       |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect project ID           | No       |
@@ -169,7 +207,9 @@ Important: `docker --env-file` does not strip quotes. Avoid quoting values in th
 | Variable                         | Description                                 | Required |
 | -------------------------------- | ------------------------------------------- | -------- |
 | `DATABASE_URL`                   | Postgres connection string                  | Yes      |
-| `CHAINWORKER_SIGNER_PRIVATE_KEY` | Signing key used by the chainworker         | Yes      |
+| `TURNKEY_API_PUBLIC_KEY`         | Turnkey API public key (P-256)              | Yes      |
+| `TURNKEY_API_PRIVATE_KEY`        | Turnkey API private key                     | Yes      |
+| `TURNKEY_API_BASE_URL`           | Turnkey API base URL                        | No       |
 | `POLY_BUILDER_API_KEY`           | Polymarket builder API key                  | Yes      |
 | `POLY_BUILDER_SECRET`            | Polymarket builder API secret               | Yes      |
 | `POLY_BUILDER_PASSPHRASE`        | Polymarket builder API passphrase           | Yes      |
@@ -203,7 +243,7 @@ Local dev:
 yarn chainworker:dev
 ```
 
-Generate signer env values:
+Generate/normalize chainworker env values:
 
 ```bash
 yarn workspace @prediction-club/chainworker env:generate
@@ -256,10 +296,11 @@ gcloud compute ssh chainworker --project cad-ai-439508
 - ✅ Ledger entries for club balances and prediction rounds
 - ✅ App-session auth endpoints for Turnkey identity linking
 - ✅ Google-based sign-in UI linked to Turnkey login endpoint
+- ✅ Turnkey club wallet provisioning (EOA + Safe + approvals + stored CLOB creds)
+- ✅ Chainworker CLOB execution with Turnkey signatures and Safe funder context
 
 ### Stubbed / TODO
 
-- 🔲 Polymarket order execution (relay/CLOB orders)
 - 🔲 Real-time updates (would need WebSocket or polling)
 - 🔲 Club discovery/ranking
 - 🔲 Email notifications
@@ -269,10 +310,10 @@ gcloud compute ssh chainworker --project cad-ai-439508
 
 Key models:
 
-- **User**: Turnkey identity linkage, wallet address compatibility, app auth identity
+- **User**: App auth identity + Turnkey sub-org/end-user linkage
 - **Club**: Name, manager, visibility, metadata
 - **ClubMember**: Role (ADMIN/MEMBER), status
-- **ClubWallet**: One wallet per `(user, club)` for isolated accounting and execution context
+- **ClubWallet**: One record per `(user, club)` with Turnkey wallet account, Polymarket Safe address, stored CLOB creds, and provisioning status
 - **Application**: Membership applications
 - **PredictionRound**: Prediction rounds with market reference
 - **PredictionRoundMember**: Individual participation, PnL tracking
