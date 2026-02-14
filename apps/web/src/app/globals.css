@@ -93,8 +93,27 @@
     animation: logo-spin 700ms ease-out forwards;
   }
 
+  @keyframes home-ticker-scroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(calc(-50% - 0.75rem));
+    }
+  }
+
+  .home-ticker-track {
+    animation: home-ticker-scroll 45s linear infinite;
+    will-change: transform;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .logo-spin-anim {
+      animation: none;
+      transform: none;
+    }
+
+    .home-ticker-track {
       animation: none;
       transform: none;
     }
