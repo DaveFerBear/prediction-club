@@ -47,13 +47,13 @@ export function ClubTicker({ clubs }: ClubTickerProps) {
   const items = clubs.length > 1 ? [...clubs, ...clubs] : clubs;
   const trackClassName = [
     clubs.length > 1 ? 'home-ticker-track' : '',
-    'flex w-max gap-3 px-3 py-3 pr-8 group-hover:[animation-play-state:paused] group-focus-within:[animation-play-state:paused] motion-reduce:animate-none',
+    'flex w-max gap-2 px-3 py-2 pr-8 group-hover:[animation-play-state:paused] group-focus-within:[animation-play-state:paused] motion-reduce:animate-none',
   ].join(' ');
 
   return (
     <section aria-label="Top clubs">
-      <div className="group overflow-hidden rounded-2xl border border-border/70 bg-card/75 shadow-sm">
-        <div className="overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="group overflow-hidden border-y border-border/70 bg-card/75">
+        <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className={trackClassName}>
             {items.map((club, idx) => {
               const perf = returnUi(club);
@@ -63,37 +63,25 @@ export function ClubTicker({ clubs }: ClubTickerProps) {
                 <Link
                   key={`${club.id}-${idx}`}
                   href={`/clubs/${club.slug}`}
-                  className="group/item min-w-[250px] rounded-xl border border-border/60 bg-background/90 px-4 py-3 transition-all hover:-translate-y-[1px] hover:border-border hover:bg-background"
+                  className="group/item min-w-[220px] rounded-md border border-border/60 bg-background/90 px-3 py-2 transition-colors hover:border-border hover:bg-background"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold">{club.name}</div>
-                      <div className="truncate text-xs text-muted-foreground">/{club.slug}</div>
                     </div>
                     <div
                       className={[
-                        'inline-flex items-center gap-1 text-sm font-semibold tabular-nums',
+                        'inline-flex items-center gap-1 text-xs font-semibold tabular-nums',
                         perf.className,
                       ].join(' ')}
                     >
-                      <PerfIcon className="h-4 w-4" />
+                      <PerfIcon className="h-3.5 w-3.5" />
                       {perf.value}
                     </div>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <div>
-                      <div className="text-muted-foreground">Active volume</div>
-                      <div className="font-semibold tabular-nums text-foreground">
-                        ${formatUsdAmount(club.activeCommittedVolume)}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-muted-foreground">Members</div>
-                      <div className="font-semibold tabular-nums text-foreground">
-                        {club._count.members.toLocaleString('en-US')}
-                      </div>
-                    </div>
+                  <div className="mt-1.5 text-xs text-muted-foreground">
+                    Vol <span className="font-semibold tabular-nums text-foreground">${formatUsdAmount(club.activeCommittedVolume)}</span>
                   </div>
                 </Link>
               );

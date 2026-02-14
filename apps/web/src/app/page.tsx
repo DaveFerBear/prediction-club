@@ -36,36 +36,36 @@ export default function HomePage() {
           <div className="container relative z-10 py-16 md:py-24">
             <div className="mx-auto max-w-5xl">
               <div className="mx-auto max-w-3xl text-center">
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <div className="inline-flex items-center rounded-full border border-slate-900/10 bg-white/75 px-3 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_1px_rgba(15,23,42,0.05)] backdrop-blur">
-                    <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-slate-500">
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                  <div className="inline-flex items-center rounded-full border border-slate-900/10 bg-white/75 px-2.5 py-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_1px_rgba(15,23,42,0.05)] backdrop-blur">
+                    <span className="text-[9px] font-medium uppercase tracking-[0.08em] text-slate-500">
                       Volume
                     </span>
-                    <span className="mx-1.5 text-slate-300">/</span>
-                    <span className="text-base font-semibold tracking-tight tabular-nums text-slate-900">
+                    <span className="mx-1 text-slate-300">/</span>
+                    <span className="text-sm font-semibold tracking-tight tabular-nums text-slate-900">
                       ${formatUsdAmount(data.kpis.totalActiveVolume)}
                     </span>
                   </div>
-                  <div className="inline-flex items-center rounded-full border border-slate-900/10 bg-white/75 px-3 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_1px_rgba(15,23,42,0.05)] backdrop-blur">
-                    <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-slate-500">
+                  <div className="inline-flex items-center rounded-full border border-slate-900/10 bg-white/75 px-2.5 py-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_1px_rgba(15,23,42,0.05)] backdrop-blur">
+                    <span className="text-[9px] font-medium uppercase tracking-[0.08em] text-slate-500">
                       Median 30d
                     </span>
-                    <span className="mx-1.5 text-slate-300">/</span>
-                    <span className="text-base font-semibold tracking-tight tabular-nums text-slate-900">
+                    <span className="mx-1 text-slate-300">/</span>
+                    <span className="text-sm font-semibold tracking-tight tabular-nums text-slate-900">
                       {medianReturnLabel}
                     </span>
                   </div>
-                  <div className="inline-flex items-center rounded-full border border-slate-900/10 bg-white/75 px-3 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_1px_rgba(15,23,42,0.05)] backdrop-blur">
-                    <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-slate-500">
+                  <div className="inline-flex items-center rounded-full border border-slate-900/10 bg-white/75 px-2.5 py-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_1px_rgba(15,23,42,0.05)] backdrop-blur">
+                    <span className="text-[9px] font-medium uppercase tracking-[0.08em] text-slate-500">
                       Clubs
                     </span>
-                    <span className="mx-1.5 text-slate-300">/</span>
-                    <span className="text-base font-semibold tracking-tight tabular-nums text-slate-900">
+                    <span className="mx-1 text-slate-300">/</span>
+                    <span className="text-sm font-semibold tracking-tight tabular-nums text-slate-900">
                       {data.kpis.publicClubCount.toLocaleString('en-US')}
                     </span>
                   </div>
                 </div>
-                <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-6xl md:text-7xl">
+                <h1 className="mt-8 text-4xl font-bold tracking-tight sm:text-6xl md:text-7xl">
                   Trade Predictions Together
                 </h1>
                 <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
@@ -92,11 +92,11 @@ export default function HomePage() {
                   Live metrics are temporarily unavailable. Core app actions still work.
                 </div>
               ) : null}
-
-              <div className="mt-10">
-                <ClubTicker clubs={data.clubs} />
-              </div>
             </div>
+          </div>
+
+          <div className="relative z-10 mt-2">
+            <ClubTicker clubs={data.clubs} />
           </div>
         </section>
 
