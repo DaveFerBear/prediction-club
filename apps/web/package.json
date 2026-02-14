@@ -7,9 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "agent:create-clubs": "tsx src/scripts/agents/create-agent-clubs.ts",
+    "agent:run": "tsx src/scripts/agents/run-agent.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.14",
+    "@ai-sdk/google": "^1.0.17",
+    "@ai-sdk/openai": "^1.0.17",
     "@tanstack/react-query": "^5.62.16",
     "@polymarket/builder-relayer-client": "^0.0.8",
     "@polymarket/builder-signing-sdk": "^0.0.8",
@@ -17,6 +22,7 @@
     "@prediction-club/db": "*",
     "@prediction-club/shared": "*",
     "@prediction-club/ui": "*",
+    "ai": "^4.1.53",
     "recharts": "^2.12.3",
     "ethers": "^5.8.0",
     "next": "^14.0.4",
@@ -36,6 +42,7 @@
     "eslint-config-next": "^14.0.4",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
+    "tsx": "^4.20.3",
     "typescript": "^5.3.3"
   }
 }
