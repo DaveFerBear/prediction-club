@@ -1,198 +1,204 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Badge } from '@prediction-club/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Skeleton,
+} from '@prediction-club/ui';
 import { Header } from '@/components/header';
+import { MarketCard } from '@/components/markets/market-card';
+import { MarketDetailsPanel } from '@/components/markets/market-details-panel';
+import { MarketCardSkeleton, MarketDetailsSkeleton } from '@/components/markets/market-skeletons';
+import { getMarketIdentifier, getMarketTitle } from '@/components/markets/market-utils';
+import { useClubs, useMarketsCatalog, type MarketItem } from '@/hooks';
 
-type MarketItem = {
-  id?: string | number;
-  slug?: string;
-  question?: string;
-  title?: string;
-  description?: string;
-  liquidity?: number;
-  volume?: number;
-  volume24h?: number;
-  startDate?: string;
-  endDate?: string;
-  closed?: boolean;
-  active?: boolean;
-  outcomes?: string[];
-  outcomePrices?: string[];
-  eventId?: string | number;
-};
-
-type MarketsResponse = {
-  success: boolean;
-  data: {
-    mode: 'markets' | 'search';
-    items: MarketItem[];
-    pagination: {
-      limit?: number;
-      offset?: number;
-      nextOffset?: number;
-    } | null;
-  };
-};
-
-function formatNumber(value?: number) {
-  if (value === undefined || value === null) return '—';
-  return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+function buildPredictHref(clubSlug: string, market: MarketItem) {
+  const params = new URLSearchParams();
+  if (market.slug) params.set('marketSlug', market.slug);
+  if (market.id !== undefined && market.id !== null) params.set('marketId', String(market.id));
+  if (market.conditionId) params.set('conditionId', market.conditionId);
+  params.set('marketTitle', getMarketTitle(market));
+  return `/clubs/${clubSlug}/predict?${params.toString()}`;
 }
 
 export default function MarketsPage() {
-  const [query, setQuery] = useState('');
-  const [submittedQuery, setSubmittedQuery] = useState('');
-  const [items, setItems] = useState<MarketItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const effectiveQuery = useMemo(() => submittedQuery.trim(), [submittedQuery]);
+  const { query, setQuery, submitSearch, clearSearch, submittedQuery, markets, isLoading, error } =
+    useMarketsCatalog();
+  const { clubs, isLoading: isClubsLoading } = useClubs();
+  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    async function fetchMarkets() {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams();
-        if (effectiveQuery) {
-          params.set('q', effectiveQuery);
-          params.set('limit', '50');
-        } else {
-          params.set('limit', '50');
-          params.set('offset', '0');
-          params.set('closed', 'false');
-        }
-
-        const res = await fetch(`/api/markets?${params.toString()}`);
-        const data: MarketsResponse = await res.json();
-        if (!data.success) {
-          throw new Error('Failed to load markets');
-        }
-        if (!cancelled) {
-          setItems(data.data.items ?? []);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load markets');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+    if (markets.length === 0) {
+      setSelectedMarketId(null);
+      return;
     }
 
-    fetchMarkets();
-    return () => {
-      cancelled = true;
-    };
-  }, [effectiveQuery]);
+    const hasSelection = selectedMarketId
+      ? markets.some((item) => getMarketIdentifier(item) === selectedMarketId)
+      : false;
 
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    setSubmittedQuery(query);
-  };
+    if (!hasSelection) {
+      setSelectedMarketId(getMarketIdentifier(markets[0]));
+    }
+  }, [markets, selectedMarketId]);
+
+  const selectedMarket = useMemo(
+    () => markets.find((item) => getMarketIdentifier(item) === selectedMarketId) ?? null,
+    [markets, selectedMarketId]
+  );
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="container py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Markets</h1>
-          <p className="text-muted-foreground">Search Polymarket via the Gamma API.</p>
-        </div>
-
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Search</CardTitle>
-            <CardDescription>Find markets by keyword.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Input
-                placeholder="Search markets (e.g. election, bitcoin, fed)"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-              <div className="flex gap-2">
-                <Button type="submit">Search</Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setQuery('');
-                    setSubmittedQuery('');
+      <main className="container space-y-6 py-8">
+        <section className="rounded-2xl border bg-gradient-to-br from-card via-card to-muted/40 p-6 md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-3">
+              <Badge variant="outline" className="text-xs font-medium">
+                Market Discovery
+              </Badge>
+              <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">Find the right market</h1>
+              <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
+                Explore live Polymarket markets, inspect outcomes, and route directly into a club prediction flow.
+              </p>
+            </div>
+            <Card className="w-full border-border/70 lg:max-w-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Search markets</CardTitle>
+                <CardDescription>
+                  Use keyword search or browse current open markets.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  className="flex flex-col gap-2 sm:flex-row"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    submitSearch();
                   }}
                 >
-                  Clear
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                  <Input
+                    value={query}
+                    placeholder="bitcoin, election, fed..."
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                  <Button type="submit">Search</Button>
+                  <Button type="button" variant="outline" onClick={clearSearch}>
+                    Reset
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
-        {loading ? (
-          <div className="text-muted-foreground">Loading markets...</div>
-        ) : error ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">{error}</p>
-            </CardContent>
-          </Card>
-        ) : items.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">No markets found.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {items.map((item, idx) => (
-              <Card key={item.id ?? item.slug ?? item.eventId ?? idx}>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg">
-                      {item.question || item.title || item.slug || 'Untitled market'}
-                    </CardTitle>
-                    <Badge variant={item.closed ? 'secondary' : 'default'}>
-                      {item.closed ? 'Closed' : 'Open'}
-                    </Badge>
-                  </div>
-                  {item.description && (
-                    <CardDescription className="line-clamp-2">{item.description}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Liquidity</span>
-                    <span>{formatNumber(item.liquidity)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Volume</span>
-                    <span>{formatNumber(item.volume)}</span>
-                  </div>
-                  {Array.isArray(item.outcomes) && Array.isArray(item.outcomePrices) && (
-                    <div className="pt-2">
-                      <div className="text-muted-foreground text-xs uppercase tracking-wide">
-                        Outcomes
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {item.outcomes.map((outcome, outcomeIdx) => (
-                          <Badge key={`${outcome}-${outcomeIdx}`} variant="outline">
-                            {outcome}: {item.outcomePrices?.[outcomeIdx] ?? '—'}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+        <section className="grid gap-6 md:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                {submittedQuery ? `Search results for “${submittedQuery}”` : 'Open markets'}
+              </h2>
+              <Badge variant="outline">{markets.length} markets</Badge>
+            </div>
+
+            {isLoading ? (
+              <div className="grid gap-3">
+                <MarketCardSkeleton />
+                <MarketCardSkeleton />
+                <MarketCardSkeleton />
+              </div>
+            ) : error ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">{error}</CardContent>
+              </Card>
+            ) : markets.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No markets found. Try a different search term.
                 </CardContent>
               </Card>
-            ))}
+            ) : (
+              <div className="grid gap-3">
+                {markets.map((market) => {
+                  const marketId = getMarketIdentifier(market);
+                  return (
+                    <MarketCard
+                      key={marketId}
+                      market={market}
+                      selected={marketId === selectedMarketId}
+                      onSelect={(item) => setSelectedMarketId(getMarketIdentifier(item))}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="space-y-4 md:sticky md:top-20 md:max-h-[calc(100vh-6rem)] md:self-start md:overflow-y-auto md:pr-1">
+            {isLoading ? (
+              <MarketDetailsSkeleton />
+            ) : (
+              <MarketDetailsPanel
+                market={selectedMarket}
+                emptyLabel="Select any market on the left to inspect pricing and outcomes."
+              />
+            )}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Use in club</CardTitle>
+                <CardDescription>
+                  Launch the prediction flow with this market pre-selected.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!selectedMarket ? (
+                  <p className="text-sm text-muted-foreground">Choose a market first.</p>
+                ) : isClubsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-14 w-full" />
+                    <Skeleton className="h-14 w-full" />
+                  </div>
+                ) : clubs.length === 0 ? (
+                  <div className="space-y-3 rounded-md border border-dashed p-4">
+                    <p className="text-sm text-muted-foreground">
+                      You need a club before you can create a prediction.
+                    </p>
+                    <Button asChild>
+                      <Link href="/clubs">Create or join a club</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {clubs.slice(0, 6).map((club) => (
+                      <div
+                        key={club.id}
+                        className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{club.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{club.slug}</p>
+                        </div>
+                        <Button asChild size="sm">
+                          <Link href={buildPredictHref(club.slug, selectedMarket)}>Use in {club.name}</Link>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
       </main>
     </div>
   );

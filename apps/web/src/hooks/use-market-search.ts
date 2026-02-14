@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import useSWR from 'swr';
 import { useApi } from './use-api';
 
 export type MarketItem = {
@@ -8,7 +9,15 @@ export type MarketItem = {
   slug?: string;
   question?: string;
   title?: string;
+  description?: string;
   subtitle?: string;
+  liquidity?: number;
+  volume?: number;
+  volume24h?: number;
+  closed?: boolean;
+  active?: boolean;
+  startDate?: string;
+  endDate?: string;
   outcomes?: string[] | string;
   outcomePrices?: string[] | string;
   clobTokenIds?: string[] | string;
@@ -19,9 +28,14 @@ export type MarketItem = {
   icon?: string;
 };
 
-type RawMarketItem = MarketItem & {
+export type RawMarketItem = MarketItem & {
   condition_id?: string;
   image_url?: string;
+};
+
+export type MarketsApiResponse = {
+  success: boolean;
+  data: { items: RawMarketItem[] };
 };
 
 function parseStringArray(value: string | string[] | undefined) {
@@ -35,7 +49,7 @@ function parseStringArray(value: string | string[] | undefined) {
   }
 }
 
-function normalizeMarketItem(item: RawMarketItem): MarketItem {
+export function normalizeMarketItem(item: RawMarketItem): MarketItem {
   const { condition_id, image_url, ...rest } = item;
   const outcomes = parseStringArray(item.outcomes);
   const outcomePrices = parseStringArray(item.outcomePrices);
@@ -55,7 +69,22 @@ function normalizeMarketItem(item: RawMarketItem): MarketItem {
   };
 }
 
-async function fetchMarketDetailsRequest(apiFetch: <T>(url: string) => Promise<T>, market: MarketItem) {
+function dedupeResults(items: MarketItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.id ?? item.conditionId ?? item.slug ?? item.url ?? item.eventId;
+    if (!key) return true;
+    const keyStr = String(key);
+    if (seen.has(keyStr)) return false;
+    seen.add(keyStr);
+    return true;
+  });
+}
+
+async function fetchMarketDetailsRequest(
+  apiFetch: <T>(url: string) => Promise<T>,
+  market: MarketItem
+) {
   const slug = market.slug?.trim();
   const id = market.id ? String(market.id) : undefined;
   if (!slug && !id) return null;
@@ -65,10 +94,7 @@ async function fetchMarketDetailsRequest(apiFetch: <T>(url: string) => Promise<T
   if (id) params.set('id', id);
   params.set('limit', '1');
 
-  const response = await apiFetch<{
-    success: boolean;
-    data: { items: RawMarketItem[] };
-  }>(`/api/markets?${params.toString()}`);
+  const response = await apiFetch<MarketsApiResponse>(`/api/markets?${params.toString()}`);
 
   if (!response.success) {
     throw new Error('Failed to fetch market details');
@@ -81,59 +107,39 @@ async function fetchMarketDetailsRequest(apiFetch: <T>(url: string) => Promise<T
 export function useMarketSearch() {
   const { fetch: apiFetch } = useApi();
   const [query, setQuery] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<MarketItem[]>([]);
+  const [submittedQuery, setSubmittedQuery] = useState('');
+  const effectiveQuery = submittedQuery.trim();
+  const key = effectiveQuery
+    ? `/api/markets?active=true&limit=50&q=${encodeURIComponent(effectiveQuery)}`
+    : null;
 
-  const dedupeResults = useCallback((items: MarketItem[]) => {
-    const seen = new Set<string>();
-    return items.filter((item) => {
-      const key =
-        item.id ??
-        item.conditionId ??
-        item.slug ??
-        item.url ??
-        item.eventId;
-      if (!key) return true;
-      const keyStr = String(key);
-      if (seen.has(keyStr)) return false;
-      seen.add(keyStr);
-      return true;
-    });
-  }, []);
+  const { data, error, isLoading, isValidating } = useSWR<MarketsApiResponse>(
+    key,
+    (url: string) => apiFetch<MarketsApiResponse>(url)
+  );
 
-  const runSearch = useCallback(async () => {
+  const runSearch = useCallback(() => {
     const trimmed = query.trim();
     if (!trimmed) {
-      setResults([]);
+      setSubmittedQuery('');
       return;
     }
-    setError(null);
-    setSearching(true);
-    try {
-      const response = await apiFetch<{
-        success: boolean;
-        data: { items: RawMarketItem[] };
-      }>(`/api/markets?active=true&limit=50&q=${encodeURIComponent(trimmed)}`);
+    setSubmittedQuery(trimmed);
+  }, [query]);
 
-      if (!response.success) {
-        throw new Error('Failed to fetch markets');
-      }
+  const results = useMemo(() => {
+    if (!data?.success) return [];
+    const normalized = (data.data.items ?? []).map((item) => normalizeMarketItem(item));
+    return dedupeResults(normalized);
+  }, [data]);
 
-      const normalized = (response.data.items ?? []).map((item) => normalizeMarketItem(item));
-      setResults(dedupeResults(normalized));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch markets');
-    } finally {
-      setSearching(false);
-    }
-  }, [apiFetch, dedupeResults, query]);
+  const errorMessage = error instanceof Error ? error.message : null;
 
   return {
     query,
     setQuery,
-    searching,
-    error,
+    searching: isLoading || isValidating,
+    error: errorMessage,
     results,
     runSearch,
   };

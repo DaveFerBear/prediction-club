@@ -34,6 +34,7 @@ export {
 } from './components/dropdown-menu';
 export { Progress } from './components/progress';
 export { Slider } from './components/slider';
+export { Skeleton } from './components/skeleton';
 export {
   Accordion,
   AccordionItem,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { parseUnits } from 'viem';
 import {
@@ -12,12 +12,23 @@ import {
   Card,
   CardContent,
   Input,
+  Skeleton,
   Slider,
 } from '@prediction-club/ui';
 import { useCreatePrediction } from '@/hooks/use-create-prediction';
 import { usePolymarketMarketData } from '@/hooks/use-polymarket-market-data';
 import { useMarketDetails, useMarketSearch, useClubWallet, type ClubDetail } from '@/hooks';
 import type { MarketItem } from '@/hooks/use-market-search';
+import { MarketCard } from '@/components/markets/market-card';
+import { MarketDetailsPanel } from '@/components/markets/market-details-panel';
+import {
+  formatMarketUrl,
+  formatOutcomePrice,
+  getMarketKey,
+  getMarketOutcomes,
+  getMarketTitle,
+  getMarketUrl,
+} from '@/components/markets/market-utils';
 
 type PredictionFormState = {
   tag: 'idle' | 'submitting' | 'error';
@@ -97,17 +108,6 @@ function predictionFormReducer(
   }
 }
 
-function getMarketTitle(market: MarketItem | null) {
-  if (!market) return 'Market';
-  return market.question || market.title || market.slug || 'Market';
-}
-
-function formatPriceValue(value: string) {
-  const num = Number(value);
-  if (Number.isNaN(num)) return value;
-  return `${(num * 100).toFixed(0)}%`;
-}
-
 function formatUsdc(value: number) {
   if (!Number.isFinite(value)) return '0.00';
   return value.toFixed(2);
@@ -117,35 +117,9 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getOutcomePrices(market: MarketItem) {
-  if (!Array.isArray(market.outcomePrices) || !Array.isArray(market.outcomes)) {
-    return [];
-  }
-  return market.outcomes.map((outcome, index) => ({
-    outcome,
-    price: market.outcomePrices?.[index] ?? '',
-  }));
-}
-
 function getEventTitle(event: MarketItem | null) {
   if (!event) return 'Event';
   return event.question || event.title || event.subtitle || event.slug || 'Event';
-}
-
-function getEventKey(event: MarketItem) {
-  return String(event.id ?? event.slug ?? event.eventId ?? '');
-}
-
-function getEventUrl(event: MarketItem) {
-  return event.url || '';
-}
-
-function getEventImage(event: MarketItem) {
-  return event.image || event.imageUrl || event.icon || '';
-}
-
-function formatUrl(url: string) {
-  return url.replace(/^https?:\/\//, '');
 }
 
 function getConditionId(market: MarketItem | null) {
@@ -169,16 +143,6 @@ function getOutcomeTokenId(market: MarketItem | null, outcome: string | null) {
   const index = outcomes.findIndex((entry) => entry === outcome);
   if (index < 0) return null;
   return tokenIds[index] ?? null;
-}
-
-function getMarketImage(market: MarketItem) {
-  return market.image || market.imageUrl || market.icon || '';
-}
-
-function getMarketUrl(market: MarketItem) {
-  if (market.url) return market.url;
-  if (market.slug) return `https://polymarket.com/market/${market.slug}`;
-  return '';
 }
 
 function OutcomeDetails({ outcome, tokenId }: { outcome: string; tokenId?: string }) {
@@ -269,10 +233,18 @@ export function ClubPredictionForm({
   club,
   clubSlug,
   address,
+  prefillMarket,
 }: {
   club: ClubDetail;
   clubSlug: string;
   address: string | null;
+  prefillMarket?: {
+    marketSlug?: string;
+    marketId?: string;
+    conditionId?: string;
+    outcome?: string;
+    title?: string;
+  };
 }) {
   const router = useRouter();
   const [state, dispatch] = useReducer(predictionFormReducer, initialState);
@@ -280,6 +252,10 @@ export function ClubPredictionForm({
     'event'
   );
   const [loadingMarketKey, setLoadingMarketKey] = useState<string | null>(null);
+  const [prefillResolvedMarket, setPrefillResolvedMarket] = useState<MarketItem | null>(null);
+  const [prefillLoading, setPrefillLoading] = useState(false);
+  const [prefillError, setPrefillError] = useState<string | null>(null);
+  const appliedPrefillKeyRef = useRef<string | null>(null);
   const { createPrediction } = useCreatePrediction(clubSlug);
   const { fetchMarketDetails } = useMarketDetails();
   const { query, setQuery, searching, error, results, runSearch } = useMarketSearch();
@@ -320,6 +296,75 @@ export function ClubPredictionForm({
     () => results.filter((item) => Array.isArray(item.markets) && item.markets.length > 0),
     [results]
   );
+  const prefillLookupKey = useMemo(
+    () => prefillMarket?.marketSlug?.trim() || prefillMarket?.marketId?.trim() || '',
+    [prefillMarket?.marketId, prefillMarket?.marketSlug]
+  );
+
+  useEffect(() => {
+    if (!prefillLookupKey) {
+      setPrefillResolvedMarket(null);
+      setPrefillError(null);
+      setPrefillLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPrefillLoading(true);
+    setPrefillError(null);
+
+    const marketSeed: MarketItem = {
+      slug: prefillMarket?.marketSlug,
+      id: prefillMarket?.marketId,
+      conditionId: prefillMarket?.conditionId,
+      title: prefillMarket?.title,
+    };
+
+    fetchMarketDetails(marketSeed)
+      .then((market) => {
+        if (cancelled) return;
+        setPrefillResolvedMarket(market ?? marketSeed);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setPrefillResolvedMarket(marketSeed);
+        setPrefillError(error instanceof Error ? error.message : 'Failed to load prefilled market');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPrefillLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    fetchMarketDetails,
+    prefillLookupKey,
+    prefillMarket?.conditionId,
+    prefillMarket?.marketId,
+    prefillMarket?.marketSlug,
+    prefillMarket?.title,
+  ]);
+
+  useEffect(() => {
+    if (!prefillResolvedMarket || !prefillLookupKey) return;
+    if (appliedPrefillKeyRef.current === prefillLookupKey) return;
+    if (state.selectedMarket) return;
+
+    dispatch({ type: 'selectMarket', market: prefillResolvedMarket });
+
+    const nextOutcomes = getMarketOutcomes(prefillResolvedMarket).map((item) => item.outcome);
+    const requestedOutcome = prefillMarket?.outcome?.trim();
+    if (requestedOutcome && nextOutcomes.includes(requestedOutcome)) {
+      dispatch({ type: 'selectOutcome', outcome: requestedOutcome });
+      setAccordionValue('bet');
+    } else {
+      setAccordionValue('winner');
+    }
+    appliedPrefillKeyRef.current = prefillLookupKey;
+  }, [prefillLookupKey, prefillMarket?.outcome, prefillResolvedMarket, state.selectedMarket]);
 
   const canOpenSection = useCallback(
     (value: string | undefined) => {
@@ -329,7 +374,7 @@ export function ClubPredictionForm({
       if (value === 'bet' && !state.selectedOutcome) return false;
       return true;
     },
-    [state.selectedEvent, state.selectedMarket]
+    [state.selectedEvent, state.selectedMarket, state.selectedOutcome]
   );
 
   const handleAccordionChange = useCallback(
@@ -351,7 +396,7 @@ export function ClubPredictionForm({
 
   const handleSelectMarket = useCallback(
     async (market: MarketItem) => {
-      const key = String(market.id ?? market.slug ?? market.eventId ?? '');
+      const key = getMarketKey(market);
       setLoadingMarketKey(key);
       try {
         const details = await fetchMarketDetails(market);
@@ -376,7 +421,7 @@ export function ClubPredictionForm({
   const canPickWinner = !!state.selectedMarket;
   const canPickBet = !!state.selectedOutcome;
   const maxBalance = Number(walletBalanceRaw) / 1_000_000;
-  const minBet = 0.01;
+  const minBet = 1.0;
   const sliderMax = maxBalance > minBet ? maxBalance : minBet;
   const numericBet = Number(state.betAmount);
   const sliderValue = Number.isFinite(numericBet) ? clamp(numericBet, minBet, sliderMax) : minBet;
@@ -416,6 +461,11 @@ export function ClubPredictionForm({
 
     if (BigInt(commitAmount) <= 0n) {
       dispatch({ type: 'submitError', message: 'Bet amount must be greater than 0.' });
+      return;
+    }
+
+    if (BigInt(commitAmount) < 1_000_000n) {
+      dispatch({ type: 'submitError', message: 'Minimum order amount is 1.00 USDC.' });
       return;
     }
 
@@ -503,6 +553,27 @@ export function ClubPredictionForm({
         {state.tag === 'error' && state.message && (
           <p className="text-sm text-destructive">{state.message}</p>
         )}
+        {prefillLookupKey ? (
+          <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+            {prefillLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-44" />
+                <Skeleton className="h-4 w-72" />
+              </div>
+            ) : (
+              <>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Prefilled market</p>
+                <p className="font-medium">
+                  {state.selectedMarket
+                    ? getMarketTitle(state.selectedMarket)
+                    : prefillResolvedMarket
+                      ? getMarketTitle(prefillResolvedMarket)
+                      : prefillMarket?.title || prefillLookupKey}
+                </p>
+              </>
+            )}
+          </div>
+        ) : null}
         <Accordion
           type="single"
           collapsible
@@ -520,41 +591,46 @@ export function ClubPredictionForm({
             </AccordionTrigger>
             <AccordionContent>
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault();
-                          runSearch();
-                        }
-                      }}
-                      placeholder="Search Polymarket events"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={searching || !query.trim()}
-                      onClick={() => runSearch()}
-                    >
-                      {searching ? 'Searching...' : 'Search'}
-                    </Button>
-                  </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        runSearch();
+                      }
+                    }}
+                    placeholder="Search Polymarket events"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={searching || !query.trim()}
+                    onClick={() => runSearch()}
+                  >
+                    {searching ? 'Searching...' : 'Search'}
+                  </Button>
                 </div>
 
                 {error && <p className="text-sm text-destructive">{error}</p>}
+                {prefillError && <p className="text-sm text-muted-foreground">{prefillError}</p>}
 
-                {eventResults.length > 0 && (
+                {searching && (
+                  <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-2">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                )}
+
+                {!searching && eventResults.length > 0 && (
                   <div className="max-h-96 overflow-y-auto rounded-lg border border-border/50 bg-muted/20 p-2">
                     <div className="space-y-2">
                       {eventResults.map((eventItem) => {
-                        const key = getEventKey(eventItem);
+                        const key = getMarketKey(eventItem);
                         const isSelected =
-                          state.selectedEvent && getEventKey(state.selectedEvent) === key;
-                        const url = getEventUrl(eventItem);
-                        const image = getEventImage(eventItem);
+                          state.selectedEvent && getMarketKey(state.selectedEvent) === key;
+                        const url = getMarketUrl(eventItem);
                         return (
                           <button
                             key={key}
@@ -567,13 +643,6 @@ export function ClubPredictionForm({
                             onClick={() => handleSelectEvent(eventItem)}
                           >
                             <div className="flex items-start gap-4">
-                              {image && (
-                                <img
-                                  src={image}
-                                  alt=""
-                                  className="h-12 w-12 rounded-md object-cover"
-                                />
-                              )}
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start justify-between gap-4">
                                   <div className="min-w-0">
@@ -588,7 +657,7 @@ export function ClubPredictionForm({
                                         className="mt-1 block truncate text-xs text-muted-foreground underline decoration-transparent hover:decoration-current"
                                         onClick={(event) => event.stopPropagation()}
                                       >
-                                        {formatUrl(url)}
+                                        {formatMarketUrl(url)}
                                       </a>
                                     ) : (
                                       <div className="mt-1 text-xs italic text-muted-foreground">
@@ -643,87 +712,39 @@ export function ClubPredictionForm({
                 </div>
               )}
               {state.selectedEvent && availableMarkets.length > 0 && (
-                <div className="rounded-lg border border-border/50 bg-muted/20 p-2">
+                <div className="space-y-4">
                   <div className="grid gap-2 md:grid-cols-2">
                     {availableMarkets.map((market) => {
-                      const key = String(market.id ?? market.slug ?? market.eventId ?? '');
-                      const isSelected =
-                        state.selectedMarket &&
-                        String(
-                          state.selectedMarket.id ??
-                            state.selectedMarket.slug ??
-                            state.selectedMarket.eventId ??
-                            ''
-                        ) === key;
-                      const outcomesCount = Array.isArray(market.outcomes)
-                        ? market.outcomes.length
-                        : 0;
-                      const marketImage = getMarketImage(market);
-                      const marketUrl = getMarketUrl(market);
+                      const key = getMarketKey(market);
+                      const isSelected = Boolean(
+                        state.selectedMarket && getMarketKey(state.selectedMarket) === key
+                      );
                       return (
-                        <button
+                        <div
                           key={key}
-                          type="button"
-                          disabled={loadingMarketKey === key}
-                          aria-busy={loadingMarketKey === key}
-                          className={`w-full rounded-md border bg-background p-4 text-left text-sm shadow-sm transition hover:bg-muted/40 ${
-                            isSelected
-                              ? 'border-primary ring-1 ring-primary/30'
-                              : 'border-border/70'
-                          }`}
-                          onClick={() => handleSelectMarket(market)}
+                          className="relative"
                         >
-                          <div className="flex items-start gap-3">
-                            {marketImage && (
-                              <img
-                                src={marketImage}
-                                alt=""
-                                className="h-10 w-10 rounded-md object-cover"
-                              />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold">
-                                    {getMarketTitle(market)}
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                    <span>{outcomesCount} outcomes</span>
-                                    {marketUrl && (
-                                      <a
-                                        href={marketUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="truncate underline decoration-transparent hover:decoration-current"
-                                        onClick={(event) => event.stopPropagation()}
-                                      >
-                                        {formatUrl(marketUrl)}
-                                      </a>
-                                    )}
-                                  </div>
-                                  {getOutcomePrices(market).length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                      {getOutcomePrices(market).map((item) => (
-                                        <span
-                                          key={item.outcome}
-                                          className="rounded-full border border-border/70 px-2 py-0.5"
-                                        >
-                                          {item.outcome}: {formatPriceValue(item.price)}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                                {loadingMarketKey === key && (
-                                  <span className="text-xs text-muted-foreground">Loading…</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
+                          <MarketCard
+                            market={market}
+                            selected={isSelected}
+                            onSelect={() => handleSelectMarket(market)}
+                          />
+                          {loadingMarketKey === key ? (
+                            <div className="pointer-events-none absolute inset-0 rounded-lg bg-background/70" />
+                          ) : null}
+                          {loadingMarketKey === key ? (
+                            <span className="pointer-events-none absolute right-3 top-3 text-xs text-muted-foreground">
+                              Loading...
+                            </span>
+                          ) : null}
+                        </div>
                       );
                     })}
                   </div>
+                  <MarketDetailsPanel
+                    market={state.selectedMarket}
+                    emptyLabel="Choose a market to preview details before selecting an outcome."
+                  />
                 </div>
               )}
             </AccordionContent>
@@ -772,7 +793,7 @@ export function ClubPredictionForm({
                           <span>{outcome}</span>
                           {displayPrice && (
                             <span className="text-xs text-muted-foreground">
-                              {formatPriceValue(displayPrice)}
+                              {formatOutcomePrice(String(displayPrice))}
                             </span>
                           )}
                         </Button>

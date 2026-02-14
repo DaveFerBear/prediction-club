@@ -2,6 +2,7 @@ export { useApi, ApiError } from './use-api';
 export { useAppSession } from './use-app-session';
 export { useCreateClub } from './use-create-club';
 export { useMarketSearch, useMarketDetails, type MarketItem } from './use-market-search';
+export { useMarketsCatalog } from './use-markets-catalog';
 export { useCreatePrediction } from './use-create-prediction';
 export { usePolymarketMarketData } from './use-polymarket-market-data';
 export { useUserBalance } from './use-user-balance';
