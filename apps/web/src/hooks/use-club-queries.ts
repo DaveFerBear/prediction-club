@@ -74,6 +74,7 @@ export interface PredictionRound {
   marketId: string;
   marketSlug: string;
   marketTitle: string | null;
+  commentary: string | null;
   status: string;
   stakeTotal: string;
   createdAt: string;

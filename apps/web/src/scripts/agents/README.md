@@ -10,8 +10,6 @@ This folder now uses a single config-driven runner:
 - Database configured (`DATABASE_URL`)
 - Service owner user `predictionclubagent@gmail.com` exists in DB
 - Service owner has completed Turnkey sign-in (has `turnkeySubOrgId`)
-- Each target club already exists
-- Service owner is an active admin member in each target club
 - Club safes are funded with USDC.e before live runs
 
 For LLM selection, install AI SDK packages in web workspace:
@@ -88,7 +86,7 @@ Legacy flags are not supported:
 - Uses LLM to select one market and one valid outcome
 - Validates model output strictly against candidate set
 - `preview`: prints choices + rationale
-- `commit`: creates `PredictionRound` entries
+- `commit`: creates `PredictionRound` entries and stores markdown commentary
 
 ## Notes
 

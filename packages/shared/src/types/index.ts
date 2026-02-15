@@ -94,6 +94,7 @@ export interface PredictionRound {
   marketId: string;
   marketSlug: string;
   marketTitle: string | null;
+  commentary: string | null;
   stakeTotal: string; // BigInt as string
   status: PredictionRoundStatus;
   targetOutcome: string;
@@ -177,6 +178,7 @@ export interface CreatePredictionRoundRequest {
   marketId: string;
   marketSlug: string;
   marketTitle?: string;
+  commentary?: string;
   commitAmount: string;
   targetTokenId: string;
   targetOutcome: string;

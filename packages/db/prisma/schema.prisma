@@ -198,6 +198,8 @@ model PredictionRound {
   marketId        String
   marketSlug      String
   marketTitle     String?
+  // Optional markdown commentary from humans or agents.
+  commentary      String?
 
   // Aggregated stake
   stakeTotal      String       @default("0") // BigInt as string (wei)

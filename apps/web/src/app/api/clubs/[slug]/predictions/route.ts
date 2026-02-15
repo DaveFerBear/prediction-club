@@ -8,6 +8,7 @@ const createPredictionRoundSchema = z.object({
   marketId: z.string().min(1).max(100),
   marketSlug: z.string().min(1).max(200),
   marketTitle: z.string().max(200).optional(),
+  commentary: z.string().max(8000).optional(),
   commitAmount: z
     .string()
     .regex(/^\d+$/, 'commitAmount must be a base-unit integer string')

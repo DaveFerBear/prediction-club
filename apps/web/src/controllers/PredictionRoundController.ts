@@ -9,6 +9,7 @@ export interface CreatePredictionRoundInput {
   marketId: string;
   marketSlug: string;
   marketTitle?: string;
+  commentary?: string;
   commitAmount: string;
   targetTokenId: string;
   targetOutcome: string;
@@ -33,6 +34,7 @@ export class PredictionRoundController {
       marketId,
       marketSlug,
       marketTitle,
+      commentary,
       commitAmount,
       targetTokenId,
       targetOutcome,
@@ -84,6 +86,7 @@ export class PredictionRoundController {
           marketId,
           marketSlug,
           marketTitle,
+          commentary,
           targetTokenId,
           targetOutcome,
           stakeTotal,

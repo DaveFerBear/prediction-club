@@ -255,6 +255,7 @@ export function ClubPredictionForm({
   const [prefillResolvedMarket, setPrefillResolvedMarket] = useState<MarketItem | null>(null);
   const [prefillLoading, setPrefillLoading] = useState(false);
   const [prefillError, setPrefillError] = useState<string | null>(null);
+  const [commentary, setCommentary] = useState('');
   const appliedPrefillKeyRef = useRef<string | null>(null);
   const { createPrediction } = useCreatePrediction(clubSlug);
   const { fetchMarketDetails } = useMarketDetails();
@@ -507,6 +508,7 @@ export function ClubPredictionForm({
         marketId,
         marketSlug,
         marketTitle,
+        commentary: commentary.trim() || undefined,
         commitAmount,
         targetTokenId: tokenId,
         targetOutcome: state.selectedOutcome ?? '',
@@ -530,6 +532,7 @@ export function ClubPredictionForm({
     isAdmin,
     members,
     router,
+    commentary,
     state.betAmount,
     state.selectedMarket,
     state.selectedOutcome,
@@ -880,6 +883,18 @@ export function ClubPredictionForm({
                         </div>
                       </div>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="prediction-commentary">
+                      Commentary (optional, Markdown)
+                    </label>
+                    <textarea
+                      id="prediction-commentary"
+                      value={commentary}
+                      onChange={(event) => setCommentary(event.target.value)}
+                      placeholder="Why this market and outcome?"
+                      className="min-h-[96px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
                   </div>
                   <Button type="submit" disabled={!canSubmit}>
                     {state.tag === 'submitting' ? 'Creating...' : 'Create Prediction'}
