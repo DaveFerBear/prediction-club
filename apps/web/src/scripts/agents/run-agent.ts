@@ -207,15 +207,20 @@ function hashString(value: string) {
 }
 
 function getOutcomeIndex(candidate: MarketCandidate, outcome: string) {
-  const normalized = outcome.trim().toLowerCase();
-  return candidate.outcomes.findIndex((entry) => entry.trim().toLowerCase() === normalized);
+  const normalized = normalizeOutcomeLabel(outcome);
+  const normalizedWithoutPrice = normalizeOutcomeLabel(stripTrailingParenthetical(outcome));
+
+  return candidate.outcomes.findIndex((entry) => {
+    const normalizedEntry = normalizeOutcomeLabel(entry);
+    return normalizedEntry === normalized || normalizedEntry === normalizedWithoutPrice;
+  });
 }
 
 function formatCandidateForPrompt(candidate: MarketCandidate, rank: number) {
-  const outcomes = candidate.outcomes.map((outcome, idx) => {
-    const price = candidate.outcomePrices[idx] ?? 'n/a';
-    return `${outcome} (${price})`;
-  });
+  const outcomeOptions = candidate.outcomes.map((outcome, idx) => ({
+    label: outcome,
+    price: candidate.outcomePrices[idx] ?? 'n/a',
+  }));
 
   return {
     rank,
@@ -225,8 +230,20 @@ function formatCandidateForPrompt(candidate: MarketCandidate, rank: number) {
     marketTitle: candidate.marketTitle,
     volume: candidate.volume,
     liquidity: candidate.liquidity,
-    outcomes,
+    outcomeOptions,
   };
+}
+
+function stripTrailingParenthetical(value: string) {
+  return value.replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+
+function normalizeOutcomeLabel(value: string) {
+  return value
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 }
 
 function extractMarketCandidatesFromSearchResponse(input: {
@@ -339,6 +356,7 @@ async function chooseMarketAndOutcomeWithLlm(input: {
       `Iteration: ${input.iteration + 1}`,
       'Candidate markets:',
       JSON.stringify(candidatePayload),
+      'For targetOutcome, you must return the exact outcomeOptions.label text for your selected market.',
       'Choose one market/outcome you think has the best expected risk-adjusted edge.',
     ].join('\n'),
   });
@@ -385,6 +403,57 @@ function parseMode(modeArg: string) {
   throw new Error(`Invalid mode "${modeArg}". Expected --mode=preview or --mode=commit.`);
 }
 
+async function getOrCreateClubBySlug(input: {
+  ClubController: {
+    getBySlug: (slug: string) => Promise<{
+      id: string;
+      slug: string;
+      name: string;
+      members: Array<{ userId: string; role: string; status: string }>;
+    }>;
+    create: (
+      values: {
+        name: string;
+        slug?: string;
+        description?: string;
+        isPublic?: boolean;
+      },
+      userId: string
+    ) => Promise<{ id: string; slug: string }>;
+  };
+  agent: {
+    id: string;
+    name: string;
+    clubSlug: string;
+    clubName?: string;
+    clubDescription?: string;
+    clubIsPublic?: boolean;
+  };
+  ownerUserId: string;
+}) {
+  try {
+    return await input.ClubController.getBySlug(input.agent.clubSlug);
+  } catch (error) {
+    const code = typeof error === 'object' && error && 'code' in error
+      ? String((error as { code?: string }).code)
+      : '';
+    if (code !== 'NOT_FOUND') throw error;
+  }
+
+  const clubName = input.agent.clubName ?? input.agent.name;
+  await input.ClubController.create(
+    {
+      name: clubName,
+      slug: input.agent.clubSlug,
+      description: input.agent.clubDescription ?? `Autonomous club for agent ${input.agent.id}`,
+      isPublic: input.agent.clubIsPublic ?? false,
+    },
+    input.ownerUserId
+  );
+
+  return input.ClubController.getBySlug(input.agent.clubSlug);
+}
+
 async function main() {
   loadEnvForScripts();
   const args = parseCliArgs();
@@ -429,7 +498,11 @@ async function main() {
   };
 
   const owner = await resolveOwnerUser(prisma, AGENT_OWNER_EMAIL);
-  const club = await ClubController.getBySlug(agent.clubSlug);
+  const club = await getOrCreateClubBySlug({
+    ClubController,
+    agent,
+    ownerUserId: owner.id,
+  });
   const isAdmin = club.members.some(
     (member: { userId: string; role: string; status: string }) =>
       member.userId === owner.id && member.role === 'ADMIN' && member.status === 'ACTIVE'

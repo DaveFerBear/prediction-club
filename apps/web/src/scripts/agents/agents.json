@@ -2,12 +2,15 @@
   "version": 1,
   "agents": [
     {
-      "id": "default-agent",
-      "name": "Default Agent",
+      "id": "openai-predicts",
+      "name": "OpenAI Predicts [Agent]",
       "enabled": true,
-      "clubSlug": "agent-club-1",
+      "clubSlug": "openai-predicts",
+      "clubName": "OpenAI Predicts",
+      "clubDescription": "Autonomous trading club managed by default-agent.",
+      "clubIsPublic": false,
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-5",
       "persona": "You are a pragmatic prediction market analyst. Pick one market and one outcome with clear, risk-aware reasoning.",
       "strategy": {
         "queryPool": [
@@ -30,4 +33,3 @@
     }
   ]
 }
-

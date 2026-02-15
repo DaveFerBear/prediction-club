@@ -9,6 +9,9 @@ export type AgentDefinition = {
   name: string;
   enabled: boolean;
   clubSlug: string;
+  clubName?: string;
+  clubDescription?: string;
+  clubIsPublic?: boolean;
   provider: AgentProvider;
   model: string;
   persona: string;
@@ -21,17 +24,16 @@ export type AgentDefinition = {
   };
 };
 
-const providerSchema = z.union([
-  z.literal('openai'),
-  z.literal('anthropic'),
-  z.literal('google'),
-]);
+const providerSchema = z.union([z.literal('openai'), z.literal('anthropic'), z.literal('google')]);
 
 const agentSchema = z.object({
   id: z.string().trim().min(1),
   name: z.string().trim().min(1),
   enabled: z.boolean().default(true),
   clubSlug: z.string().trim().min(1),
+  clubName: z.string().trim().min(1).optional(),
+  clubDescription: z.string().trim().min(1).optional(),
+  clubIsPublic: z.boolean().optional(),
   provider: providerSchema,
   model: z.string().trim().min(1),
   persona: z.string().trim().min(1),
@@ -40,26 +42,31 @@ const agentSchema = z.object({
     maxMarketsPerQuery: z.number().int().min(1).max(200),
     temperature: z.number().min(0).max(2),
     defaultCount: z.number().int().min(1).max(100),
-    defaultAmountUsdc: z.string().trim().regex(/^\d+(\.\d{1,6})?$/),
+    defaultAmountUsdc: z
+      .string()
+      .trim()
+      .regex(/^\d+(\.\d{1,6})?$/),
   }),
 });
 
-const agentsFileSchema = z.object({
-  version: z.literal(1),
-  agents: z.array(agentSchema).min(1),
-}).superRefine((value, ctx) => {
-  const seenIds = new Set<string>();
-  for (const agent of value.agents) {
-    if (seenIds.has(agent.id)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['agents'],
-        message: `Duplicate agent id "${agent.id}"`,
-      });
+const agentsFileSchema = z
+  .object({
+    version: z.literal(1),
+    agents: z.array(agentSchema).min(1),
+  })
+  .superRefine((value, ctx) => {
+    const seenIds = new Set<string>();
+    for (const agent of value.agents) {
+      if (seenIds.has(agent.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['agents'],
+          message: `Duplicate agent id "${agent.id}"`,
+        });
+      }
+      seenIds.add(agent.id);
     }
-    seenIds.add(agent.id);
-  }
-});
+  });
 
 function findAgentsConfigPath() {
   const cwd = process.cwd();
@@ -72,9 +79,7 @@ function findAgentsConfigPath() {
     if (fs.existsSync(candidate)) return candidate;
   }
 
-  throw new Error(
-    `Could not find agents.json. Checked: ${candidates.join(', ')}`
-  );
+  throw new Error(`Could not find agents.json. Checked: ${candidates.join(', ')}`);
 }
 
 export function loadAgentsConfig(): { version: 1; agents: AgentDefinition[] } {
@@ -108,4 +113,3 @@ export function getAgentById(agentId: string): AgentDefinition | null {
   if (!normalized) return null;
   return loadAgentsConfig().agents.find((agent) => agent.id === normalized) ?? null;
 }
-
