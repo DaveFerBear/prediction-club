@@ -8,7 +8,6 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "agent:create-clubs": "tsx src/scripts/agents/create-agent-clubs.ts",
     "agent:run": "tsx src/scripts/agents/run-agent.ts"
   },
   "dependencies": {

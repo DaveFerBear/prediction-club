@@ -15,6 +15,8 @@ export type ScriptUser = {
   turnkeySubOrgId: string | null;
 };
 
+export const AGENT_OWNER_EMAIL = 'predictionclubagent@gmail.com';
+
 export function loadEnvForScripts() {
   const cwd = process.cwd();
   const candidates = [

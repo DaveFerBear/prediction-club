@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
+  AGENT_OWNER_EMAIL,
   daysAgo,
-  getBooleanArg,
   getOptionalStringArg,
   getPositiveIntArg,
   getRequiredStringArg,
@@ -12,7 +12,8 @@ import {
   parseUsdcToBaseUnits,
   resolveOwnerUser,
 } from './shared';
-import { getClubAgentConfig, type AgentProvider, type ClubAgentConfig } from './club-agent-config';
+import { SHARED_AGENT_SYSTEM_PROMPT } from './agent-system-prompt';
+import { getAgentById, listAgentIds, type AgentProvider } from './agent-config';
 
 const conditionIdPattern = /^0x[a-fA-F0-9]{64}$/;
 
@@ -52,6 +53,15 @@ type RuntimeProviderFactory = (model: string) => unknown;
 type RuntimeAiSdk = {
   generateObject: RuntimeGenerateObject;
   providerFactories: Record<AgentProvider, RuntimeProviderFactory>;
+};
+
+type AgentExecutionConfig = {
+  provider: AgentProvider;
+  model: string;
+  persona: string;
+  queryPool: string[];
+  maxMarketsPerQuery: number;
+  temperature: number;
 };
 
 function asObject(value: unknown): Record<string, unknown> | null {
@@ -296,7 +306,7 @@ function extractMarketCandidatesFromSearchResponse(input: {
 }
 
 async function chooseMarketAndOutcomeWithLlm(input: {
-  config: ClubAgentConfig;
+  config: AgentExecutionConfig;
   clubSlug: string;
   iteration: number;
   candidates: MarketCandidate[];
@@ -323,13 +333,7 @@ async function chooseMarketAndOutcomeWithLlm(input: {
     model,
     schema,
     temperature: input.config.temperature,
-    system: [
-      'You are selecting one prediction market trade candidate.',
-      'Choose exactly one market from the provided list and one valid outcome from that market.',
-      'Output JSON only matching the schema.',
-      'Do not invent IDs or outcomes.',
-      `Persona: ${input.config.persona}`,
-    ].join('\n'),
+    system: `${SHARED_AGENT_SYSTEM_PROMPT}\n\nPersona:\n${input.config.persona}`,
     prompt: [
       `Club: ${input.clubSlug}`,
       `Iteration: ${input.iteration + 1}`,
@@ -374,32 +378,64 @@ async function chooseMarketAndOutcomeWithLlm(input: {
   };
 }
 
+function parseMode(modeArg: string) {
+  const normalized = modeArg.trim().toLowerCase();
+  if (normalized === 'preview') return 'preview' as const;
+  if (normalized === 'commit') return 'commit' as const;
+  throw new Error(`Invalid mode "${modeArg}". Expected --mode=preview or --mode=commit.`);
+}
+
 async function main() {
   loadEnvForScripts();
   const args = parseCliArgs();
-  const clubSlug = getRequiredStringArg(args, 'club');
-  const ownerArg = getRequiredStringArg(args, 'owner');
-  const count = getPositiveIntArg(args, 'count', 1, { min: 1, max: 100 });
-  const amountUsdc = getOptionalStringArg(args, 'amount-usdc') ?? '1.00';
-  const dryRun = getBooleanArg(args, 'dry-run', false);
+  const agentId = getRequiredStringArg(args, 'agent');
+  const mode = parseMode(getRequiredStringArg(args, 'mode'));
+
+  if (args.club !== undefined) {
+    throw new Error('Legacy flag --club is no longer supported. Use --agent=<id>.');
+  }
+  if (args['dry-run'] !== undefined) {
+    throw new Error('Legacy flag --dry-run is no longer supported. Use --mode=preview.');
+  }
 
   const providerArg = normalizeProvider(getOptionalStringArg(args, 'provider'));
   const modelArg = getOptionalStringArg(args, 'model');
   const personaArg = getOptionalStringArg(args, 'persona');
 
-  const commitAmount = parseUsdcToBaseUnits(amountUsdc).toString();
-
   const [{ prisma }, { ClubController, ClubWalletController, PredictionRoundController, GammaController }] =
     await Promise.all([import('@prediction-club/db'), import('../../controllers')]);
 
-  const owner = await resolveOwnerUser(prisma, ownerArg);
-  const club = await ClubController.getBySlug(clubSlug);
+  const agent = getAgentById(agentId);
+  if (!agent) {
+    throw new Error(
+      `Unknown agent "${agentId}". Available agents: ${listAgentIds().join(', ')}`
+    );
+  }
+  if (!agent.enabled) {
+    throw new Error(`Agent "${agentId}" is disabled in agents.json.`);
+  }
+
+  const count = getPositiveIntArg(args, 'count', agent.strategy.defaultCount, { min: 1, max: 100 });
+  const amountUsdc = getOptionalStringArg(args, 'amount-usdc') ?? agent.strategy.defaultAmountUsdc;
+  const commitAmount = parseUsdcToBaseUnits(amountUsdc).toString();
+
+  const config: AgentExecutionConfig = {
+    provider: providerArg ?? agent.provider,
+    model: modelArg ?? agent.model,
+    persona: personaArg ?? agent.persona,
+    queryPool: agent.strategy.queryPool,
+    maxMarketsPerQuery: agent.strategy.maxMarketsPerQuery,
+    temperature: agent.strategy.temperature,
+  };
+
+  const owner = await resolveOwnerUser(prisma, AGENT_OWNER_EMAIL);
+  const club = await ClubController.getBySlug(agent.clubSlug);
   const isAdmin = club.members.some(
     (member: { userId: string; role: string; status: string }) =>
       member.userId === owner.id && member.role === 'ADMIN' && member.status === 'ACTIVE'
   );
   if (!isAdmin) {
-    throw new Error(`Owner ${ownerArg} is not an active admin for club ${clubSlug}`);
+    throw new Error(`Owner ${AGENT_OWNER_EMAIL} is not an active admin for club ${agent.clubSlug}`);
   }
 
   const wallet = await ClubWalletController.ensureClubWallet({
@@ -416,11 +452,6 @@ async function main() {
     );
   }
 
-  const config = getClubAgentConfig(club.slug, {
-    provider: providerArg ?? undefined,
-    model: modelArg ?? undefined,
-    persona: personaArg ?? undefined,
-  });
   assertProviderEnv(config.provider);
   const aiSdk = await loadAiSdkRuntime();
 
@@ -509,7 +540,7 @@ async function main() {
         aiSdk,
       });
 
-      if (dryRun) {
+      if (mode === 'preview') {
         results.push({
           iteration,
           query: selectedQuery,
@@ -566,12 +597,12 @@ async function main() {
   const skippedCount = results.length - successCount;
 
   console.log(
-    `[run-agent] Completed club=${club.slug} count=${count} success=${successCount} skipped=${skippedCount} dryRun=${dryRun}`
+    `[run-agent] Completed agent=${agent.id} club=${club.slug} count=${count} success=${successCount} skipped=${skippedCount} mode=${mode}`
   );
   for (const entry of results) {
     if (entry.success) {
       console.log(
-        `[run-agent] OK iteration=${entry.iteration + 1} query=${entry.query} market=${entry.marketSlug} outcome=${entry.targetOutcome} round=${entry.predictionRoundId ?? 'dry-run'}`
+        `[run-agent] OK iteration=${entry.iteration + 1} query=${entry.query} market=${entry.marketSlug} outcome=${entry.targetOutcome} round=${entry.predictionRoundId ?? 'preview'}`
       );
     } else {
       console.log(
@@ -581,6 +612,11 @@ async function main() {
   }
 
   logJsonSummary('[run-agent] Summary', {
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      clubSlug: agent.clubSlug,
+    },
     club: {
       id: club.id,
       slug: club.slug,
@@ -595,7 +631,7 @@ async function main() {
     count,
     amountUsdc,
     commitAmount,
-    dryRun,
+    mode,
     successCount,
     skippedCount,
     results,

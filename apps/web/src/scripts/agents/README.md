@@ -1,112 +1,92 @@
 # Club Agents Scripts
 
-This folder contains two CLI scripts for simple autonomous club operations:
+This folder now uses a single config-driven runner:
 
-- `create-agent-clubs.ts`
 - `run-agent.ts`
-
-They are intentionally minimal and reuse existing app controllers/wallet provisioning.
+- `agents.json` (hard-coded agent definitions)
 
 ## Prerequisites
 
 - Database configured (`DATABASE_URL`)
-- Owner user already exists in DB
-- Owner has completed Turnkey sign-in (must have `turnkeySubOrgId`)
-- Club safes funded with USDC.e before live runs
+- Service owner user `predictionclubagent@gmail.com` exists in DB
+- Service owner has completed Turnkey sign-in (has `turnkeySubOrgId`)
+- Each target club already exists
+- Service owner is an active admin member in each target club
+- Club safes are funded with USDC.e before live runs
 
-For `run-agent` (LLM selection), install AI SDK packages in web workspace:
+For LLM selection, install AI SDK packages in web workspace:
 
 ```bash
 yarn workspace @prediction-club/web add ai @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google
 ```
 
-And set at least one provider key:
+Set at least one provider key:
 
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
 - Gemini: `GOOGLE_GENERATIVE_AI_API_KEY`
 
-## Script 1: Create Clubs
+## Configure Agents
 
-Creates clubs and provisions each club wallet/safe for the owner.
+Edit:
 
-### Command
+- `apps/web/src/scripts/agents/agents.json`
 
-```bash
-yarn agent:create-clubs --owner=you@example.com --count=5 --prefix="Agent Club"
-```
+Each agent defines:
 
-or:
+- `id`, `name`, `enabled`
+- `clubSlug`
+- `provider`, `model`, `persona`
+- strategy defaults: `queryPool`, `maxMarketsPerQuery`, `temperature`, `defaultCount`, `defaultAmountUsdc`
 
-```bash
-npx tsx apps/web/src/scripts/agents/create-agent-clubs.ts --owner=you@example.com --count=5 --prefix="Agent Club"
-```
+## Run Agent
 
-### Flags
-
-- `--owner` (required): user email or wallet address
-- `--count` (required): number of clubs to create
-- `--prefix` (required): club name prefix
-- `--public=true|false` (optional, default `true`)
-- `--start-index=<n>` (optional, default `1`)
-
-### Output
-
-- Per-club status lines (`READY` or `FAILED`)
-- JSON summary with created/failed entries
-- Safe addresses to fund manually
-
-## Script 2: Run Agent
-
-Chooses markets + outcomes and creates prediction rounds for a club.
-
-Chainworker executes orders asynchronously.
-
-### Command
+Preview mode (no DB writes):
 
 ```bash
-yarn agent:run --club=agent-club-1 --owner=you@example.com
+yarn agent:run --agent=default-agent --mode=preview
 ```
 
-or:
+Commit mode (creates prediction rounds):
 
 ```bash
-npx tsx apps/web/src/scripts/agents/run-agent.ts --club=agent-club-1 --owner=you@example.com
+yarn agent:run --agent=default-agent --mode=commit
 ```
 
-### Flags
+or directly:
 
-- `--club` (required): club slug
-- `--owner` (required): admin user email or wallet address for that club
-- `--count=<n>` (optional, default `1`)
-- `--amount-usdc=<decimal>` (optional, default `1.00`, minimum `1.00`)
-- `--dry-run` (optional, default `false`)
+```bash
+npx tsx apps/web/src/scripts/agents/run-agent.ts --agent=default-agent --mode=preview
+```
+
+## CLI Flags
+
+- `--agent` (required): agent id from `agents.json`
+- `--mode` (required): `preview` or `commit`
+- `--count=<n>` (optional override): default from agent strategy
+- `--amount-usdc=<decimal>` (optional override): default from agent strategy, minimum `1.00`
 - `--provider=openai|anthropic|google` (optional override)
 - `--model=<model-name>` (optional override)
 - `--persona="<prompt text>"` (optional override)
 
-### Behavior
+Legacy flags are not supported:
 
-- Rotates through a query pool for market diversity
-- Fetches up to 100 markets per query
-- Skips markets used in last 7 days for the same club
-- Skips currently active (`PENDING` / `COMMITTED`) condition IDs
-- Uses LLM to choose:
-  - one market
-  - one valid outcome
-- Validates model output strictly against candidates
-- Creates `PredictionRound` entries (unless `--dry-run`)
+- `--club`
+- `--dry-run`
 
-### Notes
+## Behavior
+
+- Rotates through a query pool for diversity
+- Fetches up to configured market cap per query
+- Skips condition IDs used in last 7 days for the club
+- Skips active condition IDs (`PENDING` / `COMMITTED`)
+- Uses LLM to select one market and one valid outcome
+- Validates model output strictly against candidate set
+- `preview`: prints choices + rationale
+- `commit`: creates `PredictionRound` entries
+
+## Notes
 
 - If all iterations are skipped/failed, script exits non-zero.
 - If at least one iteration succeeds, script exits zero.
-- Running chainworker is required to place/settle orders after rounds are created.
-
-## Agent Config
-
-Default per-club config lives in:
-
-- `club-agent-config.ts`
-
-You can define per-club overrides there (provider/model/persona/query pool).
+- Chainworker must be running to execute and settle committed rounds.

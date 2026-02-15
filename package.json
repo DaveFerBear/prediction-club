@@ -21,7 +21,6 @@
     "chainworker:start": "yarn workspace @prediction-club/chainworker start",
     "chainworker:typecheck": "yarn workspace @prediction-club/chainworker typecheck",
     "chainworker:deploy": "yarn workspace @prediction-club/chainworker deploy",
-    "agent:create-clubs": "yarn workspace @prediction-club/web agent:create-clubs",
     "agent:run": "yarn workspace @prediction-club/web agent:run"
   },
   "devDependencies": {

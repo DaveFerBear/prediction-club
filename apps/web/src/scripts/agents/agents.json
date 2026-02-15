@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "agents": [
+    {
+      "id": "default-agent",
+      "name": "Default Agent",
+      "enabled": true,
+      "clubSlug": "agent-club-1",
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "persona": "You are a pragmatic prediction market analyst. Pick one market and one outcome with clear, risk-aware reasoning.",
+      "strategy": {
+        "queryPool": [
+          "bitcoin",
+          "ethereum",
+          "election",
+          "macro",
+          "fed",
+          "stocks",
+          "sports",
+          "technology",
+          "geopolitics",
+          "ai"
+        ],
+        "maxMarketsPerQuery": 100,
+        "temperature": 0.2,
+        "defaultCount": 1,
+        "defaultAmountUsdc": "1.00"
+      }
+    }
+  ]
+}
+
