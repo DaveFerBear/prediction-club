@@ -11,7 +11,6 @@ import type {
 
 const POLYMARKET_CLOB_URL = process.env.POLYMARKET_CLOB_URL || 'https://clob.polymarket.com';
 const POLYMARKET_CHAIN_ID = Number(process.env.POLYMARKET_CHAIN_ID ?? 137);
-const ALLOW_ZERO_PAYOUTS = process.env.CHAINWORKER_ALLOW_ZERO_PAYOUTS === 'true';
 const TURNKEY_BASE_URL = process.env.TURNKEY_API_BASE_URL || 'https://api.turnkey.com';
 const TURNKEY_API_PUBLIC_KEY = process.env.TURNKEY_API_PUBLIC_KEY;
 const TURNKEY_API_PRIVATE_KEY = process.env.TURNKEY_API_PRIVATE_KEY;
@@ -594,12 +593,89 @@ function parseResolvedAt(value: unknown): Date | null {
   return null;
 }
 
+function parseBoolean(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === 'yes' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === 'no' || normalized === '0') return false;
+  }
+  return null;
+}
+
+function parseNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function getMarketTokens(market: Record<string, unknown>): Record<string, unknown>[] {
+  const tokens = market.tokens;
+  if (!Array.isArray(tokens)) return [];
+  return tokens.filter(
+    (token): token is Record<string, unknown> =>
+      token !== null && typeof token === 'object' && !Array.isArray(token)
+  );
+}
+
+function getWinnerToken(market: Record<string, unknown>): Record<string, unknown> | null {
+  const tokens = getMarketTokens(market);
+  for (const token of tokens) {
+    if (parseBoolean(token.winner) === true) return token;
+  }
+  return null;
+}
+
+function getResolvedOutcome(market: Record<string, unknown>): string | null {
+  const winnerToken = getWinnerToken(market);
+  const winnerOutcome = winnerToken?.outcome;
+  if (typeof winnerOutcome === 'string' && winnerOutcome.trim().length > 0) {
+    return winnerOutcome.trim();
+  }
+
+  const fallback =
+    (market.outcome as string | undefined) ??
+    (market.result as string | undefined) ??
+    (market.winningOutcome as string | undefined) ??
+    null;
+
+  return typeof fallback === 'string' && fallback.trim().length > 0 ? fallback.trim() : null;
+}
+
 function isMarketResolved(market: Record<string, unknown>) {
   const status = typeof market.status === 'string' ? market.status.toLowerCase() : '';
   const resolvedFlag = Boolean(
     market.resolved ?? market.isResolved ?? market.settled ?? market.finalized
   );
-  return resolvedFlag || status === 'resolved' || status === 'settled' || status === 'final';
+  if (
+    resolvedFlag ||
+    status === 'resolved' ||
+    status === 'settled' ||
+    status === 'final' ||
+    status === 'closed'
+  ) {
+    return true;
+  }
+
+  if (getWinnerToken(market)) return true;
+
+  const closed = parseBoolean(market.closed);
+  const acceptingOrders = parseBoolean(market.accepting_orders ?? market.acceptingOrders);
+  if (closed === true && acceptingOrders === false) return true;
+
+  if (closed === true) {
+    const hasPriceOneToken = getMarketTokens(market).some((token) => {
+      const price = parseNumber(token.price);
+      return price !== null && price >= 0.999;
+    });
+    if (hasPriceOneToken) return true;
+  }
+
+  return false;
 }
 
 export class PolymarketController {
@@ -704,18 +780,27 @@ export class PolymarketController {
     const resolved = isMarketResolved(market);
 
     if (!resolved) {
+      const tokens = getMarketTokens(market);
+      const winnerTokenCount = tokens.filter((token) => parseBoolean(token.winner) === true).length;
+      console.log('[chainworker] Market unresolved snapshot', {
+        conditionId,
+        status: typeof market.status === 'string' ? market.status : null,
+        closed: parseBoolean(market.closed),
+        acceptingOrders: parseBoolean(market.accepting_orders ?? market.acceptingOrders),
+        winnerTokenCount,
+        tokenCount: tokens.length,
+      });
       return { isResolved: false, outcome: null, resolvedAt: null };
     }
 
-    const outcome =
-      (market.outcome as string | undefined) ??
-      (market.result as string | undefined) ??
-      (market.winningOutcome as string | undefined) ??
-      null;
+    const outcome = getResolvedOutcome(market);
     const resolvedAt =
       parseResolvedAt(market.resolvedAt) ??
       parseResolvedAt(market.resolved_at) ??
       parseResolvedAt(market.resolutionDate) ??
+      parseResolvedAt(market.end_date_iso) ??
+      parseResolvedAt(market.endDateIso) ??
+      parseResolvedAt(market.endDate) ??
       null;
 
     return {
@@ -727,12 +812,6 @@ export class PolymarketController {
 
   static computeMemberPayouts(members: RoundMember[]): MemberPayout[] | null {
     if (members.length === 0) return null;
-    const hasAnyNonZero = members.some(
-      (member) => member.payoutAmount !== '0' || member.pnlAmount !== '0'
-    );
-    if (!hasAnyNonZero && !ALLOW_ZERO_PAYOUTS) {
-      return null;
-    }
 
     return members.map((member) => ({
       userId: member.userId,

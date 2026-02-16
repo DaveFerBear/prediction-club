@@ -217,7 +217,6 @@ Important: `docker --env-file` does not strip quotes. Avoid quoting values in th
 | `POLYMARKET_CHAIN_ID`            | Chain ID (Polygon mainnet is 137)           | No       |
 | `CHAINWORKER_POLL_INTERVAL_MS`   | Polling interval in ms                      | No       |
 | `CHAINWORKER_BATCH_SIZE`         | Batch size for polling                      | No       |
-| `CHAINWORKER_ALLOW_ZERO_PAYOUTS` | Allow zero payouts to be recorded           | No       |
 
 ## Available Scripts
 

@@ -53,7 +53,6 @@ function writeEnv(pathname, env) {
     'CHAINWORKER_BATCH_SIZE',
     'POLYMARKET_CLOB_URL',
     'POLYMARKET_CHAIN_ID',
-    'CHAINWORKER_ALLOW_ZERO_PAYOUTS',
     'POLY_BUILDER_API_KEY',
     'POLY_BUILDER_SECRET',
     'POLY_BUILDER_PASSPHRASE',
@@ -105,7 +104,6 @@ function main() {
   setDefault(chainworkerEnv, 'CHAINWORKER_BATCH_SIZE', '25');
   setDefault(chainworkerEnv, 'POLYMARKET_CLOB_URL', 'https://clob.polymarket.com');
   setDefault(chainworkerEnv, 'POLYMARKET_CHAIN_ID', '137');
-  setDefault(chainworkerEnv, 'CHAINWORKER_ALLOW_ZERO_PAYOUTS', 'false');
 
   writeEnv(chainworkerEnvPath, chainworkerEnv);
   console.log(`Wrote: ${chainworkerEnvPath}`);
