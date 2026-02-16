@@ -12,6 +12,30 @@ type PredictionRoundListItemProps = {
   isAdmin: boolean;
 };
 
+function normalizeOutcome(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed.toLowerCase() : null;
+}
+
+function getStatusBadge(round: PredictionRound) {
+  const isSettled = round.status === 'SETTLED';
+  if (!isSettled) {
+    const open = round.status === 'COMMITTED' || round.status === 'PENDING';
+    return <Badge variant={open ? 'default' : 'secondary'}>{round.status}</Badge>;
+  }
+
+  const normalizedOutcome = normalizeOutcome(round.outcome);
+  const normalizedTarget = normalizeOutcome(round.targetOutcome);
+
+  if (!normalizedOutcome || !normalizedTarget) {
+    return <Badge variant="secondary">SETTLED</Badge>;
+  }
+
+  const hitTarget = normalizedOutcome === normalizedTarget;
+  return <Badge variant={hitTarget ? 'success' : 'destructive'}>{`SETTLED · ${hitTarget ? 'HIT' : 'MISS'}`}</Badge>;
+}
+
 function renderCommentary(markdown: string): ReactNode[] {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n');
   const nodes: ReactNode[] = [];
@@ -84,7 +108,6 @@ function renderCommentary(markdown: string): ReactNode[] {
 
 export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
   const { round, clubSlug, isAdmin } = props;
-  const open = round.status === 'COMMITTED' || round.status === 'PENDING';
 
   return (
     <Card className="overflow-hidden border-[color:var(--club-border-soft)] bg-white shadow-sm">
@@ -99,7 +122,7 @@ export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
             </div>
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
-            <Badge variant={open ? 'default' : 'secondary'}>{round.status}</Badge>
+            {getStatusBadge(round)}
             {isAdmin ? (
               <Link href={`/clubs/${clubSlug}/predict`}>
                 <Button size="sm" variant="outline" className="whitespace-nowrap">

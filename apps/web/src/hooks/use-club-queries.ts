@@ -75,6 +75,9 @@ export interface PredictionRound {
   marketTitle: string | null;
   commentary: string | null;
   status: string;
+  outcome: string | null;
+  resolvedAt: string | null;
+  settledAt: string | null;
   stakeTotal: string;
   createdAt: string;
   _count: {
