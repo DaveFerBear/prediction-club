@@ -175,15 +175,23 @@ async function runOnce() {
         continue;
       }
 
+      const resolvedOutcome = resolution.outcome ?? round.outcome ?? null;
+      if (!resolvedOutcome) {
+        console.warn(
+          `[chainworker] Round ${round.id} resolved without outcome for ${round.conditionId}; skipping settlement until outcome is available.`
+        );
+        continue;
+      }
+
       const members = await ChainWorkerDBController.getRoundMembers(round.id);
-      const payouts = PolymarketController.computeMemberPayouts(round, members);
+      const payouts = PolymarketController.computeMemberPayouts(round, members, resolvedOutcome);
       if (!payouts) {
         console.log(`[chainworker] Round ${round.id} missing payout data.`);
         continue;
       }
 
       await ChainWorkerDBController.settleRound(round, members, payouts, {
-        outcome: resolution.outcome ?? null,
+        outcome: resolvedOutcome,
         resolvedAt: resolution.resolvedAt ?? null,
       });
 

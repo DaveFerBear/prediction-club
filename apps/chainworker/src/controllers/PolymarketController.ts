@@ -857,10 +857,14 @@ export class PolymarketController {
     };
   }
 
-  static computeMemberPayouts(round: Pick<PendingRound, 'id' | 'targetOutcome' | 'outcome'>, members: RoundMember[]): MemberPayout[] | null {
+  static computeMemberPayouts(
+    round: Pick<PendingRound, 'id' | 'targetOutcome' | 'outcome'>,
+    members: RoundMember[],
+    resolvedOutcome?: string | null
+  ): MemberPayout[] | null {
     if (members.length === 0) return null;
 
-    const roundOutcome = normalizeLabel(round.outcome);
+    const roundOutcome = normalizeLabel(resolvedOutcome ?? round.outcome);
     const targetOutcome = normalizeLabel(round.targetOutcome);
     const isWinningRound = roundOutcome !== null && targetOutcome !== null && roundOutcome === targetOutcome;
 
