@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { formatUsdAmount } from '@prediction-club/shared';
 import { Button } from '@prediction-club/ui';
 import { ProfileDropdownMenu } from './menus/profile-dropdown-menu';
@@ -10,6 +11,7 @@ import { useApi, useUserBalance } from '@/hooks';
 
 export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' }) {
   const logoRef = useRef<SVGSVGElement | null>(null);
+  const pathname = usePathname();
   const { address, isAuthenticated } = useApi();
   const { balance } = useUserBalance();
   const balanceDisplay = formatUsdAmount(balance);
@@ -63,9 +65,18 @@ export function Header({ variant = 'default' }: { variant?: 'default' | 'ghost' 
           {isAuthenticated ? (
             <ProfileDropdownMenu />
           ) : (
-            <Link href="/profile">
-              <Button size="sm">Sign in</Button>
-            </Link>
+            <>
+              {pathname !== '/' ? (
+                <Link href="/clubs">
+                  <Button size="sm" variant="ghost" className="text-foreground">
+                    Explore Clubs
+                  </Button>
+                </Link>
+              ) : null}
+              <Link href="/profile">
+                <Button size="sm">Sign in</Button>
+              </Link>
+            </>
           )}
         </nav>
       </div>
