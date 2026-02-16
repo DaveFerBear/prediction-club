@@ -25,6 +25,8 @@ type MarketCandidate = {
   outcomes: string[];
   outcomePrices: string[];
   clobTokenIds: string[];
+  endDateIso: string | null;
+  endDateMs: number | null;
   volume: number;
   liquidity: number;
   query: string;
@@ -37,6 +39,7 @@ type AgentRunResult = {
   marketSlug?: string;
   targetOutcome?: string;
   targetTokenId?: string;
+  marketEndDate?: string;
   predictionRoundId?: string;
   reasoning?: string;
   success: boolean;
@@ -44,9 +47,7 @@ type AgentRunResult = {
   error?: string;
 };
 
-type RuntimeGenerateObject = (
-  options: Record<string, unknown>
-) => Promise<{ object: unknown }>;
+type RuntimeGenerateObject = (options: Record<string, unknown>) => Promise<{ object: unknown }>;
 
 type RuntimeProviderFactory = (model: string) => unknown;
 
@@ -61,6 +62,7 @@ type AgentExecutionConfig = {
   persona: string;
   queryPool: string[];
   maxMarketsPerQuery: number;
+  maxHoursToResolution: number | null;
   temperature: number;
 };
 
@@ -91,6 +93,48 @@ function asNumber(value: unknown): number {
     if (Number.isFinite(parsed)) return parsed;
   }
   return 0;
+}
+
+function parseDateMs(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value <= 0) return null;
+    const asMs = value < 1_000_000_000_000 ? value * 1000 : value;
+    return Number.isFinite(asMs) ? asMs : null;
+  }
+
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    const asMs = numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+    return Number.isFinite(asMs) ? asMs : null;
+  }
+
+  const parsed = Date.parse(trimmed);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function toIsoString(valueMs: number | null): string | null {
+  if (!valueMs || valueMs <= 0) return null;
+  return new Date(valueMs).toISOString();
+}
+
+function computeHoursToResolution(valueMs: number | null): number | null {
+  if (!valueMs) return null;
+  const deltaMs = valueMs - Date.now();
+  return deltaMs / (1000 * 60 * 60);
+}
+
+function isWithinResolutionWindow(candidate: MarketCandidate, maxHours: number | null): boolean {
+  if (!maxHours) return true;
+  if (!candidate.endDateMs) return false;
+  const hoursToResolution = computeHoursToResolution(candidate.endDateMs);
+  if (hoursToResolution === null) return false;
+  if (hoursToResolution <= 0) return false;
+  return hoursToResolution <= maxHours;
 }
 
 function parseStringArray(value: unknown): string[] {
@@ -228,6 +272,8 @@ function formatCandidateForPrompt(candidate: MarketCandidate, rank: number) {
     marketId: candidate.marketId,
     marketSlug: candidate.marketSlug,
     marketTitle: candidate.marketTitle,
+    endDateUtc: candidate.endDateIso,
+    hoursToResolution: computeHoursToResolution(candidate.endDateMs),
     volume: candidate.volume,
     liquidity: candidate.liquidity,
     outcomeOptions,
@@ -260,6 +306,15 @@ function extractMarketCandidatesFromSearchResponse(input: {
     if (!event) continue;
     const markets = asArray(event.markets);
     const eventTitle = inferMarketTitle(event, 'Untitled event');
+    const eventEndDateMs =
+      parseDateMs(
+        event.endDate ||
+          event.end_date ||
+          event.endTime ||
+          event.end_time ||
+          event.resolutionDate ||
+          event.resolution_date
+      ) ?? null;
 
     for (const marketValue of markets) {
       const market = asObject(marketValue);
@@ -273,7 +328,8 @@ function extractMarketCandidatesFromSearchResponse(input: {
         ) ?? null;
       if (!conditionId) continue;
 
-      const marketId = asIdString(market.id) || asIdString(market.marketId) || asIdString(market.eventId);
+      const marketId =
+        asIdString(market.id) || asIdString(market.marketId) || asIdString(market.eventId);
       const marketSlug = asString(market.slug);
       if (!marketId || !marketSlug) continue;
 
@@ -281,11 +337,26 @@ function extractMarketCandidatesFromSearchResponse(input: {
       const outcomePrices = parseStringArray(market.outcomePrices);
       const clobTokenIds = parseStringArray(market.clobTokenIds || market.clob_token_ids);
 
-      if (outcomes.length === 0 || clobTokenIds.length === 0 || outcomes.length !== clobTokenIds.length) {
+      if (
+        outcomes.length === 0 ||
+        clobTokenIds.length === 0 ||
+        outcomes.length !== clobTokenIds.length
+      ) {
         continue;
       }
 
       const marketTitle = inferMarketTitle(market, eventTitle);
+      const marketEndDateMs =
+        parseDateMs(
+          market.endDate ||
+            market.end_date ||
+            market.endTime ||
+            market.end_time ||
+            market.resolveBy ||
+            market.resolve_by ||
+            market.resolutionDate ||
+            market.resolution_date
+        ) ?? eventEndDateMs;
       const volume = asNumber(market.volume24h) || asNumber(market.volume) || 0;
       const liquidity = asNumber(market.liquidity) || 0;
       const active = market.active !== false;
@@ -300,6 +371,8 @@ function extractMarketCandidatesFromSearchResponse(input: {
         outcomes,
         outcomePrices,
         clobTokenIds,
+        endDateIso: toIsoString(marketEndDateMs),
+        endDateMs: marketEndDateMs,
         volume,
         liquidity,
         query: input.query,
@@ -434,9 +507,10 @@ async function getOrCreateClubBySlug(input: {
   try {
     return await input.ClubController.getBySlug(input.agent.clubSlug);
   } catch (error) {
-    const code = typeof error === 'object' && error && 'code' in error
-      ? String((error as { code?: string }).code)
-      : '';
+    const code =
+      typeof error === 'object' && error && 'code' in error
+        ? String((error as { code?: string }).code)
+        : '';
     if (code !== 'NOT_FOUND') throw error;
   }
 
@@ -471,14 +545,14 @@ async function main() {
   const modelArg = getOptionalStringArg(args, 'model');
   const personaArg = getOptionalStringArg(args, 'persona');
 
-  const [{ prisma }, { ClubController, ClubWalletController, PredictionRoundController, GammaController }] =
-    await Promise.all([import('@prediction-club/db'), import('../../controllers')]);
+  const [
+    { prisma },
+    { ClubController, ClubWalletController, PredictionRoundController, GammaController },
+  ] = await Promise.all([import('@prediction-club/db'), import('../../controllers')]);
 
   const agent = getAgentById(agentId);
   if (!agent) {
-    throw new Error(
-      `Unknown agent "${agentId}". Available agents: ${listAgentIds().join(', ')}`
-    );
+    throw new Error(`Unknown agent "${agentId}". Available agents: ${listAgentIds().join(', ')}`);
   }
   if (!agent.enabled) {
     throw new Error(`Agent "${agentId}" is disabled in agents.json.`);
@@ -494,6 +568,7 @@ async function main() {
     persona: personaArg ?? agent.persona,
     queryPool: agent.strategy.queryPool,
     maxMarketsPerQuery: agent.strategy.maxMarketsPerQuery,
+    maxHoursToResolution: agent.strategy.maxHoursToResolution ?? null,
     temperature: agent.strategy.temperature,
   };
 
@@ -549,12 +624,8 @@ async function main() {
     }),
   ]);
 
-  const recentConditionIds = new Set(
-    recentRounds.map((round) => round.conditionId.toLowerCase())
-  );
-  const activeConditionIds = new Set(
-    activeRounds.map((round) => round.conditionId.toLowerCase())
-  );
+  const recentConditionIds = new Set(recentRounds.map((round) => round.conditionId.toLowerCase()));
+  const activeConditionIds = new Set(activeRounds.map((round) => round.conditionId.toLowerCase()));
 
   const queryPool = config.queryPool;
   if (queryPool.length === 0) {
@@ -585,6 +656,7 @@ async function main() {
         const normalizedConditionId = candidate.conditionId.toLowerCase();
         if (recentConditionIds.has(normalizedConditionId)) return false;
         if (activeConditionIds.has(normalizedConditionId)) return false;
+        if (!isWithinResolutionWindow(candidate, config.maxHoursToResolution)) return false;
         return true;
       });
 
@@ -621,6 +693,7 @@ async function main() {
           marketSlug: pick.candidate.marketSlug,
           targetOutcome: pick.targetOutcome,
           targetTokenId: pick.targetTokenId,
+          marketEndDate: pick.candidate.endDateIso ?? undefined,
           reasoning: pick.reasoning,
           success: true,
         });
@@ -656,6 +729,7 @@ async function main() {
         marketSlug: pick.candidate.marketSlug,
         targetOutcome: pick.targetOutcome,
         targetTokenId: pick.targetTokenId,
+        marketEndDate: pick.candidate.endDateIso ?? undefined,
         predictionRoundId: round.id,
         reasoning: pick.reasoning,
         success: true,

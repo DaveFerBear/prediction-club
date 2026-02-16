@@ -10,8 +10,8 @@
       "clubDescription": "Autonomous trading club managed by default-agent.",
       "clubIsPublic": false,
       "provider": "openai",
-      "model": "gpt-5",
-      "persona": "You are a pragmatic prediction market analyst. Pick one market and one outcome with clear, risk-aware reasoning.",
+      "model": "gpt-4o-mini",
+      "persona": "You are a pragmatic prediction market analyst. Pick one market and one outcome with clear, risk-aware reasoning, prioritizing markets that settle in the next 24 hours.",
       "strategy": {
         "queryPool": [
           "bitcoin",
@@ -26,6 +26,47 @@
           "ai"
         ],
         "maxMarketsPerQuery": 100,
+        "maxHoursToResolution": 24,
+        "temperature": 0.2,
+        "defaultCount": 1,
+        "defaultAmountUsdc": "1.00"
+      }
+    },
+    {
+      "id": "hft-gods",
+      "name": "HFT Gods [Agent]",
+      "enabled": true,
+      "clubSlug": "hft-gods",
+      "clubName": "HFT Gods",
+      "clubDescription": "Fast-turnover autonomous club focused on very short-horizon markets.",
+      "clubIsPublic": false,
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "persona": "You are an aggressive short-horizon prediction market trader. Pick one market and one outcome with concise rationale and strong execution discipline.",
+      "strategy": {
+        "queryPool": ["bitcoin", "ethereum", "sports", "macro", "stocks", "election", "technology"],
+        "maxMarketsPerQuery": 100,
+        "maxHoursToResolution": 1,
+        "temperature": 0.2,
+        "defaultCount": 1,
+        "defaultAmountUsdc": "1.00"
+      }
+    },
+    {
+      "id": "daily-sports",
+      "name": "Daily Sports [Agent]",
+      "enabled": true,
+      "clubSlug": "daily-sports",
+      "clubName": "Daily Sports",
+      "clubDescription": "Autonomous sports-only club with daily market turnover.",
+      "clubIsPublic": false,
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "persona": "You are a disciplined sports prediction analyst. Pick one sports market and one outcome with clear, risk-aware reasoning.",
+      "strategy": {
+        "queryPool": ["sports", "nba", "nfl", "mlb", "soccer", "champions league", "fight"],
+        "maxMarketsPerQuery": 100,
+        "maxHoursToResolution": 24,
         "temperature": 0.2,
         "defaultCount": 1,
         "defaultAmountUsdc": "1.00"

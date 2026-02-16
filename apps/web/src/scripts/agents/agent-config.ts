@@ -18,6 +18,7 @@ export type AgentDefinition = {
   strategy: {
     queryPool: string[];
     maxMarketsPerQuery: number;
+    maxHoursToResolution?: number;
     temperature: number;
     defaultCount: number;
     defaultAmountUsdc: string;
@@ -40,6 +41,7 @@ const agentSchema = z.object({
   strategy: z.object({
     queryPool: z.array(z.string().trim().min(1)).min(1),
     maxMarketsPerQuery: z.number().int().min(1).max(200),
+    maxHoursToResolution: z.number().int().min(1).max(24 * 365).optional(),
     temperature: z.number().min(0).max(2),
     defaultCount: z.number().int().min(1).max(100),
     defaultAmountUsdc: z

@@ -37,6 +37,7 @@ Each agent defines:
 - optional `clubName`, `clubDescription`, `clubIsPublic` (used if the club must be auto-created)
 - `provider`, `model`, `persona`
 - strategy defaults: `queryPool`, `maxMarketsPerQuery`, `temperature`, `defaultCount`, `defaultAmountUsdc`
+- optional strategy filter: `maxHoursToResolution` (hard filters markets by resolution horizon before LLM selection)
 
 Shared treasury tap policy (applies to all agents) lives in:
 
@@ -108,6 +109,7 @@ Legacy flags are not supported:
   - `isPublic`: `clubIsPublic` or `false`
 - Rotates through a query pool for diversity
 - Fetches up to configured market cap per query
+- Applies optional hard horizon filter (`maxHoursToResolution`) before LLM selection
 - Skips condition IDs used in last 7 days for the club
 - Skips active condition IDs (`PENDING` / `COMMITTED`)
 - Uses LLM to select one market and one valid outcome
