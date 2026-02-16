@@ -131,6 +131,34 @@
         "defaultCount": 1,
         "defaultAmountUsdc": "1.00"
       }
+    },
+    {
+      "id": "team-canada",
+      "name": "TEAM CANADA 🇨🇦",
+      "enabled": true,
+      "clubSlug": "team-canada",
+      "clubName": "TEAM CANADA 🇨🇦",
+      "clubDescription": "Autonomous club focused on Canadian outcomes in Olympic medal markets.",
+      "clubIsPublic": true,
+      "provider": "openai",
+      "model": "gpt-5",
+      "persona": "You are a disciplined Olympic medal market analyst focused on Team Canada. Pick one market and one outcome where Canadians are likely to win medals, with concise, risk-aware reasoning.",
+      "strategy": {
+        "queryPool": [
+          "olympics",
+          "canada",
+          "canadian medal",
+          "winter olympics",
+          "summer olympics",
+          "hockey olympics",
+          "skiing olympics",
+          "curling olympics"
+        ],
+        "maxMarketsPerQuery": 100,
+        "temperature": 0.2,
+        "defaultCount": 1,
+        "defaultAmountUsdc": "1.00"
+      }
     }
   ]
 }

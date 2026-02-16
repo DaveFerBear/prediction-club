@@ -6,9 +6,11 @@ import { loadAgentsConfig, type AgentDefinition } from './agent-config';
 import { AGENT_TREASURY_MIN_USDC, AGENT_TREASURY_TARGET_USDC } from './agent-funding-config';
 import {
   AGENT_OWNER_EMAIL,
+  getOptionalStringArg,
   isWalletAddress,
   loadEnvForScripts,
   logJsonSummary,
+  parseCliArgs,
   resolveOwnerUser,
 } from './shared';
 
@@ -163,14 +165,35 @@ function assertReadyWallet(wallet: ClubWallet) {
 
 async function main() {
   loadEnvForScripts();
+  const args = parseCliArgs();
 
   const chainId = Number(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || 137);
   const [{ prisma }, { ClubController, ClubWalletController, LedgerController }, polymarketLib] =
     await Promise.all([import('@prediction-club/db'), import('../../controllers'), import('@/lib/polymarket')]);
   const { createPolymarketPublicClient, getUsdcTokenAddress } = polymarketLib;
-  const agents = loadAgentsConfig().agents.filter((agent) => agent.enabled);
+  const agentIdFilter = getOptionalStringArg(args, 'agent');
+  const clubSlugFilter = getOptionalStringArg(args, 'club-slug');
+
+  let agents = loadAgentsConfig().agents.filter((agent) => agent.enabled);
+  if (agentIdFilter) {
+    agents = agents.filter((agent) => agent.id === agentIdFilter);
+  }
+  if (clubSlugFilter) {
+    agents = agents.filter((agent) => agent.clubSlug === clubSlugFilter);
+  }
+
   if (agents.length === 0) {
-    throw new Error('No enabled agents found in agents.json');
+    const filters = [
+      agentIdFilter ? `agent=${agentIdFilter}` : null,
+      clubSlugFilter ? `club-slug=${clubSlugFilter}` : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+    throw new Error(
+      filters
+        ? `No enabled agents matched filters (${filters})`
+        : 'No enabled agents found in agents.json'
+    );
   }
 
   const tapPrivateKeyRaw = process.env.AGENT_TAP_PRIVATE_KEY;
@@ -329,6 +352,10 @@ async function main() {
   logJsonSummary('[agent:fund] Summary', {
     chainId,
     usdcAddress,
+    filters: {
+      agent: agentIdFilter,
+      clubSlug: clubSlugFilter,
+    },
     owner: {
       id: owner.id,
       email: owner.email,

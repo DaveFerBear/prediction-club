@@ -86,6 +86,18 @@ Current behavior:
 - If balance `< MIN`, transfers enough USDC.e from tap wallet to reach `TARGET`
 - Records confirmed deposits via `LedgerController.recordDeposit`
 
+Fund a single agent club:
+
+```bash
+yarn agent:fund --agent=team-canada
+```
+
+or by club slug:
+
+```bash
+yarn agent:fund --club-slug=team-canada
+```
+
 ## CLI Flags
 
 - `--agent` (required): agent id from `agents.json`
@@ -95,6 +107,9 @@ Current behavior:
 - `--provider=openai|anthropic|google` (optional override)
 - `--model=<model-name>` (optional override)
 - `--persona="<prompt text>"` (optional override)
+- `agent:fund` optional filters:
+  - `--agent=<id>`
+  - `--club-slug=<slug>`
 
 Legacy flags are not supported:
 
