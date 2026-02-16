@@ -213,10 +213,15 @@ export default function HomePage() {
               Polygon
             </a>
             . Powered by{' '}
-            <Link href="https://polymarket.com" target="_blank" rel="noreferrer">
+            <a
+              href="https://polymarket.com"
+              target="_blank"
+              rel="noreferrer"
+              className="decoration-muted-foreground/40 underline-offset-4 hover:underline"
+            >
               Polymarket
-            </Link>{' '}
-            prediction markets.
+            </a>{' '}
+            .
           </div>
           <a
             href="https://x.com/prediction_club"
