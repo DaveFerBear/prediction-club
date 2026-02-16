@@ -61,18 +61,34 @@ Do not execute until the user confirms.
 
 ## Execution Command
 
-Run inside a read-only transaction:
+Preferred command (loads repo `.env` first, then runs read-only transaction):
 
 ```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -P pager=off -c "BEGIN READ ONLY; <SQL>; ROLLBACK;"
+set -a; source .env >/dev/null 2>&1; set +a; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -P pager=off -c "BEGIN READ ONLY; <SQL>; ROLLBACK;"
+```
+
+For single-value counts, prefer machine-friendly output:
+
+```bash
+set -a; source .env >/dev/null 2>&1; set +a; psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -X -At -c "SELECT COUNT(*)::int FROM <table>;"
 ```
 
 ## Environment Checks
 
 Before execution:
 
-- Confirm `DATABASE_URL` is set.
-- If not set, ask user to export it.
+- Confirm `DATABASE_URL` is set after loading `.env`.
+- If still missing, check fallback env files:
+  - `apps/web/.env`
+  - `apps/chainworker/.env`
+
+If connection fails, run a quick host diagnostic:
+
+```bash
+node -e "const u=new URL(process.env.DATABASE_URL||''); console.log(u.host)"
+```
+
+If DNS/network fails in sandbox, rerun the query outside sandbox (with approval) rather than changing SQL.
 
 ## Output Style
 
