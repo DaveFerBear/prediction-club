@@ -52,7 +52,7 @@ export function ClubTicker({ clubs }: ClubTickerProps) {
 
   return (
     <section aria-label="Top clubs">
-      <div className="group overflow-hidden border-y border-border/70 bg-card/75">
+      <div className="group overflow-hidden border-y border-border bg-card/75">
         <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className={trackClassName}>
             {items.map((club, idx) => {

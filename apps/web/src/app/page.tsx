@@ -21,7 +21,7 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <main className="flex-1">
-        <section className="relative isolate overflow-hidden border-b bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)]">
+        <section className="relative isolate overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)]">
           <div className="pointer-events-none absolute inset-0 z-0">
             <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-primary/14 blur-3xl" />
             <div className="absolute -right-32 top-10 h-96 w-96 rounded-full bg-emerald-400/14 blur-3xl" />
