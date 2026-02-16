@@ -71,6 +71,66 @@
         "defaultCount": 1,
         "defaultAmountUsdc": "1.00"
       }
+    },
+    {
+      "id": "macro-pulse",
+      "name": "Macro Pulse [Agent]",
+      "enabled": true,
+      "clubSlug": "macro-pulse",
+      "clubName": "Macro Pulse",
+      "clubDescription": "Short-horizon macro event club focused on rates, inflation, and policy catalysts.",
+      "clubIsPublic": true,
+      "provider": "openai",
+      "model": "gpt-5",
+      "persona": "You are a macro event trader. Pick one liquid market and one outcome with clear, risk-aware reasoning, prioritizing macro catalysts and short-horizon settlement.",
+      "strategy": {
+        "queryPool": ["fed", "cpi", "inflation", "rates", "jobs report", "macro"],
+        "maxMarketsPerQuery": 100,
+        "maxHoursToResolution": 48,
+        "temperature": 0.2,
+        "defaultCount": 1,
+        "defaultAmountUsdc": "1.00"
+      }
+    },
+    {
+      "id": "crypto-vol-swing",
+      "name": "Crypto Vol Swing [Agent]",
+      "enabled": true,
+      "clubSlug": "crypto-vol-swing",
+      "clubName": "Crypto Vol Swing",
+      "clubDescription": "Short-horizon crypto club focused on BTC/ETH volatility and level markets.",
+      "clubIsPublic": true,
+      "provider": "openai",
+      "model": "gpt-5",
+      "persona": "You are a crypto volatility trader. Pick one near-term BTC or ETH market and one outcome with concise, risk-aware reasoning.",
+      "strategy": {
+        "queryPool": ["bitcoin", "ethereum", "crypto", "btc", "eth"],
+        "maxMarketsPerQuery": 100,
+        "maxHoursToResolution": 24,
+        "temperature": 0.2,
+        "defaultCount": 1,
+        "defaultAmountUsdc": "1.00"
+      }
+    },
+    {
+      "id": "us-politics-daily",
+      "name": "US Politics Daily [Agent]",
+      "enabled": true,
+      "clubSlug": "us-politics-daily",
+      "clubName": "US Politics Daily",
+      "clubDescription": "Short-horizon US politics club focused on headline-driven event markets.",
+      "clubIsPublic": true,
+      "provider": "openai",
+      "model": "gpt-5",
+      "persona": "You are a US politics prediction analyst. Pick one liquid market and one outcome with clear, probabilistic, risk-aware reasoning.",
+      "strategy": {
+        "queryPool": ["election", "trump", "biden", "congress", "politics"],
+        "maxMarketsPerQuery": 100,
+        "maxHoursToResolution": 72,
+        "temperature": 0.2,
+        "defaultCount": 1,
+        "defaultAmountUsdc": "1.00"
+      }
     }
   ]
 }
