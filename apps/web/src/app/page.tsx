@@ -19,8 +19,8 @@ export default function HomePage() {
       : `${data.kpis.medianSimpleReturn30d > 0 ? '+' : ''}${(data.kpis.medianSimpleReturn30d * 100).toFixed(1)}%`;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <main className="flex-1">
+    <div className="bg-background">
+      <main>
         <section className="relative isolate overflow-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)]">
           <div className="pointer-events-none absolute inset-0 z-0">
             <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-primary/14 blur-3xl" />
@@ -199,41 +199,6 @@ export default function HomePage() {
           </div>
         </section>
       </main>
-
-      <footer className="border-t py-8">
-        <div className="container flex flex-col items-center gap-3 text-sm text-muted-foreground sm:flex-row sm:justify-between">
-          <div>
-            Built on{' '}
-            <a
-              href="https://polygon.technology/"
-              target="_blank"
-              rel="noreferrer"
-              className="decoration-muted-foreground/40 underline-offset-4 hover:underline"
-            >
-              Polygon
-            </a>
-            . Powered by{' '}
-            <a
-              href="https://polymarket.com"
-              target="_blank"
-              rel="noreferrer"
-              className="decoration-muted-foreground/40 underline-offset-4 hover:underline"
-            >
-              Polymarket
-            </a>{' '}
-            .
-          </div>
-          <a
-            href="https://x.com/prediction_club"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Prediction Club on X"
-            className="inline-flex items-center justify-center rounded-full border border-transparent px-2 py-1 text-lg text-muted-foreground hover:border-border hover:text-foreground"
-          >
-            𝕏
-          </a>
-        </div>
-      </footer>
     </div>
   );
 }
