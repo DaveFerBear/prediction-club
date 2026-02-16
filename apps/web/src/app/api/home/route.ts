@@ -10,7 +10,7 @@ type HomeClub = {
   description: string | null;
   isPublic: boolean;
   createdByUserId: string | null;
-  activeCommittedVolume: string;
+  allTimeCommittedVolume: string;
   performance: {
     days: number;
     navStart: string;
@@ -28,7 +28,7 @@ type HomeClub = {
 
 type HomePayload = {
   kpis: {
-    totalActiveVolume: string;
+    totalAllTimeVolume: string;
     medianSimpleReturn30d: number | null;
     publicClubCount: number;
   };
@@ -47,8 +47,8 @@ function median(values: number[]): number | null {
 }
 
 function compareClubs(a: HomeClub, b: HomeClub): number {
-  const volumeA = BigInt(a.activeCommittedVolume);
-  const volumeB = BigInt(b.activeCommittedVolume);
+  const volumeA = BigInt(a.allTimeCommittedVolume);
+  const volumeB = BigInt(b.allTimeCommittedVolume);
   if (volumeA !== volumeB) {
     return volumeA > volumeB ? -1 : 1;
   }
@@ -82,7 +82,7 @@ export async function GET() {
     });
 
     const clubIds = clubs.map((club) => club.id);
-    const volumeByClub = await LedgerController.getClubsActiveCommitVolume({ clubIds });
+    const volumeByClub = await LedgerController.getClubsAllTimeCommitVolume({ clubIds });
 
     const perfByClub = new Map<string, ReturnType<typeof computeClubPerformanceFromRounds>>();
     if (clubIds.length > 0) {
@@ -127,7 +127,7 @@ export async function GET() {
       description: club.description,
       isPublic: club.isPublic,
       createdByUserId: club.createdByUserId,
-      activeCommittedVolume: volumeByClub.get(club.id) ?? '0',
+      allTimeCommittedVolume: volumeByClub.get(club.id) ?? '0',
       performance: perfByClub.get(club.id) ?? null,
       _count: {
         members: club._count.members,
@@ -135,8 +135,8 @@ export async function GET() {
       },
     }));
 
-    const totalActiveVolume = enrichedClubs.reduce(
-      (sum, club) => sum + BigInt(club.activeCommittedVolume),
+    const totalAllTimeVolume = enrichedClubs.reduce(
+      (sum, club) => sum + BigInt(club.allTimeCommittedVolume),
       0n
     );
 
@@ -148,7 +148,7 @@ export async function GET() {
 
     const payload: HomePayload = {
       kpis: {
-        totalActiveVolume: totalActiveVolume.toString(),
+        totalAllTimeVolume: totalAllTimeVolume.toString(),
         medianSimpleReturn30d: median(returns),
         publicClubCount: enrichedClubs.length,
       },

@@ -9,7 +9,7 @@ export type HomeClubItem = {
   description: string | null;
   isPublic: boolean;
   createdByUserId: string | null;
-  activeCommittedVolume: string;
+  allTimeCommittedVolume: string;
   performance: {
     days: number;
     navStart: string;
@@ -27,7 +27,7 @@ export type HomeClubItem = {
 
 export type HomeDataPayload = {
   kpis: {
-    totalActiveVolume: string;
+    totalAllTimeVolume: string;
     medianSimpleReturn30d: number | null;
     publicClubCount: number;
   };
@@ -37,7 +37,7 @@ export type HomeDataPayload = {
 
 const defaultHomeData: HomeDataPayload = {
   kpis: {
-    totalActiveVolume: '0',
+    totalAllTimeVolume: '0',
     medianSimpleReturn30d: null,
     publicClubCount: 0,
   },

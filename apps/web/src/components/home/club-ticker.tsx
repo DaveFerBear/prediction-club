@@ -81,7 +81,10 @@ export function ClubTicker({ clubs }: ClubTickerProps) {
                   </div>
 
                   <div className="mt-1.5 text-xs text-muted-foreground">
-                    Vol <span className="font-semibold tabular-nums text-foreground">${formatUsdAmount(club.activeCommittedVolume)}</span>
+                    Volume{' '}
+                    <span className="font-semibold tabular-nums text-foreground">
+                      ${formatUsdAmount(club.allTimeCommittedVolume)}
+                    </span>
                   </div>
                 </Link>
               );
