@@ -721,6 +721,11 @@ function isMarketResolved(market: Record<string, unknown>) {
 }
 
 export class PolymarketController {
+  static isNoMatchOrderError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    return /no match/i.test(error.message);
+  }
+
   static missingMemberFields(member: RoundMember): string[] {
     const missing: string[] = [];
     if (!member.clubWallet) {

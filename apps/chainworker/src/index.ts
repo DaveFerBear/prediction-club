@@ -101,6 +101,8 @@ async function runOnce() {
         }
 
         let allSucceeded = true;
+        let placedOrderThisRun = false;
+        let cancelPendingRoundReason: string | null = null;
         for (const member of members) {
           if (member.orderId) {
             continue;
@@ -113,13 +115,35 @@ async function runOnce() {
             });
             await ChainWorkerDBController.updateMemberOrder(member.id, order);
             member.orderId = order.orderId;
+            placedOrderThisRun = true;
           } catch (error) {
             allSucceeded = false;
             console.error(
               `[chainworker] Round ${round.id} order failed for member ${member.userId}:`,
               error
             );
+
+            if (
+              !placedOrderThisRun &&
+              members.every((candidate) => !candidate.orderId) &&
+              PolymarketController.isNoMatchOrderError(error)
+            ) {
+              cancelPendingRoundReason =
+                'order book had no fillable liquidity (no match) before first execution';
+              break;
+            }
           }
+        }
+
+        if (cancelPendingRoundReason) {
+          await ChainWorkerDBController.cancelRoundAndRevertCommits(
+            round.id,
+            cancelPendingRoundReason
+          );
+          console.warn(
+            `[chainworker] Round ${round.id} cancelled and commits reversed: ${cancelPendingRoundReason}`
+          );
+          continue;
         }
 
         const pendingMembers = members.filter((member) => !member.orderId);

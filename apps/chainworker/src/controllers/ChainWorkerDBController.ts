@@ -94,6 +94,88 @@ export class ChainWorkerDBController {
     });
   }
 
+  static async cancelRoundAndRevertCommits(roundId: string, reason: string) {
+    const now = new Date();
+
+    await prisma.$transaction(async (tx) => {
+      const commits = await tx.ledgerEntry.findMany({
+        where: {
+          predictionRoundId: roundId,
+          type: 'COMMIT',
+        },
+        select: {
+          id: true,
+          safeAddress: true,
+          clubWalletId: true,
+          clubId: true,
+          userId: true,
+          amount: true,
+          asset: true,
+        },
+      });
+
+      const existingReversals = await tx.ledgerEntry.findMany({
+        where: {
+          predictionRoundId: roundId,
+          type: 'ADJUSTMENT',
+        },
+        select: {
+          userId: true,
+          amount: true,
+          metadata: true,
+        },
+      });
+
+      const reversalKeys = new Set(
+        existingReversals
+          .filter((entry) => {
+            if (!entry.metadata || typeof entry.metadata !== 'object') return false;
+            return (
+              (entry.metadata as Record<string, unknown>).source ===
+              'prediction-round-cancelled-reversal'
+            );
+          })
+          .map((entry) => `${entry.userId}:${entry.amount}`)
+      );
+
+      const reversals = commits.flatMap((entry) => {
+        const absolute = (() => {
+          const value = BigInt(entry.amount);
+          return (value < 0n ? -value : value).toString();
+        })();
+        const key = `${entry.userId}:${absolute}`;
+        if (reversalKeys.has(key)) return [];
+
+        return [
+          {
+            safeAddress: entry.safeAddress,
+            clubWalletId: entry.clubWalletId,
+            clubId: entry.clubId,
+            userId: entry.userId,
+            predictionRoundId: roundId,
+            type: 'ADJUSTMENT' as LedgerEntryType,
+            amount: absolute,
+            asset: entry.asset,
+            metadata: {
+              source: 'prediction-round-cancelled-reversal',
+              reason,
+            } satisfies Prisma.InputJsonValue,
+            createdAt: now,
+          },
+        ];
+      });
+
+      if (reversals.length > 0) {
+        await tx.ledgerEntry.createMany({ data: reversals });
+      }
+
+      await tx.predictionRound.update({
+        where: { id: roundId },
+        data: { status: 'CANCELLED' },
+      });
+    });
+  }
+
   static async updateMemberOrder(memberId: string, order: MemberOrder) {
     await prisma.predictionRoundMember.update({
       where: { id: memberId },
