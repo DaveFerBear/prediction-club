@@ -220,6 +220,66 @@ async function enrichCandidateEndDates(input: {
   });
 }
 
+async function fetchHorizonCandidatesForQuery(input: {
+  query: string;
+  maxMarkets: number;
+  endDateMin: string;
+  endDateMax: string;
+  GammaController: {
+    listMarkets: (input?: {
+      limit?: number;
+      offset?: number;
+      active?: boolean;
+      closed?: boolean;
+      order?: string;
+      slug?: string;
+      id?: string | number;
+      endDateMin?: string;
+      endDateMax?: string;
+    }) => Promise<unknown[]>;
+  };
+}): Promise<MarketCandidate[]> {
+  const pageSize = Math.max(100, Math.min(200, input.maxMarkets));
+  const maxPages = 12;
+  const deduped = new Map<string, MarketCandidate>();
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const pageResults = await input.GammaController.listMarkets({
+      limit: pageSize,
+      offset: page * pageSize,
+      active: true,
+      closed: false,
+      endDateMin: input.endDateMin,
+      endDateMax: input.endDateMax,
+    });
+
+    if (!Array.isArray(pageResults) || pageResults.length === 0) {
+      break;
+    }
+
+    const candidates = extractMarketCandidatesFromMarketsResponse({
+      query: input.query,
+      response: pageResults,
+      maxMarkets: input.maxMarkets,
+    });
+
+    for (const candidate of candidates) {
+      if (!deduped.has(candidate.conditionId)) {
+        deduped.set(candidate.conditionId, candidate);
+      }
+      if (deduped.size >= input.maxMarkets) {
+        break;
+      }
+    }
+
+    if (deduped.size >= input.maxMarkets || pageResults.length < pageSize) {
+      break;
+    }
+  }
+
+  return Array.from(deduped.values()).slice(0, input.maxMarkets);
+}
+
 function parseStringArray(value: unknown): string[] {
   if (!value) return [];
   if (Array.isArray(value)) {
@@ -375,6 +435,62 @@ function normalizeOutcomeLabel(value: string) {
     .toLowerCase();
 }
 
+function buildMarketSearchText(market: Record<string, unknown>): string {
+  const pieces: string[] = [];
+  const add = (value: unknown) => {
+    const parsed = asString(value);
+    if (parsed) pieces.push(parsed.toLowerCase());
+  };
+
+  add(market.question);
+  add(market.title);
+  add(market.subtitle);
+  add(market.description);
+  add(market.slug);
+  add(market.category);
+  add(market.subcategory);
+  add(market.groupItemTitle);
+  add(market.group_item_title);
+
+  const tags = asArray(market.tags);
+  for (const tagValue of tags) {
+    const tag = asObject(tagValue);
+    if (!tag) continue;
+    add(tag.name);
+    add(tag.label);
+    add(tag.slug);
+  }
+
+  return pieces.join(' ');
+}
+
+function marketMatchesQuery(market: Record<string, unknown>, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (q === 'sports') {
+    const category = asString(market.category)?.toLowerCase();
+    const subcategory = asString(market.subcategory)?.toLowerCase();
+    const text = buildMarketSearchText(market);
+    return (
+      category === 'sports' ||
+      subcategory === 'sports' ||
+      text.includes('sports') ||
+      text.includes('nba') ||
+      text.includes('nfl') ||
+      text.includes('mlb') ||
+      text.includes('soccer') ||
+      text.includes('fight')
+    );
+  }
+
+  const text = buildMarketSearchText(market);
+  if (text.includes(q)) return true;
+
+  const tokens = q.split(/\s+/).filter((token) => token.length >= 3);
+  if (tokens.length === 0) return false;
+  return tokens.some((token) => text.includes(token));
+}
+
 function extractMarketCandidatesFromSearchResponse(input: {
   query: string;
   response: unknown;
@@ -451,6 +567,82 @@ function extractMarketCandidatesFromSearchResponse(input: {
         query: input.query,
       });
     }
+  }
+
+  const deduped = new Map<string, MarketCandidate>();
+  for (const candidate of flattened) {
+    if (!deduped.has(candidate.conditionId)) {
+      deduped.set(candidate.conditionId, candidate);
+    }
+  }
+
+  const sorted = Array.from(deduped.values()).sort((a, b) => {
+    if (b.volume !== a.volume) return b.volume - a.volume;
+    return b.liquidity - a.liquidity;
+  });
+
+  return sorted.slice(0, input.maxMarkets);
+}
+
+function extractMarketCandidatesFromMarketsResponse(input: {
+  query: string;
+  response: unknown[];
+  maxMarkets: number;
+}): MarketCandidate[] {
+  const flattened: MarketCandidate[] = [];
+
+  for (const marketValue of input.response) {
+    const market = asObject(marketValue);
+    if (!market) continue;
+    if (!marketMatchesQuery(market, input.query)) continue;
+
+    const conditionId =
+      normalizeConditionId(
+        asString(market.conditionId) ||
+          asString(market.condition_id) ||
+          asString(market.conditionID)
+      ) ?? null;
+    if (!conditionId) continue;
+
+    const marketId = asIdString(market.id) || asIdString(market.marketId);
+    const marketSlug = asString(market.slug);
+    if (!marketId || !marketSlug) continue;
+
+    const outcomes = parseStringArray(market.outcomes);
+    const outcomePrices = parseStringArray(market.outcomePrices);
+    const clobTokenIds = parseStringArray(
+      market.clobTokenIds || market.clob_token_ids || market.tokenIds || market.token_ids
+    );
+    if (
+      outcomes.length === 0 ||
+      clobTokenIds.length === 0 ||
+      outcomes.length !== clobTokenIds.length
+    ) {
+      continue;
+    }
+
+    const marketTitle = inferMarketTitle(market, 'Untitled market');
+    const marketEndDateMs = parseCandidateEndDate({ market, eventEndDateMs: null });
+    const volume = asNumber(market.volume24h) || asNumber(market.volume) || 0;
+    const liquidity = asNumber(market.liquidity) || 0;
+    const active = market.active !== false;
+    const closed = market.closed === true;
+    if (!active || closed) continue;
+
+    flattened.push({
+      conditionId,
+      marketId,
+      marketSlug,
+      marketTitle,
+      outcomes,
+      outcomePrices,
+      clobTokenIds,
+      endDateIso: toIsoString(marketEndDateMs),
+      endDateMs: marketEndDateMs,
+      volume,
+      liquidity,
+      query: input.query,
+    });
   }
 
   const deduped = new Map<string, MarketCandidate>();
@@ -705,6 +897,10 @@ async function main() {
     throw new Error('queryPool cannot be empty');
   }
   const baseQueryOffset = (existingRoundCount + hashString(club.slug)) % queryPool.length;
+  const horizonStartIso = config.maxHoursToResolution ? new Date().toISOString() : null;
+  const horizonEndIso = config.maxHoursToResolution
+    ? new Date(Date.now() + config.maxHoursToResolution * 60 * 60 * 1000).toISOString()
+    : null;
 
   const results: AgentRunResult[] = [];
   const marketEndDateCache = new Map<string, number | null>();
@@ -716,32 +912,43 @@ async function main() {
 
     for (let attempt = 0; attempt < queryPool.length; attempt += 1) {
       const query = pickQuery(queryPool, baseQueryOffset, iteration, attempt);
-      const searchResponse = await GammaController.publicSearch({
-        q: query,
-        page: 1,
-        limitPerType: config.maxMarketsPerQuery,
-        keepClosedMarkets: 0,
-      });
+      const baseCandidates = config.maxHoursToResolution
+        ? await fetchHorizonCandidatesForQuery({
+            query,
+            maxMarkets: config.maxMarketsPerQuery,
+            endDateMin: horizonStartIso ?? new Date().toISOString(),
+            endDateMax:
+              horizonEndIso ??
+              new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            GammaController,
+          })
+        : extractMarketCandidatesFromSearchResponse({
+            query,
+            response: await GammaController.publicSearch({
+              q: query,
+              page: 1,
+              limitPerType: config.maxMarketsPerQuery,
+              keepClosedMarkets: 0,
+            }),
+            maxMarkets: config.maxMarketsPerQuery,
+          });
 
-      const baseCandidates = extractMarketCandidatesFromSearchResponse({
-        query,
-        response: searchResponse,
-        maxMarkets: config.maxMarketsPerQuery,
-      }).filter((candidate) => {
+      const dedupedByRoundState = baseCandidates.filter((candidate) => {
         const normalizedConditionId = candidate.conditionId.toLowerCase();
         if (recentConditionIds.has(normalizedConditionId)) return false;
         if (activeConditionIds.has(normalizedConditionId)) return false;
         return true;
       });
 
-      hadCandidatesBeforeHorizon = hadCandidatesBeforeHorizon || baseCandidates.length > 0;
-      const withResolvedEndDates = config.maxHoursToResolution
-        ? await enrichCandidateEndDates({
-            candidates: baseCandidates,
-            marketEndDateCache,
-            GammaController,
-          })
-        : baseCandidates;
+      hadCandidatesBeforeHorizon = hadCandidatesBeforeHorizon || dedupedByRoundState.length > 0;
+      const withResolvedEndDates =
+        !config.maxHoursToResolution && dedupedByRoundState.length > 0
+          ? await enrichCandidateEndDates({
+              candidates: dedupedByRoundState,
+              marketEndDateCache,
+              GammaController,
+            })
+          : dedupedByRoundState;
       const candidates = withResolvedEndDates.filter((candidate) =>
         isWithinResolutionWindow(candidate, config.maxHoursToResolution)
       );

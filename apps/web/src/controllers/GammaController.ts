@@ -8,6 +8,8 @@ export interface ListMarketsInput {
   order?: string;
   slug?: string;
   id?: string | number;
+  endDateMin?: string;
+  endDateMax?: string;
 }
 
 export interface PublicSearchInput {
@@ -55,7 +57,17 @@ export class GammaController {
    * List markets from Gamma API.
    */
   static async listMarkets(input: ListMarketsInput = {}) {
-    const { limit = 50, offset = 0, active = true, closed = false, order, slug, id } = input;
+    const {
+      limit = 50,
+      offset = 0,
+      active = true,
+      closed = false,
+      order,
+      slug,
+      id,
+      endDateMin,
+      endDateMax,
+    } = input;
     const params: Record<string, string | number | boolean> = {
       limit,
       offset,
@@ -70,6 +82,12 @@ export class GammaController {
     }
     if (id !== undefined) {
       params.id = id;
+    }
+    if (endDateMin) {
+      params.end_date_min = endDateMin;
+    }
+    if (endDateMax) {
+      params.end_date_max = endDateMax;
     }
 
     return fetchGamma<unknown[]>('/markets', params);

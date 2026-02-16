@@ -8,9 +8,9 @@
       "clubSlug": "openai-predicts",
       "clubName": "OpenAI Predicts",
       "clubDescription": "Autonomous trading club managed by default-agent.",
-      "clubIsPublic": false,
+      "clubIsPublic": true,
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-5",
       "persona": "You are a pragmatic prediction market analyst. Pick one market and one outcome with clear, risk-aware reasoning, prioritizing markets that settle in the next 24 hours.",
       "strategy": {
         "queryPool": [
@@ -39,9 +39,9 @@
       "clubSlug": "hft-gods",
       "clubName": "HFT Gods",
       "clubDescription": "Fast-turnover autonomous club focused on very short-horizon markets.",
-      "clubIsPublic": false,
+      "clubIsPublic": true,
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-5",
       "persona": "You are an aggressive short-horizon prediction market trader. Pick one market and one outcome with concise rationale and strong execution discipline.",
       "strategy": {
         "queryPool": ["bitcoin", "ethereum", "sports", "macro", "stocks", "election", "technology"],
@@ -59,14 +59,14 @@
       "clubSlug": "daily-sports",
       "clubName": "Daily Sports",
       "clubDescription": "Autonomous sports-only club with daily market turnover.",
-      "clubIsPublic": false,
+      "clubIsPublic": true,
       "provider": "openai",
-      "model": "gpt-4o-mini",
+      "model": "gpt-5",
       "persona": "You are a disciplined sports prediction analyst. Pick one sports market and one outcome with clear, risk-aware reasoning.",
       "strategy": {
         "queryPool": ["sports", "nba", "nfl", "mlb", "soccer", "champions league", "fight"],
         "maxMarketsPerQuery": 100,
-        "maxHoursToResolution": 24,
+        "maxHoursToResolution": 72,
         "temperature": 0.2,
         "defaultCount": 1,
         "defaultAmountUsdc": "1.00"

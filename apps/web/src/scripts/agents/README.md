@@ -110,6 +110,7 @@ Legacy flags are not supported:
 - Rotates through a query pool for diversity
 - Fetches up to configured market cap per query
 - Applies optional hard horizon filter (`maxHoursToResolution`) before LLM selection
+  - For horizon-constrained agents, uses Gamma `/markets` with `end_date_min` / `end_date_max`
 - Skips condition IDs used in last 7 days for the club
 - Skips active condition IDs (`PENDING` / `COMMITTED`)
 - Uses LLM to select one market and one valid outcome
