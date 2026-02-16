@@ -50,7 +50,6 @@ export interface ClubDetail {
     user: {
       id: string;
       walletAddress: string;
-      email: string | null;
     };
   }>;
   predictionRounds: Array<{

@@ -173,7 +173,6 @@ export class ClubController {
               select: {
                 id: true,
                 walletAddress: true,
-                email: true,
               },
             },
           },

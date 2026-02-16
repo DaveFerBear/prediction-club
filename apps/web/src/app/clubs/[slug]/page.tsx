@@ -416,9 +416,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
 
                         <div className="min-w-0 flex-1">
                           <CopyableAddress address={member.user.walletAddress} variant="compact" />
-                          {member.user.email ? (
-                            <p className="truncate text-xs text-muted-foreground">{member.user.email}</p>
-                          ) : null}
                         </div>
 
                         {member.role === 'ADMIN' ? (
