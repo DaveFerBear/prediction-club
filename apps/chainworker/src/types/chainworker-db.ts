@@ -22,6 +22,11 @@ export const roundMemberSelect = Prisma.validator<Prisma.PredictionRoundMemberSe
   payoutAmount: true,
   pnlAmount: true,
   orderId: true,
+  orderStatus: true,
+  orderSize: true,
+  orderSizeMatched: true,
+  orderTakingAmount: true,
+  orderOutcome: true,
   settledAt: true,
   user: {
     select: {

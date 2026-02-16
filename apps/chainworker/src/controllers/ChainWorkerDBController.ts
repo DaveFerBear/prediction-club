@@ -213,4 +213,93 @@ export class ChainWorkerDBController {
       });
     });
   }
+
+  static async syncSettledRoundPayouts(
+    round: PendingRound,
+    members: RoundMember[],
+    payouts: MemberPayout[]
+  ): Promise<{ updatedMembers: number; createdPayoutEntries: number }> {
+    const payoutByUser = new Map(payouts.map((payout) => [payout.userId, payout]));
+    const missing = members.filter((member) => !payoutByUser.has(member.userId));
+    if (missing.length > 0) {
+      throw new Error(`Missing payouts for ${missing.length} members.`);
+    }
+
+    const now = new Date();
+
+    return prisma.$transaction(async (tx) => {
+      const existingPayouts = await tx.ledgerEntry.findMany({
+        where: {
+          predictionRoundId: round.id,
+          type: 'PAYOUT',
+        },
+        select: { userId: true },
+      });
+      const existingPayoutUsers = new Set(existingPayouts.map((entry) => entry.userId));
+
+      const ledgerEntries: Array<{
+        safeAddress: string;
+        clubWalletId?: string | null;
+        clubId: string;
+        userId: string;
+        predictionRoundId: string;
+        type: LedgerEntryType;
+        amount: string;
+        asset: string;
+        metadata?: Prisma.InputJsonValue;
+        txHash?: string | null;
+        createdAt?: Date;
+      }> = [];
+
+      let updatedMembers = 0;
+      for (const member of members) {
+        const payout = payoutByUser.get(member.userId);
+        if (!payout) continue;
+
+        const payoutAmount = payout.payoutAmount;
+        const pnlAmount =
+          payout.pnlAmount ?? (BigInt(payoutAmount) - BigInt(member.commitAmount)).toString();
+
+        if (!existingPayoutUsers.has(member.userId) && BigInt(payoutAmount) > 0n) {
+          const safeAddress = member.clubWallet?.polymarketSafeAddress;
+          if (!safeAddress) {
+            throw new Error(`Missing club wallet for user ${member.userId}`);
+          }
+          const clubWalletId = member.clubWallet?.id;
+          ledgerEntries.push({
+            safeAddress,
+            clubWalletId,
+            clubId: round.clubId,
+            userId: member.userId,
+            predictionRoundId: round.id,
+            type: 'PAYOUT',
+            amount: payoutAmount,
+            asset: 'USDC.e',
+            metadata: { source: 'polymarket-payout-backfill' } as Prisma.InputJsonValue,
+            createdAt: now,
+          });
+        }
+
+        const payoutChanged = member.payoutAmount !== payoutAmount;
+        const pnlChanged = member.pnlAmount !== pnlAmount;
+        if (!payoutChanged && !pnlChanged) continue;
+
+        await tx.predictionRoundMember.update({
+          where: { id: member.id },
+          data: {
+            payoutAmount,
+            pnlAmount,
+            settledAt: member.settledAt ?? now,
+          },
+        });
+        updatedMembers += 1;
+      }
+
+      if (ledgerEntries.length > 0) {
+        await tx.ledgerEntry.createMany({ data: ledgerEntries });
+      }
+
+      return { updatedMembers, createdPayoutEntries: ledgerEntries.length };
+    });
+  }
 }

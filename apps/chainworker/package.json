@@ -6,6 +6,7 @@
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
+    "payouts:backfill": "tsx src/scripts/backfill-settled-payouts.ts",
     "env:generate": "node scripts/generate-env.js",
     "deploy": "./deploy.sh"
   },

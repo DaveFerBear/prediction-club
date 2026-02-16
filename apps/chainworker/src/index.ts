@@ -152,7 +152,7 @@ async function runOnce() {
       }
 
       const members = await ChainWorkerDBController.getRoundMembers(round.id);
-      const payouts = PolymarketController.computeMemberPayouts(members);
+      const payouts = PolymarketController.computeMemberPayouts(round, members);
       if (!payouts) {
         console.log(`[chainworker] Round ${round.id} missing payout data.`);
         continue;

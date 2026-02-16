@@ -3,6 +3,7 @@ import { ClobClient, OrderType, Side } from '@polymarket/clob-client';
 import { createPrivateKey, createSign } from 'crypto';
 import { utils } from 'ethers';
 import type {
+  PendingRound,
   RoundMember,
   MemberPayout,
   MemberOrder,
@@ -613,6 +614,35 @@ function parseNumber(value: unknown): number | null {
   return null;
 }
 
+function normalizeLabel(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function decimalToBaseUnits(value: string, decimals = 6): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^\d+$/u.test(trimmed)) {
+    return trimmed;
+  }
+
+  const match = /^(\d+)(?:\.(\d+))?$/u.exec(trimmed);
+  if (!match) return null;
+  const whole = match[1];
+  const fractionRaw = match[2] ?? '';
+  const fraction = fractionRaw.slice(0, decimals).padEnd(decimals, '0');
+
+  try {
+    const wholeUnits = BigInt(whole) * 10n ** BigInt(decimals);
+    const fractionUnits = fraction.length > 0 ? BigInt(fraction) : 0n;
+    return (wholeUnits + fractionUnits).toString();
+  } catch {
+    return null;
+  }
+}
+
 function getMarketTokens(market: Record<string, unknown>): Record<string, unknown>[] {
   const tokens = market.tokens;
   if (!Array.isArray(tokens)) return [];
@@ -644,6 +674,18 @@ function getResolvedOutcome(market: Record<string, unknown>): string | null {
     null;
 
   return typeof fallback === 'string' && fallback.trim().length > 0 ? fallback.trim() : null;
+}
+
+function resolveMemberPayoutFromOrder(member: RoundMember): string {
+  const candidates = [member.orderSizeMatched, member.orderTakingAmount, member.orderSize];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const payoutAmount = decimalToBaseUnits(candidate, 6);
+    if (payoutAmount && BigInt(payoutAmount) >= 0n) {
+      return payoutAmount;
+    }
+  }
+  return '0';
 }
 
 function isMarketResolved(market: Record<string, unknown>) {
@@ -810,17 +852,21 @@ export class PolymarketController {
     };
   }
 
-  static computeMemberPayouts(members: RoundMember[]): MemberPayout[] | null {
+  static computeMemberPayouts(round: Pick<PendingRound, 'id' | 'targetOutcome' | 'outcome'>, members: RoundMember[]): MemberPayout[] | null {
     if (members.length === 0) return null;
 
-    return members.map((member) => ({
-      userId: member.userId,
-      payoutAmount: member.payoutAmount,
-      pnlAmount:
-        member.pnlAmount !== '0'
-          ? member.pnlAmount
-          : (BigInt(member.payoutAmount) - BigInt(member.commitAmount)).toString(),
-    }));
+    const roundOutcome = normalizeLabel(round.outcome);
+    const targetOutcome = normalizeLabel(round.targetOutcome);
+    const isWinningRound = roundOutcome !== null && targetOutcome !== null && roundOutcome === targetOutcome;
+
+    return members.map((member) => {
+      const payoutAmount = isWinningRound ? resolveMemberPayoutFromOrder(member) : '0';
+      return {
+        userId: member.userId,
+        payoutAmount,
+        pnlAmount: (BigInt(payoutAmount) - BigInt(member.commitAmount)).toString(),
+      };
+    });
   }
 
   static async placeMarketOrder(params: {

@@ -242,6 +242,12 @@ Local dev:
 yarn chainworker:dev
 ```
 
+Backfill settled round payouts from stored Polymarket order fill data:
+
+```bash
+yarn workspace @prediction-club/chainworker payouts:backfill
+```
+
 Generate/normalize chainworker env values:
 
 ```bash
