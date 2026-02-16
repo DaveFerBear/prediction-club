@@ -20,18 +20,21 @@ export const AGENT_OWNER_EMAIL = 'predictionclubagent@gmail.com';
 export function loadEnvForScripts() {
   const cwd = process.cwd();
   const candidates = [
+    path.resolve(cwd, '../../.env'),
     path.resolve(cwd, '.env'),
     path.resolve(cwd, '../.env'),
-    path.resolve(cwd, '../../.env'),
     path.resolve(cwd, 'apps/web/.env'),
     path.resolve(cwd, '../web/.env'),
+    path.resolve(cwd, 'src/scripts/agents/.env'),
+    path.resolve(cwd, 'scripts/agents/.env'),
+    path.resolve(cwd, 'apps/web/src/scripts/agents/.env'),
   ];
 
   const loaded = new Set<string>();
   for (const candidate of candidates) {
     if (!fs.existsSync(candidate)) continue;
     if (loaded.has(candidate)) continue;
-    loadDotEnv({ path: candidate });
+    loadDotEnv({ path: candidate, override: true });
     loaded.add(candidate);
   }
 

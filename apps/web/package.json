@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "agent:run": "tsx src/scripts/agents/run-agent.ts"
+    "agent:run": "tsx src/scripts/agents/run-agent.ts",
+    "agent:fund": "tsx src/scripts/agents/fund-agent-wallets.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.44",

@@ -10,7 +10,7 @@ This folder now uses a single config-driven runner:
 - Database configured (`DATABASE_URL`)
 - Service owner user `predictionclubagent@gmail.com` exists in DB
 - Service owner has completed Turnkey sign-in (has `turnkeySubOrgId`)
-- Club safes are funded with USDC.e before live runs
+- Tap wallet private key set (`AGENT_TAP_PRIVATE_KEY`) for treasury funding
 
 For LLM selection, install AI SDK packages in web workspace:
 
@@ -38,6 +38,10 @@ Each agent defines:
 - `provider`, `model`, `persona`
 - strategy defaults: `queryPool`, `maxMarketsPerQuery`, `temperature`, `defaultCount`, `defaultAmountUsdc`
 
+Shared treasury tap policy (applies to all agents) lives in:
+
+- `apps/web/src/scripts/agents/agent-funding-config.ts`
+
 ## Run Agent
 
 Preview mode (no DB writes):
@@ -57,6 +61,29 @@ or directly:
 ```bash
 npx tsx apps/web/src/scripts/agents/run-agent.ts --agent=default-agent --mode=preview
 ```
+
+## Fund Agent Treasuries
+
+Funds all enabled agent clubs to a shared target if their safe balance is below a shared minimum.
+
+```bash
+yarn agent:fund
+```
+
+or directly:
+
+```bash
+npx tsx apps/web/src/scripts/agents/fund-agent-wallets.ts
+```
+
+Current behavior:
+
+- Reads all enabled agents from `agents.json`
+- Auto-creates missing clubs by slug (same as run-agent)
+- Ensures each club wallet exists and is provisioned
+- Checks safe USDC.e balance
+- If balance `< MIN`, transfers enough USDC.e from tap wallet to reach `TARGET`
+- Records confirmed deposits via `LedgerController.recordDeposit`
 
 ## CLI Flags
 
