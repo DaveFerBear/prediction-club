@@ -122,6 +122,28 @@ function toIsoString(valueMs: number | null): string | null {
   return new Date(valueMs).toISOString();
 }
 
+function parseCandidateEndDate(input: {
+  market: Record<string, unknown>;
+  eventEndDateMs: number | null;
+}): number | null {
+  return (
+    parseDateMs(
+      input.market.endDate ||
+        input.market.end_date ||
+        input.market.endTime ||
+        input.market.end_time ||
+        input.market.resolveBy ||
+        input.market.resolve_by ||
+        input.market.resolutionDate ||
+        input.market.resolution_date ||
+        input.market.marketEndDate ||
+        input.market.market_end_date ||
+        input.market.umaEndDate ||
+        input.market.uma_end_date
+    ) ?? input.eventEndDateMs
+  );
+}
+
 function computeHoursToResolution(valueMs: number | null): number | null {
   if (!valueMs) return null;
   const deltaMs = valueMs - Date.now();
@@ -135,6 +157,67 @@ function isWithinResolutionWindow(candidate: MarketCandidate, maxHours: number |
   if (hoursToResolution === null) return false;
   if (hoursToResolution <= 0) return false;
   return hoursToResolution <= maxHours;
+}
+
+async function enrichCandidateEndDates(input: {
+  candidates: MarketCandidate[];
+  marketEndDateCache: Map<string, number | null>;
+  GammaController: {
+    listMarkets: (input?: {
+      limit?: number;
+      offset?: number;
+      active?: boolean;
+      closed?: boolean;
+      order?: string;
+      slug?: string;
+      id?: string | number;
+    }) => Promise<unknown[]>;
+  };
+}) {
+  const candidates = [...input.candidates];
+  const unresolved = candidates.filter((candidate) => !candidate.endDateMs);
+  if (unresolved.length === 0) {
+    return candidates;
+  }
+
+  // Keep this bounded to avoid expensive per-iteration request storms.
+  const lookupSlice = unresolved.slice(0, 40);
+
+  await Promise.all(
+    lookupSlice.map(async (candidate) => {
+      if (input.marketEndDateCache.has(candidate.marketId)) return;
+
+      try {
+        const records = await input.GammaController.listMarkets({
+          id: candidate.marketId,
+          limit: 1,
+        });
+        const first = asObject(records[0]);
+        if (!first) {
+          input.marketEndDateCache.set(candidate.marketId, null);
+          return;
+        }
+        const endDateMs = parseCandidateEndDate({
+          market: first,
+          eventEndDateMs: null,
+        });
+        input.marketEndDateCache.set(candidate.marketId, endDateMs);
+      } catch {
+        input.marketEndDateCache.set(candidate.marketId, null);
+      }
+    })
+  );
+
+  return candidates.map((candidate) => {
+    if (candidate.endDateMs) return candidate;
+    const fromCache = input.marketEndDateCache.get(candidate.marketId);
+    if (!fromCache) return candidate;
+    return {
+      ...candidate,
+      endDateMs: fromCache,
+      endDateIso: toIsoString(fromCache),
+    };
+  });
 }
 
 function parseStringArray(value: unknown): string[] {
@@ -346,17 +429,7 @@ function extractMarketCandidatesFromSearchResponse(input: {
       }
 
       const marketTitle = inferMarketTitle(market, eventTitle);
-      const marketEndDateMs =
-        parseDateMs(
-          market.endDate ||
-            market.end_date ||
-            market.endTime ||
-            market.end_time ||
-            market.resolveBy ||
-            market.resolve_by ||
-            market.resolutionDate ||
-            market.resolution_date
-        ) ?? eventEndDateMs;
+      const marketEndDateMs = parseCandidateEndDate({ market, eventEndDateMs });
       const volume = asNumber(market.volume24h) || asNumber(market.volume) || 0;
       const liquidity = asNumber(market.liquidity) || 0;
       const active = market.active !== false;
@@ -407,7 +480,7 @@ async function chooseMarketAndOutcomeWithLlm(input: {
     marketId: z.string(),
     marketSlug: z.string(),
     targetOutcome: z.string(),
-    reasoning: z.string().min(1).max(280),
+    reasoning: z.string().min(1).max(10_000),
   });
 
   const model = resolveModel({
@@ -634,10 +707,12 @@ async function main() {
   const baseQueryOffset = (existingRoundCount + hashString(club.slug)) % queryPool.length;
 
   const results: AgentRunResult[] = [];
+  const marketEndDateCache = new Map<string, number | null>();
 
   for (let iteration = 0; iteration < count; iteration += 1) {
     let selectedQuery = '';
     let selectedCandidates: MarketCandidate[] = [];
+    let hadCandidatesBeforeHorizon = false;
 
     for (let attempt = 0; attempt < queryPool.length; attempt += 1) {
       const query = pickQuery(queryPool, baseQueryOffset, iteration, attempt);
@@ -648,7 +723,7 @@ async function main() {
         keepClosedMarkets: 0,
       });
 
-      const candidates = extractMarketCandidatesFromSearchResponse({
+      const baseCandidates = extractMarketCandidatesFromSearchResponse({
         query,
         response: searchResponse,
         maxMarkets: config.maxMarketsPerQuery,
@@ -656,9 +731,20 @@ async function main() {
         const normalizedConditionId = candidate.conditionId.toLowerCase();
         if (recentConditionIds.has(normalizedConditionId)) return false;
         if (activeConditionIds.has(normalizedConditionId)) return false;
-        if (!isWithinResolutionWindow(candidate, config.maxHoursToResolution)) return false;
         return true;
       });
+
+      hadCandidatesBeforeHorizon = hadCandidatesBeforeHorizon || baseCandidates.length > 0;
+      const withResolvedEndDates = config.maxHoursToResolution
+        ? await enrichCandidateEndDates({
+            candidates: baseCandidates,
+            marketEndDateCache,
+            GammaController,
+          })
+        : baseCandidates;
+      const candidates = withResolvedEndDates.filter((candidate) =>
+        isWithinResolutionWindow(candidate, config.maxHoursToResolution)
+      );
 
       if (candidates.length > 0) {
         selectedQuery = query;
@@ -671,7 +757,9 @@ async function main() {
       results.push({
         iteration,
         success: false,
-        skippedReason: 'NO_CANDIDATES',
+        skippedReason: hadCandidatesBeforeHorizon
+          ? 'NO_CANDIDATES_WITHIN_HORIZON'
+          : 'NO_CANDIDATES',
       });
       continue;
     }
