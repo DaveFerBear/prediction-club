@@ -1,15 +1,10 @@
-'use client';
-
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { formatUsdAmount } from '@prediction-club/shared';
-import { Badge, Button, Card, CardContent } from '@prediction-club/ui';
+import { Badge, Card, CardContent } from '@prediction-club/ui';
 import type { PredictionRound } from '@/hooks';
 
 type PredictionRoundListItemProps = {
   round: PredictionRound;
-  clubSlug: string;
-  isAdmin: boolean;
 };
 
 function normalizeOutcome(value: string | null | undefined): string | null {
@@ -107,7 +102,7 @@ function renderCommentary(markdown: string): ReactNode[] {
 }
 
 export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
-  const { round, clubSlug, isAdmin } = props;
+  const { round } = props;
 
   return (
     <Card className="overflow-hidden border-[color:var(--club-border-soft)] bg-white shadow-sm">
@@ -123,17 +118,6 @@ export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
             {getStatusBadge(round)}
-            {isAdmin ? (
-              <Link href={`/clubs/${clubSlug}/predict`}>
-                <Button size="sm" variant="outline" className="whitespace-nowrap">
-                  Manage
-                </Button>
-              </Link>
-            ) : (
-              <Button size="sm" variant="ghost" disabled title="Round detail page coming soon">
-                View
-              </Button>
-            )}
           </div>
         </div>
 

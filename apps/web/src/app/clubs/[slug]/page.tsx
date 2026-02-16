@@ -386,12 +386,7 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
               ) : (
                 <div className="space-y-4">
                   {predictionRounds.map((predictionRound) => (
-                    <PredictionRoundListItem
-                      key={predictionRound.id}
-                      round={predictionRound}
-                      clubSlug={club.slug}
-                      isAdmin={isAdmin}
-                    />
+                    <PredictionRoundListItem key={predictionRound.id} round={predictionRound} />
                   ))}
                 </div>
               )}
