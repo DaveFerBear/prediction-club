@@ -8,6 +8,13 @@ const createPredictionRoundSchema = z.object({
   marketId: z.string().min(1).max(100),
   marketSlug: z.string().min(1).max(200),
   marketTitle: z.string().max(200).optional(),
+  marketEndAt: z
+    .string()
+    .optional()
+    .refine(
+      (value) => !value || !Number.isNaN(new Date(value).getTime()),
+      'marketEndAt must be a valid datetime'
+    ),
   commentary: z.string().max(8000).optional(),
   commitAmount: z
     .string()

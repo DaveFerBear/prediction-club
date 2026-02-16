@@ -208,6 +208,9 @@ model PredictionRound {
   targetOutcome   String
   targetTokenId   String
 
+  // Expected market close/resolution timestamp from Polymarket Gamma /markets endDate at round creation.
+  marketEndAt     DateTime?
+
   // Resolution metadata: null at creation, set when chainworker resolves the market.
   outcome         String? // Resolved market outcome label.
   resolvedAt      DateTime? // Timestamp reported by market resolution.

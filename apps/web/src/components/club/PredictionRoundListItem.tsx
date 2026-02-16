@@ -13,6 +13,79 @@ function normalizeOutcome(value: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed.toLowerCase() : null;
 }
 
+function parseDateValue(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function formatAbsoluteDateTime(date: Date): string {
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatRelativeDuration(targetDate: Date, now = new Date()): { text: string; isPast: boolean } {
+  const diffMs = targetDate.getTime() - now.getTime();
+  const isPast = diffMs < 0;
+  const absMs = Math.abs(diffMs);
+  const minuteMs = 60 * 1000;
+  const hourMs = 60 * minuteMs;
+  const dayMs = 24 * hourMs;
+  const weekMs = 7 * dayMs;
+
+  if (absMs < minuteMs) {
+    return { text: '<1m', isPast };
+  }
+
+  let remaining = absMs;
+  const parts: string[] = [];
+  const units = [
+    { suffix: 'w', ms: weekMs },
+    { suffix: 'd', ms: dayMs },
+    { suffix: 'h', ms: hourMs },
+    { suffix: 'm', ms: minuteMs },
+  ];
+
+  for (const unit of units) {
+    if (parts.length >= 2) break;
+    const count = Math.floor(remaining / unit.ms);
+    if (count <= 0) continue;
+    parts.push(`${count}${unit.suffix}`);
+    remaining -= count * unit.ms;
+  }
+
+  return { text: parts.join(' '), isPast };
+}
+
+function getResolveLabel(round: PredictionRound): string | null {
+  if (round.status === 'SETTLED') {
+    const resolvedDate = parseDateValue(round.resolvedAt);
+    if (!resolvedDate) return null;
+    return `Resolved ${formatAbsoluteDateTime(resolvedDate)}`;
+  }
+
+  if (round.status !== 'PENDING' && round.status !== 'COMMITTED') {
+    return null;
+  }
+
+  const expectedDate = parseDateValue(round.marketEndAt);
+  if (!expectedDate) return null;
+
+  const relative = formatRelativeDuration(expectedDate);
+  const absolute = formatAbsoluteDateTime(expectedDate);
+
+  if (relative.isPast) {
+    return `Expected to resolve ${relative.text} ago • ${absolute}`;
+  }
+
+  return `Resolves in ${relative.text} • ${absolute}`;
+}
+
 function getStatusBadge(round: PredictionRound) {
   const isSettled = round.status === 'SETTLED';
   if (!isSettled) {
@@ -103,6 +176,7 @@ function renderCommentary(markdown: string): ReactNode[] {
 
 export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
   const { round } = props;
+  const resolveLabel = getResolveLabel(round);
 
   return (
     <Card className="overflow-hidden border-[color:var(--club-border-soft)] bg-white shadow-sm">
@@ -115,6 +189,7 @@ export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
             <div className="mt-1 text-xs text-muted-foreground">
               Created {new Date(round.createdAt).toLocaleDateString()}
             </div>
+            {resolveLabel ? <div className="mt-1 text-xs text-muted-foreground">{resolveLabel}</div> : null}
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
             {getStatusBadge(round)}

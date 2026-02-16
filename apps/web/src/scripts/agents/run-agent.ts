@@ -1003,6 +1003,7 @@ async function main() {
         marketId: pick.candidate.marketId,
         marketSlug: pick.candidate.marketSlug,
         marketTitle: pick.candidate.marketTitle,
+        marketEndAt: pick.candidate.endDateIso ?? undefined,
         commentary: [
           '### Agent Commentary',
           '',

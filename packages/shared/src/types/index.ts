@@ -99,6 +99,7 @@ export interface PredictionRound {
   status: PredictionRoundStatus;
   targetOutcome: string;
   targetTokenId: string;
+  marketEndAt: Date | null;
   outcome: string | null;
   resolvedAt: Date | null;
   settledAt: Date | null;
@@ -178,6 +179,7 @@ export interface CreatePredictionRoundRequest {
   marketId: string;
   marketSlug: string;
   marketTitle?: string;
+  marketEndAt?: string;
   commentary?: string;
   commitAmount: string;
   targetTokenId: string;

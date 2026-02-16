@@ -280,6 +280,41 @@ A change is good if it:
 
 ---
 
+## 16) Database Migration Policy (Strict)
+
+When changing Prisma schema or SQL migrations:
+
+- Do not run destructive migration commands automatically.
+- Do not run `prisma migrate reset` unless the user explicitly asks.
+- Do not run `prisma db push --force-reset` unless the user explicitly asks.
+- Do not run `prisma migrate dev` against shared/remote databases unless the user explicitly asks.
+
+Default workflow for agents:
+
+1. Update `packages/db/prisma/schema.prisma`.
+2. Generate or author the migration SQL diff in `packages/db/prisma/migrations/<timestamp>_<name>/migration.sql`.
+3. Hand migration execution back to the user with exact commands.
+
+Example diff-generation command (do not apply automatically):
+
+```bash
+cd packages/db
+npx prisma migrate diff \
+  --from-migrations prisma/migrations \
+  --to-schema-datamodel prisma/schema.prisma \
+  --script > prisma/migrations/<timestamp>_<name>/migration.sql
+```
+
+Required handoff behavior:
+
+- Assume the user runs migrations.
+- Provide a copy-paste command block for the user to apply migration(s).
+- If migration history is drifted, provide a non-destructive recovery path (`migrate resolve`) instead of reset.
+
+In short: agents prepare schema + migration artifacts; users execute DB migrations.
+
+---
+
 ## Notes for Agents
 
 When refactoring or adding flows:

@@ -482,6 +482,10 @@ export function ClubPredictionForm({
       const conditionId = getConditionId(state.selectedMarket);
       const marketId = getMarketId(state.selectedMarket);
       const marketSlug = getMarketSlug(state.selectedMarket);
+      const marketEndAt =
+        typeof state.selectedMarket.endDate === 'string' && state.selectedMarket.endDate.length > 0
+          ? state.selectedMarket.endDate
+          : undefined;
       const tokenId = getOutcomeTokenId(state.selectedMarket, state.selectedOutcome);
 
       if (!conditionId) {
@@ -508,6 +512,7 @@ export function ClubPredictionForm({
         marketId,
         marketSlug,
         marketTitle,
+        marketEndAt,
         commentary: commentary.trim() || undefined,
         commitAmount,
         targetTokenId: tokenId,

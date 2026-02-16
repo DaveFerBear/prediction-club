@@ -9,6 +9,7 @@ export interface CreatePredictionRoundInput {
   marketId: string;
   marketSlug: string;
   marketTitle?: string;
+  marketEndAt?: string;
   commentary?: string;
   commitAmount: string;
   targetTokenId: string;
@@ -34,6 +35,7 @@ export class PredictionRoundController {
       marketId,
       marketSlug,
       marketTitle,
+      marketEndAt,
       commentary,
       commitAmount,
       targetTokenId,
@@ -50,6 +52,14 @@ export class PredictionRoundController {
     }
 
     const stakeTotal = (BigInt(commitAmount) * BigInt(activeMembers.length)).toString();
+    const parsedMarketEndAt = (() => {
+      if (!marketEndAt) return null;
+      const parsed = new Date(marketEndAt);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new LedgerError('INVALID_MARKET_END_AT', 'Invalid market end time');
+      }
+      return parsed;
+    })();
 
     const memberIds = activeMembers.map((member) => member.userId);
     let clubWalletByUser: Map<
@@ -86,6 +96,7 @@ export class PredictionRoundController {
           marketId,
           marketSlug,
           marketTitle,
+          marketEndAt: parsedMarketEndAt,
           commentary,
           targetTokenId,
           targetOutcome,

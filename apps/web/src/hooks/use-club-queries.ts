@@ -74,6 +74,7 @@ export interface PredictionRound {
   marketSlug: string;
   marketTitle: string | null;
   commentary: string | null;
+  marketEndAt: string | null;
   status: string;
   outcome: string | null;
   resolvedAt: string | null;
