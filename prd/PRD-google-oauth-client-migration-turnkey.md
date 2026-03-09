@@ -6,6 +6,12 @@ We deleted the existing Google OAuth client used by browser sign-in (`NEXT_PUBLI
 
 Key risk: creating a new Google OAuth client changes the OIDC audience (`aud`), which can break Turnkey OIDC identity matching for already-onboarded users unless we add a migration path.
 
+### Migration Decision (Locked)
+
+- Strategy: **Identity relink only** (no wallet rotation, no fund transfer).
+- Scope: **All existing users**.
+- Cleanup: **Mark and review orphan Turnkey sub-orgs first** (no auto-delete).
+
 ## 2. Current Flow in This Repo
 
 - Frontend uses Google Identity Services popup and sends `credential` (OIDC token) to backend.
@@ -67,18 +73,35 @@ Before creating a new Turnkey sub-org on OIDC miss:
 
 Do not create a second `User` record for the same person during migration window. Existing club wallets are tied to old `userId`.
 
+### 5.3 Non-goal for this migration
+
+- Do **not** move on-chain funds.
+- Do **not** rotate wallet addresses.
+- Do **not** rebind club wallets to new user records.
+
 ## 6. Rollout Plan
 
 1. Create new Google OAuth client.
 2. Add JavaScript origins listed in section 3.
 3. Update env var:
    - `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in web runtime/deployment.
-4. Deploy backend change from section 5 before broad user re-login.
-5. Test with one existing user account and verify:
+4. Deploy backend relink changes before existing users re-login.
+5. Validate with all existing users and verify:
    - same `User.id`
    - same `turnkeySubOrgId`
    - same wallet access in profile/club flows.
-6. Monitor login errors and new user creation metrics for duplicates.
+6. Monitor login errors and `oidc_miss_relinked_by_email` vs `oidc_miss_created_new_suborg`.
+7. Build orphan sub-org report for manual review only (no deletion in this step).
+
+## 6.1 Required backend behavior (decision complete)
+
+For `POST /api/auth/turnkey/login` flow:
+
+1. Attempt Turnkey OIDC token lookup first (existing behavior).
+2. If lookup misses, parse token email.
+3. If app user exists by email with `turnkeySubOrgId`, relink to that sub-org and continue.
+4. If existing email user has an inaccessible sub-org, fail closed with explicit error.
+5. Only create new sub-org for truly new users (no existing app user identity).
 
 ## 7. Validation Checklist
 
@@ -95,3 +118,11 @@ If duplicate identities appear:
 1. Temporarily block new social login attempts.
 2. Revert to previous login behavior or hotfix to force email->existing-user recovery.
 3. Merge duplicate user identities in DB only with explicit mapping and audit trail.
+
+## 9. Acceptance Criteria
+
+- Existing funded users can sign in after OAuth client change.
+- Existing funded users retain original `turnkeySubOrgId`.
+- Existing club wallets remain accessible without fund movement.
+- No net increase in duplicate `User` rows for existing user emails.
+- Any orphan Turnkey sub-orgs are reported and manually reviewed.
