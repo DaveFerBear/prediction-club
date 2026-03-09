@@ -180,43 +180,43 @@ The web app will be available at http://localhost:3000
 
 ### Web App (`apps/web/.env`)
 
-| Variable                               | Description                        | Required |
-| -------------------------------------- | ---------------------------------- | -------- |
-| `DATABASE_URL`                         | PostgreSQL connection string       | Yes      |
-| `APP_SESSION_SECRET`                   | Secret for app session cookie (min 32 chars) | Yes      |
-| `TURNKEY_ORGANIZATION_ID`              | Parent Turnkey organization ID     | Yes      |
-| `TURNKEY_API_PUBLIC_KEY`               | Turnkey API public key (P-256)     | Yes      |
-| `TURNKEY_API_PRIVATE_KEY`              | Turnkey API private key            | Yes      |
-| `TURNKEY_API_BASE_URL`                 | Turnkey API base URL               | No       |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID`         | Google OAuth client ID for sign-in | Yes      |
-| `NEXT_PUBLIC_DEFAULT_CHAIN_ID`         | Default chain (80002 for Amoy)     | No       |
-| `POLYMARKET_RELAYER_URL`               | Polymarket relayer base URL        | Yes      |
-| `POLY_BUILDER_API_KEY`                 | Polymarket builder API key         | Yes      |
-| `POLY_BUILDER_SECRET`                  | Polymarket builder API secret      | Yes      |
-| `POLY_BUILDER_PASSPHRASE`              | Polymarket builder API passphrase  | Yes      |
-| `POLYGON_RPC_URL`                      | Server-side Polygon RPC URL        | Recommended |
-| `AMOY_RPC_URL`                         | Server-side Amoy RPC URL           | Optional |
-| `NEXT_PUBLIC_POLYGON_RPC_URL`          | Polygon mainnet RPC                | No       |
-| `NEXT_PUBLIC_AMOY_RPC_URL`             | Amoy testnet RPC                   | No       |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect project ID           | No       |
+| Variable                               | Description                                  | Required    |
+| -------------------------------------- | -------------------------------------------- | ----------- |
+| `DATABASE_URL`                         | PostgreSQL connection string                 | Yes         |
+| `APP_SESSION_SECRET`                   | Secret for app session cookie (min 32 chars) | Yes         |
+| `TURNKEY_ORGANIZATION_ID`              | Parent Turnkey organization ID               | Yes         |
+| `TURNKEY_API_PUBLIC_KEY`               | Turnkey API public key (P-256)               | Yes         |
+| `TURNKEY_API_PRIVATE_KEY`              | Turnkey API private key                      | Yes         |
+| `TURNKEY_API_BASE_URL`                 | Turnkey API base URL                         | No          |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID`         | Google OAuth client ID for sign-in           | Yes         |
+| `NEXT_PUBLIC_DEFAULT_CHAIN_ID`         | Default chain (80002 for Amoy)               | No          |
+| `POLYMARKET_RELAYER_URL`               | Polymarket relayer base URL                  | Yes         |
+| `POLY_BUILDER_API_KEY`                 | Polymarket builder API key                   | Yes         |
+| `POLY_BUILDER_SECRET`                  | Polymarket builder API secret                | Yes         |
+| `POLY_BUILDER_PASSPHRASE`              | Polymarket builder API passphrase            | Yes         |
+| `POLYGON_RPC_URL`                      | Server-side Polygon RPC URL                  | Recommended |
+| `AMOY_RPC_URL`                         | Server-side Amoy RPC URL                     | Optional    |
+| `NEXT_PUBLIC_POLYGON_RPC_URL`          | Polygon mainnet RPC                          | No          |
+| `NEXT_PUBLIC_AMOY_RPC_URL`             | Amoy testnet RPC                             | No          |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | WalletConnect project ID                     | No          |
 
 ### Chainworker (`apps/chainworker/.env`)
 
 Important: `docker --env-file` does not strip quotes. Avoid quoting values in this file.
 
-| Variable                         | Description                                 | Required |
-| -------------------------------- | ------------------------------------------- | -------- |
-| `DATABASE_URL`                   | Postgres connection string                  | Yes      |
-| `TURNKEY_API_PUBLIC_KEY`         | Turnkey API public key (P-256)              | Yes      |
-| `TURNKEY_API_PRIVATE_KEY`        | Turnkey API private key                     | Yes      |
-| `TURNKEY_API_BASE_URL`           | Turnkey API base URL                        | No       |
-| `POLY_BUILDER_API_KEY`           | Polymarket builder API key                  | Yes      |
-| `POLY_BUILDER_SECRET`            | Polymarket builder API secret               | Yes      |
-| `POLY_BUILDER_PASSPHRASE`        | Polymarket builder API passphrase           | Yes      |
-| `POLYMARKET_CLOB_URL`            | CLOB base URL                               | No       |
-| `POLYMARKET_CHAIN_ID`            | Chain ID (Polygon mainnet is 137)           | No       |
-| `CHAINWORKER_POLL_INTERVAL_MS`   | Polling interval in ms                      | No       |
-| `CHAINWORKER_BATCH_SIZE`         | Batch size for polling                      | No       |
+| Variable                       | Description                       | Required |
+| ------------------------------ | --------------------------------- | -------- |
+| `DATABASE_URL`                 | Postgres connection string        | Yes      |
+| `TURNKEY_API_PUBLIC_KEY`       | Turnkey API public key (P-256)    | Yes      |
+| `TURNKEY_API_PRIVATE_KEY`      | Turnkey API private key           | Yes      |
+| `TURNKEY_API_BASE_URL`         | Turnkey API base URL              | No       |
+| `POLY_BUILDER_API_KEY`         | Polymarket builder API key        | Yes      |
+| `POLY_BUILDER_SECRET`          | Polymarket builder API secret     | Yes      |
+| `POLY_BUILDER_PASSPHRASE`      | Polymarket builder API passphrase | Yes      |
+| `POLYMARKET_CLOB_URL`          | CLOB base URL                     | No       |
+| `POLYMARKET_CHAIN_ID`          | Chain ID (Polygon mainnet is 137) | No       |
+| `CHAINWORKER_POLL_INTERVAL_MS` | Polling interval in ms            | No       |
+| `CHAINWORKER_BATCH_SIZE`       | Batch size for polling            | No       |
 
 ## Available Scripts
 
@@ -288,7 +288,7 @@ gcloud compute ssh <vm> --zone <zone> --project <project> \
 Quick SSH:
 
 ```bash
-gcloud compute ssh chainworker --project cad-ai-439508
+gcloud compute ssh chainworker --project prediction-club
 ```
 
 ## What's Implemented vs Stubbed
