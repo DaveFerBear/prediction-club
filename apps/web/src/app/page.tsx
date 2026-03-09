@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { formatUsdAmount } from '@prediction-club/shared';
-import { Button } from '@prediction-club/ui';
+import { Button, Skeleton } from '@prediction-club/ui';
 import { AlertTriangle } from 'lucide-react';
 import { Header } from '@/components/header';
 import { PolymarketIcon } from '@/components/icons/polymarket-icon';
@@ -12,7 +12,7 @@ import { ClubTicker } from '@/components/home/club-ticker';
 import { useHomeData } from '@/hooks';
 
 export default function HomePage() {
-  const { data, error } = useHomeData();
+  const { data, error, isLoading } = useHomeData();
   const medianReturnLabel =
     data.kpis.medianSimpleReturn30d === null
       ? 'No settled activity'
@@ -43,7 +43,11 @@ export default function HomePage() {
                     </span>
                     <span className="mx-1 text-slate-300">/</span>
                     <span className="text-sm font-semibold tracking-tight tabular-nums text-slate-900">
-                      ${formatUsdAmount(data.kpis.totalAllTimeVolume)}
+                      {isLoading ? (
+                        <Skeleton className="h-4 w-16 bg-slate-200/80" />
+                      ) : (
+                        `$${formatUsdAmount(data.kpis.totalAllTimeVolume)}`
+                      )}
                     </span>
                   </div>
                   <div className="inline-flex items-center rounded-full border border-slate-900/10 bg-white/75 px-2.5 py-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_1px_rgba(15,23,42,0.05)] backdrop-blur">
@@ -52,7 +56,11 @@ export default function HomePage() {
                     </span>
                     <span className="mx-1 text-slate-300">/</span>
                     <span className="text-sm font-semibold tracking-tight tabular-nums text-slate-900">
-                      {medianReturnLabel}
+                      {isLoading ? (
+                        <Skeleton className="h-4 w-20 bg-slate-200/80" />
+                      ) : (
+                        medianReturnLabel
+                      )}
                     </span>
                   </div>
                   <div className="inline-flex items-center rounded-full border border-slate-900/10 bg-white/75 px-2.5 py-[3px] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_1px_rgba(15,23,42,0.05)] backdrop-blur">
@@ -61,16 +69,19 @@ export default function HomePage() {
                     </span>
                     <span className="mx-1 text-slate-300">/</span>
                     <span className="text-sm font-semibold tracking-tight tabular-nums text-slate-900">
-                      {data.kpis.publicClubCount.toLocaleString('en-US')}
+                      {isLoading ? (
+                        <Skeleton className="h-4 w-10 bg-slate-200/80" />
+                      ) : (
+                        data.kpis.publicClubCount.toLocaleString('en-US')
+                      )}
                     </span>
                   </div>
                 </div>
                 <h1 className="mt-8 text-4xl font-bold tracking-tight sm:text-6xl md:text-7xl">
                   Trade Predictions Together
                 </h1>
-                <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
-                  Create, discover, and join prediction clubs on Polymarket. <br /> No wallet
-                  required.
+                <p className="mx-auto mt-6 max-w-3xl text-xl text-muted-foreground md:max-w-none md:text-[1.35rem] md:whitespace-nowrap">
+                  Create, discover, and join prediction clubs on Polymarket. No wallet required.
                 </p>
                 <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
                   <Link href="/clubs/create">
