@@ -1,4 +1,5 @@
 import { createPrivateKey, createSign } from 'crypto';
+import { prisma } from '@prediction-club/db';
 
 const TURNKEY_BASE_URL = process.env.TURNKEY_API_BASE_URL || 'https://api.turnkey.com';
 const TURNKEY_ORGANIZATION_ID = process.env.TURNKEY_ORGANIZATION_ID;
@@ -26,6 +27,7 @@ type OidcIdentity = {
   turnkeyEndUserId: string;
   walletAddress?: string;
   email?: string;
+  resolutionSource: 'oidc_token_match' | 'email_relink' | 'new_suborg';
 };
 
 const TURNKEY_SIGN_ACTIVITY_TYPE = 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2';
@@ -37,6 +39,16 @@ class TurnkeyRequestError extends Error {
   ) {
     super(message);
     this.name = 'TurnkeyRequestError';
+  }
+}
+
+export class TurnkeyOidcRelinkError extends Error {
+  constructor(
+    public code: 'EXISTING_SUBORG_INACCESSIBLE',
+    message: string
+  ) {
+    super(message);
+    this.name = 'TurnkeyOidcRelinkError';
   }
 }
 
@@ -422,6 +434,12 @@ function parseJwtPayload(token: string): Record<string, unknown> {
   }
 }
 
+function normalizeEmail(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim().toLowerCase()
+    : undefined;
+}
+
 function buildSubOrgName(input: { name?: string; email?: string }): string {
   const fallback = 'Prediction Club User Sub-Org';
   const rawName = input.name?.trim();
@@ -449,6 +467,15 @@ async function listSubOrgIdsByOidcToken(oidcToken: string): Promise<string[]> {
     }
   );
   return response.organizationIds ?? [];
+}
+
+async function getExistingAppSubOrgIdByEmail(email?: string): Promise<string | null> {
+  if (!email) return null;
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { turnkeySubOrgId: true },
+  });
+  return existingUser?.turnkeySubOrgId ?? null;
 }
 
 async function isOrganizationAccessible(organizationId: string): Promise<boolean> {
@@ -600,10 +627,11 @@ export async function resolveTurnkeyIdentityFromOidcToken(
   oidcToken: string
 ): Promise<OidcIdentity> {
   const tokenPayload = parseJwtPayload(oidcToken);
-  const email = typeof tokenPayload.email === 'string' ? tokenPayload.email : undefined;
+  const email = normalizeEmail(tokenPayload.email);
 
   const existingSubOrgs = await listSubOrgIdsByOidcToken(oidcToken);
   let turnkeySubOrgId: string | null = null;
+  let resolutionSource: OidcIdentity['resolutionSource'] = 'oidc_token_match';
   for (const orgId of existingSubOrgs) {
     const accessible = await isOrganizationAccessible(orgId);
     if (accessible) {
@@ -612,8 +640,24 @@ export async function resolveTurnkeyIdentityFromOidcToken(
     }
   }
 
+  if (!turnkeySubOrgId && email) {
+    const existingAppSubOrgId = await getExistingAppSubOrgIdByEmail(email);
+    if (existingAppSubOrgId) {
+      const accessible = await isOrganizationAccessible(existingAppSubOrgId);
+      if (!accessible) {
+        throw new TurnkeyOidcRelinkError(
+          'EXISTING_SUBORG_INACCESSIBLE',
+          'Existing user Turnkey sub-organization is not accessible'
+        );
+      }
+      turnkeySubOrgId = existingAppSubOrgId;
+      resolutionSource = 'email_relink';
+    }
+  }
+
   if (!turnkeySubOrgId) {
     turnkeySubOrgId = await createSubOrganizationWithGoogle(oidcToken);
+    resolutionSource = 'new_suborg';
   }
 
   const users = await listUsers(turnkeySubOrgId);
@@ -635,6 +679,7 @@ export async function resolveTurnkeyIdentityFromOidcToken(
     turnkeyEndUserId,
     walletAddress,
     email,
+    resolutionSource,
   };
 }
 

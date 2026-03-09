@@ -8,6 +8,10 @@ import {
 
 const hexAddressPattern = /^0x[a-fA-F0-9]{40}$/;
 
+function normalizeEmail(value: string | undefined): string | undefined {
+  return value?.trim().toLowerCase();
+}
+
 function normalizeWalletAddress(address: string): string {
   const normalized = address.trim().toLowerCase();
   if (!hexAddressPattern.test(normalized)) {
@@ -23,6 +27,7 @@ function shouldReplaceCompatibilityWallet(currentWalletAddress: string, identity
 
 export async function getOrCreateUserFromTurnkeyIdentity(identity: TurnkeyIdentity) {
   const fallbackWalletAddress = deriveCompatibilityWalletAddress(identity);
+  const normalizedEmail = normalizeEmail(identity.email);
   const normalizedWalletAddress = identity.walletAddress
     ? normalizeWalletAddress(identity.walletAddress)
     : fallbackWalletAddress.toLowerCase();
@@ -71,6 +76,59 @@ export async function getOrCreateUserFromTurnkeyIdentity(identity: TurnkeyIdenti
     });
   }
 
+  if (normalizedEmail) {
+    const existingByEmail = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingByEmail) {
+      // During OAuth client migration, keep existing Turnkey identity stable for funded users.
+      if (
+        existingByEmail.turnkeySubOrgId &&
+        existingByEmail.turnkeySubOrgId !== identity.turnkeySubOrgId
+      ) {
+        return existingByEmail;
+      }
+
+      const updates: {
+        turnkeySubOrgId?: string;
+        turnkeyEndUserId?: string;
+        walletAddress?: string;
+        email?: string | null;
+      } = {};
+
+      if (!existingByEmail.turnkeySubOrgId) {
+        updates.turnkeySubOrgId = identity.turnkeySubOrgId;
+      }
+      if (
+        (!existingByEmail.turnkeySubOrgId ||
+          existingByEmail.turnkeySubOrgId === identity.turnkeySubOrgId) &&
+        existingByEmail.turnkeyEndUserId !== identity.turnkeyEndUserId
+      ) {
+        updates.turnkeyEndUserId = identity.turnkeyEndUserId;
+      }
+      if (
+        identity.walletAddress &&
+        existingByEmail.walletAddress !== normalizedWalletAddress &&
+        shouldReplaceCompatibilityWallet(existingByEmail.walletAddress, identity)
+      ) {
+        updates.walletAddress = normalizedWalletAddress;
+      }
+      if (existingByEmail.email !== normalizedEmail) {
+        updates.email = normalizedEmail;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return existingByEmail;
+      }
+
+      return prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: updates,
+      });
+    }
+  }
+
   const existingByWallet = await prisma.user.findUnique({
     where: { walletAddress: normalizedWalletAddress },
   });
@@ -89,7 +147,7 @@ export async function getOrCreateUserFromTurnkeyIdentity(identity: TurnkeyIdenti
   return prisma.user.create({
     data: {
       walletAddress: normalizedWalletAddress,
-      email: identity.email,
+      email: normalizedEmail,
       turnkeySubOrgId: identity.turnkeySubOrgId,
       turnkeyEndUserId: identity.turnkeyEndUserId,
     },
