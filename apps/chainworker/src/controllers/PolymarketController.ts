@@ -1,7 +1,21 @@
 import { BuilderConfig } from '@polymarket/builder-signing-sdk';
+import { RelayClient, type Transaction as RelayTransaction } from '@polymarket/builder-relayer-client';
 import { ClobClient, OrderType, Side } from '@polymarket/clob-client';
 import { createPrivateKey, createSign } from 'crypto';
 import { utils } from 'ethers';
+import {
+  createPublicClient,
+  createWalletClient,
+  encodeFunctionData,
+  erc20Abi,
+  hashMessage,
+  hashTypedData,
+  http,
+  parseAbi,
+  type Address,
+} from 'viem';
+import { toAccount } from 'viem/accounts';
+import { polygon, polygonAmoy } from 'viem/chains';
 import type {
   PendingRound,
   RoundMember,
@@ -21,6 +35,18 @@ const POLY_BUILDER_PASSPHRASE = process.env.POLY_BUILDER_PASSPHRASE || '';
 const DEBUG_TURNKEY = process.env.CHAINWORKER_DEBUG_TURNKEY === 'true';
 const TURNKEY_SIGN_ACTIVITY_TYPE = 'ACTIVITY_TYPE_SIGN_RAW_PAYLOAD_V2';
 const POLYMARKET_SAFE_SIGNATURE_TYPE = 2; // SignatureType.POLY_GNOSIS_SAFE
+const POLYMARKET_RELAYER_URL = process.env.POLYMARKET_RELAYER_URL?.trim() || '';
+const POLYGON_USDC_E_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+const POLYGON_CTF_ADDRESS = '0x4D97DCd97eC945f40cF65F87097ACe5EA0476045';
+const POLYGON_NEG_RISK_ADAPTER_ADDRESS = '0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296';
+const EMPTY_BYTES32 = `0x${'0'.repeat(64)}` as const;
+const erc1155Abi = parseAbi([
+  'function balanceOf(address account, uint256 id) view returns (uint256)',
+  'function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint256[] indexSets)',
+]);
+const negRiskAdapterAbi = parseAbi([
+  'function redeemPositions(bytes32 _conditionId, uint256[] _amounts)',
+]);
 
 type UserCreds = {
   key: string;
@@ -58,6 +84,18 @@ function describeCreds(creds: UserCreds) {
 }
 
 export type MarketResolution = { isResolved: boolean } & SettledMarketResolution;
+
+type RedemptionResult = {
+  payoutAmount: string;
+  redemptionTxHash: string;
+  redeemedAt: Date;
+};
+
+type MarketResolutionDetails = MarketResolution & {
+  indexSets: bigint[];
+  winnerTokenId: string | null;
+  negRisk: boolean;
+};
 
 const CONDITION_ID_PATTERN = /0x[a-fA-F0-9]{64}/;
 const privateKeyIdByWalletKey = new Map<string, Promise<string>>();
@@ -581,6 +619,156 @@ class TurnkeySigner {
   }
 }
 
+function normalizeAddressValue(address: string): Address {
+  return normalizeAddress(address) as Address;
+}
+
+function getUsdcTokenAddress(): Address {
+  const configured = process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS?.trim();
+  if (configured) {
+    return normalizeAddressValue(configured);
+  }
+  if (POLYMARKET_CHAIN_ID === polygon.id) {
+    return normalizeAddressValue(POLYGON_USDC_E_ADDRESS);
+  }
+  throw new Error(`Unsupported chain id ${POLYMARKET_CHAIN_ID} for USDC token`);
+}
+
+function getCtfTokenAddress(): Address {
+  const configured = process.env.NEXT_PUBLIC_CTF_TOKEN_ADDRESS?.trim();
+  if (configured) {
+    return normalizeAddressValue(configured);
+  }
+  if (POLYMARKET_CHAIN_ID === polygon.id) {
+    return normalizeAddressValue(POLYGON_CTF_ADDRESS);
+  }
+  throw new Error(`Unsupported chain id ${POLYMARKET_CHAIN_ID} for CTF token`);
+}
+
+function getNegRiskAdapterAddress(): Address {
+  if (POLYMARKET_CHAIN_ID === polygon.id) {
+    return normalizeAddressValue(POLYGON_NEG_RISK_ADAPTER_ADDRESS);
+  }
+  throw new Error(`Unsupported chain id ${POLYMARKET_CHAIN_ID} for neg risk adapter`);
+}
+
+function getChain() {
+  if (POLYMARKET_CHAIN_ID === polygon.id) return polygon;
+  if (POLYMARKET_CHAIN_ID === polygonAmoy.id) return polygonAmoy;
+  throw new Error(`Unsupported chain id ${POLYMARKET_CHAIN_ID}`);
+}
+
+function getTransport() {
+  if (POLYMARKET_CHAIN_ID === polygon.id) {
+    const rpcUrl = process.env.POLYGON_RPC_URL || process.env.NEXT_PUBLIC_POLYGON_RPC_URL;
+    return rpcUrl ? http(rpcUrl) : http();
+  }
+
+  if (POLYMARKET_CHAIN_ID === polygonAmoy.id) {
+    const rpcUrl = process.env.AMOY_RPC_URL || process.env.NEXT_PUBLIC_AMOY_RPC_URL;
+    return rpcUrl ? http(rpcUrl) : http();
+  }
+
+  throw new Error(`Unsupported chain id ${POLYMARKET_CHAIN_ID}`);
+}
+
+function createPolymarketPublicClient() {
+  return createPublicClient({
+    chain: getChain(),
+    transport: getTransport(),
+  });
+}
+
+function createTurnkeyViemAccount(input: {
+  organizationId: string;
+  walletAccountId: string;
+  walletAddress: Address;
+}) {
+  const checksummedAddress = (() => {
+    try {
+      return utils.getAddress(input.walletAddress);
+    } catch {
+      return input.walletAddress;
+    }
+  })();
+  const signWithCandidates = Array.from(
+    new Set([checksummedAddress, input.walletAddress, input.walletAccountId])
+  );
+
+  return toAccount({
+    address: input.walletAddress,
+    signMessage: async ({ message }) => {
+      const digest = hashMessage(message);
+      return signDigestWithTurnkey({
+        organizationId: input.organizationId,
+        signWithCandidates,
+        digestHex: digest,
+      }) as Promise<`0x${string}`>;
+    },
+    signTypedData: async (typedData) => {
+      const digest = hashTypedData(typedData as Parameters<typeof hashTypedData>[0]);
+      return signDigestWithTurnkey({
+        organizationId: input.organizationId,
+        signWithCandidates,
+        digestHex: digest,
+      }) as Promise<`0x${string}`>;
+    },
+    signTransaction: async () => {
+      throw new Error('Turnkey relay account does not support signTransaction');
+    },
+  });
+}
+
+function createRelayClient(input: {
+  organizationId: string;
+  walletAccountId: string;
+  walletAddress: Address;
+}) {
+  if (!POLYMARKET_RELAYER_URL) {
+    throw new Error('POLYMARKET_RELAYER_URL is required');
+  }
+
+  const walletClient = createWalletClient({
+    account: createTurnkeyViemAccount(input),
+    chain: getChain(),
+    transport: getTransport(),
+  });
+
+  return new RelayClient(
+    POLYMARKET_RELAYER_URL,
+    POLYMARKET_CHAIN_ID,
+    walletClient,
+    new BuilderConfig({
+      localBuilderCreds: {
+        key: POLY_BUILDER_API_KEY,
+        secret: POLY_BUILDER_SECRET,
+        passphrase: POLY_BUILDER_PASSPHRASE,
+      },
+    })
+  );
+}
+
+async function readUsdcBalance(walletAddress: Address): Promise<bigint> {
+  return createPolymarketPublicClient().readContract({
+    address: getUsdcTokenAddress(),
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [walletAddress],
+  });
+}
+
+async function readPositionBalance(input: {
+  walletAddress: Address;
+  tokenId: string;
+}): Promise<bigint> {
+  return createPolymarketPublicClient().readContract({
+    address: getCtfTokenAddress(),
+    abi: erc1155Abi,
+    functionName: 'balanceOf',
+    args: [input.walletAddress, BigInt(input.tokenId)],
+  });
+}
+
 function parseResolvedAt(value: unknown): Date | null {
   if (value instanceof Date) return value;
   if (typeof value === 'string') {
@@ -652,6 +840,14 @@ function getMarketTokens(market: Record<string, unknown>): Record<string, unknow
   );
 }
 
+function buildSingletonIndexSets(tokenCount: number): bigint[] {
+  const normalizedCount = Math.max(0, Math.floor(tokenCount));
+  if (normalizedCount === 0) {
+    return [1n, 2n];
+  }
+  return Array.from({ length: normalizedCount }, (_, index) => 1n << BigInt(index));
+}
+
 function getWinnerToken(market: Record<string, unknown>): Record<string, unknown> | null {
   const tokens = getMarketTokens(market);
   for (const token of tokens) {
@@ -674,6 +870,27 @@ function getResolvedOutcome(market: Record<string, unknown>): string | null {
     null;
 
   return typeof fallback === 'string' && fallback.trim().length > 0 ? fallback.trim() : null;
+}
+
+function getWinnerTokenId(market: Record<string, unknown>): string | null {
+  const winnerToken = getWinnerToken(market);
+  const tokenId = winnerToken?.token_id ?? winnerToken?.tokenId;
+  return typeof tokenId === 'string' && tokenId.trim().length > 0 ? tokenId.trim() : null;
+}
+
+function buildNegRiskRedeemAmounts(winnerOutcome: string | null, positionBalance: bigint): [bigint, bigint] {
+  const normalizedOutcome = normalizeLabel(winnerOutcome);
+  if (normalizedOutcome === 'yes') {
+    return [positionBalance, 0n];
+  }
+  if (normalizedOutcome === 'no') {
+    return [0n, positionBalance];
+  }
+  throw new Error(`Unsupported negRisk winner outcome: ${winnerOutcome ?? 'unknown'}`);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function resolveMemberPayoutFromOrder(member: RoundMember): string {
@@ -817,17 +1034,25 @@ export class PolymarketController {
     return safeAddress;
   }
 
-  static async fetchMarketResolution(conditionId: string): Promise<MarketResolution> {
+  static async fetchMarketResolutionDetails(conditionId: string): Promise<MarketResolutionDetails> {
     if (!CONDITION_ID_PATTERN.test(conditionId)) {
-      return { isResolved: false, outcome: null, resolvedAt: null };
+      return {
+        isResolved: false,
+        outcome: null,
+        resolvedAt: null,
+        indexSets: [1n, 2n],
+        winnerTokenId: null,
+        negRisk: false,
+      };
     }
 
     const clobClient = new ClobClient(POLYMARKET_CLOB_URL, POLYMARKET_CHAIN_ID);
     const market = (await clobClient.getMarket(conditionId)) as Record<string, unknown>;
     const resolved = isMarketResolved(market);
+    const tokens = getMarketTokens(market);
+    const indexSets = buildSingletonIndexSets(tokens.length);
 
     if (!resolved) {
-      const tokens = getMarketTokens(market);
       const winnerTokenCount = tokens.filter((token) => parseBoolean(token.winner) === true).length;
       console.log('[chainworker] Market unresolved snapshot', {
         conditionId,
@@ -837,10 +1062,19 @@ export class PolymarketController {
         winnerTokenCount,
         tokenCount: tokens.length,
       });
-      return { isResolved: false, outcome: null, resolvedAt: null };
+      return {
+        isResolved: false,
+        outcome: null,
+        resolvedAt: null,
+        indexSets,
+        winnerTokenId: null,
+        negRisk: parseBoolean(market.negRisk ?? market.neg_risk) === true,
+      };
     }
 
     const outcome = getResolvedOutcome(market);
+    const winnerTokenId = getWinnerTokenId(market);
+    const negRisk = parseBoolean(market.negRisk ?? market.neg_risk) === true;
     const resolvedAt =
       parseResolvedAt(market.resolvedAt) ??
       parseResolvedAt(market.resolved_at) ??
@@ -854,6 +1088,144 @@ export class PolymarketController {
       isResolved: true,
       outcome,
       resolvedAt,
+      indexSets,
+      winnerTokenId,
+      negRisk,
+    };
+  }
+
+  static async fetchMarketResolution(conditionId: string): Promise<MarketResolution> {
+    const details = await this.fetchMarketResolutionDetails(conditionId);
+    return {
+      isResolved: details.isResolved,
+      outcome: details.outcome,
+      resolvedAt: details.resolvedAt,
+    };
+  }
+
+  static isWinningRound(
+    round: Pick<PendingRound, 'targetOutcome' | 'outcome'>,
+    resolvedOutcome?: string | null
+  ): boolean {
+    const roundOutcome = normalizeLabel(resolvedOutcome ?? round.outcome);
+    const targetOutcome = normalizeLabel(round.targetOutcome);
+    return roundOutcome !== null && targetOutcome !== null && roundOutcome === targetOutcome;
+  }
+
+  static isWinningResolution(
+    round: Pick<PendingRound, 'targetOutcome' | 'targetTokenId' | 'outcome'>,
+    resolution: Pick<MarketResolutionDetails, 'winnerTokenId' | 'outcome'>
+  ): boolean {
+    if (resolution.winnerTokenId && resolution.winnerTokenId === round.targetTokenId) {
+      return true;
+    }
+
+    return this.isWinningRound(round, resolution.outcome ?? null);
+  }
+
+  static async getWinningPositionBalance(params: {
+    round: Pick<PendingRound, 'targetTokenId'>;
+    member: RoundMember;
+  }): Promise<bigint> {
+    const safeAddress = normalizeAddressValue(this.getFunderAddress(params.member));
+    return readPositionBalance({
+      walletAddress: safeAddress,
+      tokenId: params.round.targetTokenId,
+    });
+  }
+
+  static async redeemWinningPosition(params: {
+    round: Pick<PendingRound, 'conditionId' | 'targetTokenId'>;
+    member: RoundMember;
+    resolution: Pick<MarketResolutionDetails, 'indexSets' | 'negRisk' | 'outcome'>;
+  }): Promise<RedemptionResult | null> {
+    const { round, member, resolution } = params;
+    const clubWallet = member.clubWallet;
+    if (!clubWallet || clubWallet.isDisabled) {
+      throw new Error(`Missing active club wallet for user ${member.userId}`);
+    }
+    if (!member.user.turnkeySubOrgId) {
+      throw new Error(`Missing Turnkey sub-org for user ${member.userId}`);
+    }
+
+    const safeAddress = normalizeAddressValue(this.getFunderAddress(member));
+    const walletAddress = normalizeAddressValue(clubWallet.turnkeyWalletAddress);
+    const positionBalance = await readPositionBalance({
+      walletAddress: safeAddress,
+      tokenId: round.targetTokenId,
+    });
+    if (positionBalance <= 0n) {
+      return null;
+    }
+
+    const publicClient = createPolymarketPublicClient();
+    const usdcBefore = await readUsdcBalance(safeAddress);
+    const relayClient = createRelayClient({
+      organizationId: member.user.turnkeySubOrgId,
+      walletAccountId: clubWallet.turnkeyWalletAccountId,
+      walletAddress,
+    });
+    const txs: RelayTransaction[] = [
+      resolution.negRisk
+        ? {
+            to: getNegRiskAdapterAddress(),
+            value: '0',
+            data: encodeFunctionData({
+              abi: negRiskAdapterAbi,
+              functionName: 'redeemPositions',
+              args: [
+                round.conditionId as `0x${string}`,
+                buildNegRiskRedeemAmounts(resolution.outcome ?? null, positionBalance),
+              ],
+            }),
+          }
+        : {
+            to: getCtfTokenAddress(),
+            value: '0',
+            data: encodeFunctionData({
+              abi: erc1155Abi,
+              functionName: 'redeemPositions',
+              args: [
+                getUsdcTokenAddress(),
+                EMPTY_BYTES32,
+                round.conditionId as `0x${string}`,
+                resolution.indexSets,
+              ],
+            }),
+          },
+    ];
+
+    const response = await relayClient.execute(txs, 'chainworker-redeem-positions');
+    const result = await response.wait();
+    const redemptionTxHash = result?.transactionHash ?? response.transactionHash ?? null;
+    if (!redemptionTxHash) {
+      throw new Error(`Redemption relay transaction failed for user ${member.userId}`);
+    }
+
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: redemptionTxHash as `0x${string}`,
+    });
+    if (receipt.status !== 'success') {
+      throw new Error(`Redemption transaction reverted for user ${member.userId}`);
+    }
+
+    let usdcAfter = usdcBefore;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      usdcAfter = await readUsdcBalance(safeAddress);
+      if (usdcAfter > usdcBefore) break;
+      if (attempt < 4) {
+        await sleep(1_000);
+      }
+    }
+
+    if (usdcAfter <= usdcBefore) {
+      throw new Error(`Redemption completed without USDC payout for user ${member.userId}`);
+    }
+
+    return {
+      payoutAmount: (usdcAfter - usdcBefore).toString(),
+      redemptionTxHash,
+      redeemedAt: new Date(),
     };
   }
 
@@ -864,9 +1236,7 @@ export class PolymarketController {
   ): MemberPayout[] | null {
     if (members.length === 0) return null;
 
-    const roundOutcome = normalizeLabel(resolvedOutcome ?? round.outcome);
-    const targetOutcome = normalizeLabel(round.targetOutcome);
-    const isWinningRound = roundOutcome !== null && targetOutcome !== null && roundOutcome === targetOutcome;
+    const isWinningRound = this.isWinningRound(round, resolvedOutcome);
 
     return members.map((member) => {
       const payoutAmount = isWinningRound ? resolveMemberPayoutFromOrder(member) : '0';

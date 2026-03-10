@@ -84,7 +84,7 @@ export class LedgerController {
         clubId: input.clubId,
         type: 'COMMIT',
         predictionRound: {
-          status: { in: ['PENDING', 'COMMITTED'] },
+          status: { in: ['PENDING', 'COMMITTED', 'RESOLVED'] },
         },
       },
       select: { amount: true },
@@ -103,7 +103,7 @@ export class LedgerController {
         clubId: { in: input.clubIds },
         type: 'COMMIT',
         predictionRound: {
-          status: { in: ['PENDING', 'COMMITTED'] },
+          status: { in: ['PENDING', 'COMMITTED', 'RESOLVED'] },
         },
       },
       select: { clubId: true, amount: true },

@@ -880,7 +880,7 @@ async function main() {
     prisma.predictionRound.findMany({
       where: {
         clubId: club.id,
-        status: { in: ['PENDING', 'COMMITTED'] },
+        status: { in: ['PENDING', 'COMMITTED', 'RESOLVED'] },
       },
       select: { conditionId: true },
     }),
