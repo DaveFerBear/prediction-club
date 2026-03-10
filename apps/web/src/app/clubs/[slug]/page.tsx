@@ -73,7 +73,8 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
 
   const members = club?.members ?? [];
   const activePredictionRounds = predictionRounds.filter(
-    (round) => round.status === 'COMMITTED' || round.status === 'PENDING'
+    (round) =>
+      round.status === 'COMMITTED' || round.status === 'PENDING' || round.status === 'RESOLVED'
   );
 
   const exposureSeries = useMemo(() => buildExposureSeries(clubHistory, 7), [clubHistory]);

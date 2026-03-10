@@ -96,7 +96,7 @@ Turnkey-managed EOAs and per-club Polymarket Safes.
    - Posts market BUY orders; writes order metadata to `PredictionRoundMember`.
 
 5. **Settlement (chainworker)**  
-   For `COMMITTED` rounds, polls resolution and writes payouts + PnL, then appends ledger `PAYOUT` entries.
+   For `COMMITTED` rounds, polls market resolution, redeems winning positions, then writes payouts + PnL and appends ledger `PAYOUT` entries.
 
 ## Repo Structure
 
@@ -109,7 +109,7 @@ Turnkey-managed EOAs and per-club Polymarket Safes.
 │   ├── db/               # Prisma schema and client
 │   ├── shared/           # Shared types, utils, env validation
 │   └── ui/               # Shared UI components (shadcn/ui)
-├── docker-compose.yml    # Local Postgres
+├── docker-compose.yml    # Optional local infra, not used for the current DB workflow
 └── package.json          # Yarn workspaces root
 ```
 
@@ -126,7 +126,37 @@ Turnkey-managed EOAs and per-club Polymarket Safes.
 
 - Node.js >= 22.12.0
 - Yarn Classic (v1.22.x) - **NOT Yarn Berry/v3+**
-- Docker & Docker Compose
+- Access to the shared Neon `DATABASE_URL`
+
+## Database Workflow
+
+We currently do **not** use a local Postgres database for normal development. `DATABASE_URL` points at the shared Neon database.
+
+Rules:
+
+- `yarn db:migrate` is the shared-database path and runs `prisma migrate deploy`
+- `yarn db:migrate:dev` is local-only and should not be used unless we intentionally stand up a local Postgres database
+- `yarn db:push:unsafe` is disabled by default and should not be part of normal workflow
+- never run `prisma migrate dev` against the shared Neon database
+- never run `prisma db push` against the shared Neon database
+
+Current safe sequence for schema changes:
+
+```bash
+# 1. Update the Prisma schema
+$EDITOR packages/db/prisma/schema.prisma
+
+# 2. Generate a migration from the live Neon schema diff
+yarn db:migration:create <migration_name>
+
+# 3. Review and commit the generated migration under packages/db/prisma/migrations/
+
+# 4. Apply committed migrations to Neon
+yarn db:migrate
+
+# 5. Regenerate the Prisma client
+yarn db:generate
+```
 
 ## Local Development Setup
 
@@ -144,30 +174,36 @@ yarn install
 
 Create `apps/web/.env` and `apps/chainworker/.env`, then fill required vars below.
 
-### 3. Start Database
+Important:
 
-```bash
-# Start PostgreSQL
-docker-compose up -d
+- `DATABASE_URL` should point at the shared Neon database
+- do not point `DATABASE_URL` at a disposable local Postgres unless you are explicitly doing local-only migration work
+- the repo scripts now block `migrate dev` and `db push` against non-local hosts
 
-# Verify it's running
-docker-compose ps
-```
-
-### 4. Setup Database
+### 3. Database Setup
 
 ```bash
 # Generate Prisma client
 yarn db:generate
 
-# Run migrations
+# Apply committed migrations to the shared Neon database
 yarn db:migrate
 
 # (Optional) Seed with test data
 yarn db:seed
 ```
 
-### 5. Run Development Servers
+Do not use these unless you intentionally bring back a local database workflow:
+
+```bash
+# Local-only guard; will refuse to run against Neon/shared hosts
+yarn db:migrate:dev
+
+# Local-only escape hatch; requires ALLOW_PRISMA_DB_PUSH=1
+yarn db:push:unsafe
+```
+
+### 4. Run Development Servers
 
 ```bash
 # Terminal 1: Web app
@@ -226,8 +262,10 @@ Important: `docker --env-file` does not strip quotes. Avoid quoting values in th
 yarn dev              # Run web app in dev mode
 yarn build            # Build web app
 yarn db:generate      # Generate Prisma client
-yarn db:migrate       # Run database migrations
-yarn db:push          # Push schema to database
+yarn db:migration:create <name> # Generate a migration from the live Neon schema diff
+yarn db:migrate       # Apply committed migrations to the shared Neon database
+yarn db:migrate:dev   # Local-only migration generation; guarded against shared hosts
+yarn db:push:unsafe   # Local-only escape hatch for db push (requires ALLOW_PRISMA_DB_PUSH=1)
 yarn db:seed          # Seed database
 yarn db:studio        # Open Prisma Studio
 yarn typecheck        # Run TypeScript checks
@@ -242,10 +280,10 @@ Local dev:
 yarn chainworker:dev
 ```
 
-Backfill settled round payouts from stored Polymarket order fill data:
+Repair historical payouts by redeeming resolved winning positions on-chain:
 
 ```bash
-yarn workspace @prediction-club/chainworker payouts:backfill
+yarn workspace @prediction-club/chainworker payouts:repair
 ```
 
 Generate/normalize chainworker env values:

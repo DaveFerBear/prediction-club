@@ -174,7 +174,8 @@ model Application {
 enum PredictionRoundStatus {
   PENDING     // Created, not yet executed
   COMMITTED   // Orders placed
-  SETTLED     // Market resolved and settled
+  RESOLVED    // Market resolved, awaiting redemption or zero-payout finalization
+  SETTLED     // Cash payout finalized (or zero payout confirmed)
   CANCELLED   // Cancelled before execution
 }
 
@@ -217,6 +218,7 @@ model PredictionRound {
 
   // Settlement metadata: null at creation, set when chainworker finalizes payouts.
   settledAt       DateTime? // Timestamp when round settlement finished.
+  redemptionError String?   // Last redemption/finalization error for retryable resolved rounds.
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -264,6 +266,10 @@ model PredictionRoundMember {
   orderTakingAmount String? // Taking amount from order response.
 
   // Settlement metadata: null at creation, set when member settlement is finalized.
+  redeemedAmount String   @default("0") // Actual collateral redeemed back into the wallet.
+  redemptionTxHash String? // On-chain redemption transaction hash.
+  redemptionError String? // Last redemption error observed for this member.
+  redeemedAt     DateTime? // Timestamp when winning shares were redeemed (or zero payout finalized).
   settledAt     DateTime? // Timestamp when member settlement finished.
 
   createdAt     DateTime @default(now())

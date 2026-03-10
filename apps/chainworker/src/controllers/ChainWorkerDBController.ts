@@ -10,10 +10,22 @@ import {
 } from '../types/chainworker-db';
 
 export class ChainWorkerDBController {
-  static async listRoundsToSettle(batchSize: number): Promise<PendingRound[]> {
+  static async listRoundsToResolve(batchSize: number): Promise<PendingRound[]> {
     return prisma.predictionRound.findMany({
       where: {
         status: 'COMMITTED',
+        settledAt: null,
+      },
+      orderBy: { createdAt: 'asc' },
+      take: batchSize,
+      select: pendingRoundSelect,
+    });
+  }
+
+  static async listRoundsToRedeem(batchSize: number): Promise<PendingRound[]> {
+    return prisma.predictionRound.findMany({
+      where: {
+        status: 'RESOLVED',
         settledAt: null,
       },
       orderBy: { createdAt: 'asc' },
@@ -91,6 +103,29 @@ export class ChainWorkerDBController {
     await prisma.predictionRound.update({
       where: { id: roundId },
       data: { status: 'CANCELLED' },
+    });
+  }
+
+  static async markRoundResolved(roundId: string, resolution: MarketResolution) {
+    const now = new Date();
+    await prisma.predictionRound.update({
+      where: { id: roundId },
+      data: {
+        status: 'RESOLVED',
+        outcome: resolution.outcome ?? null,
+        resolvedAt: resolution.resolvedAt ?? now,
+        redemptionError: null,
+      },
+    });
+  }
+
+  static async markRoundRedemptionError(roundId: string, errorMessage: string) {
+    await prisma.predictionRound.update({
+      where: { id: roundId },
+      data: {
+        status: 'RESOLVED',
+        redemptionError: errorMessage,
+      },
     });
   }
 
@@ -200,7 +235,11 @@ export class ChainWorkerDBController {
     round: PendingRound,
     members: RoundMember[],
     payouts: MemberPayout[],
-    resolution: MarketResolution
+    resolution: MarketResolution,
+    options: {
+      replaceExistingPayouts?: boolean;
+      payoutSource?: string;
+    } = {}
   ) {
     const payoutByUser = new Map(payouts.map((payout) => [payout.userId, payout]));
     const missing = members.filter((member) => !payoutByUser.has(member.userId));
@@ -209,8 +248,19 @@ export class ChainWorkerDBController {
     }
 
     const now = new Date();
+    const replaceExistingPayouts = options.replaceExistingPayouts ?? false;
+    const payoutSource = options.payoutSource ?? 'polymarket-redemption';
 
     await prisma.$transaction(async (tx) => {
+      if (replaceExistingPayouts) {
+        await tx.ledgerEntry.deleteMany({
+          where: {
+            predictionRoundId: round.id,
+            type: 'PAYOUT',
+          },
+        });
+      }
+
       const existingPayouts = await tx.ledgerEntry.findMany({
         where: {
           predictionRoundId: round.id,
@@ -240,6 +290,7 @@ export class ChainWorkerDBController {
         const payoutAmount = payout.payoutAmount;
         const pnlAmount =
           payout.pnlAmount ?? (BigInt(payoutAmount) - BigInt(member.commitAmount)).toString();
+        const redeemedAmount = payout.redeemedAmount ?? payoutAmount;
 
         if (!existingPayoutUsers.has(member.userId) && BigInt(payoutAmount) > 0n) {
           const safeAddress = member.clubWallet?.polymarketSafeAddress;
@@ -256,12 +307,13 @@ export class ChainWorkerDBController {
             type: 'PAYOUT',
             amount: payoutAmount,
             asset: 'USDC.e',
-            metadata: { source: 'polymarket-settlement' } as Prisma.InputJsonValue,
+            txHash: payout.redemptionTxHash ?? null,
+            metadata: { source: payoutSource } as Prisma.InputJsonValue,
             createdAt: now,
           });
         }
 
-        if (member.settledAt) {
+        if (member.settledAt && !replaceExistingPayouts) {
           return null;
         }
 
@@ -270,6 +322,10 @@ export class ChainWorkerDBController {
           data: {
             payoutAmount,
             pnlAmount,
+            redeemedAmount,
+            redemptionTxHash: payout.redemptionTxHash ?? null,
+            redemptionError: null,
+            redeemedAt: payout.redeemedAt ?? (BigInt(payoutAmount) > 0n ? now : member.redeemedAt ?? now),
             settledAt: now,
           },
         });
@@ -291,6 +347,7 @@ export class ChainWorkerDBController {
           outcome: resolution.outcome ?? null,
           resolvedAt: resolution.resolvedAt ?? now,
           settledAt: now,
+          redemptionError: null,
         },
       });
     });
@@ -341,6 +398,7 @@ export class ChainWorkerDBController {
         const payoutAmount = payout.payoutAmount;
         const pnlAmount =
           payout.pnlAmount ?? (BigInt(payoutAmount) - BigInt(member.commitAmount)).toString();
+        const redeemedAmount = payout.redeemedAmount ?? payoutAmount;
 
         if (!existingPayoutUsers.has(member.userId) && BigInt(payoutAmount) > 0n) {
           const safeAddress = member.clubWallet?.polymarketSafeAddress;
@@ -357,6 +415,7 @@ export class ChainWorkerDBController {
             type: 'PAYOUT',
             amount: payoutAmount,
             asset: 'USDC.e',
+            txHash: payout.redemptionTxHash ?? null,
             metadata: { source: 'polymarket-payout-backfill' } as Prisma.InputJsonValue,
             createdAt: now,
           });
@@ -364,13 +423,17 @@ export class ChainWorkerDBController {
 
         const payoutChanged = member.payoutAmount !== payoutAmount;
         const pnlChanged = member.pnlAmount !== pnlAmount;
-        if (!payoutChanged && !pnlChanged) continue;
+        const redeemedChanged = member.redeemedAmount !== redeemedAmount;
+        if (!payoutChanged && !pnlChanged && !redeemedChanged) continue;
 
         await tx.predictionRoundMember.update({
           where: { id: member.id },
           data: {
             payoutAmount,
             pnlAmount,
+            redeemedAmount,
+            redemptionTxHash: payout.redemptionTxHash ?? null,
+            redeemedAt: payout.redeemedAt ?? member.redeemedAt ?? now,
             settledAt: member.settledAt ?? now,
           },
         });

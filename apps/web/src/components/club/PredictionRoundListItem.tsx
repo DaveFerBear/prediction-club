@@ -69,6 +69,12 @@ function getResolveLabel(round: PredictionRound): string | null {
     return `Resolved ${formatAbsoluteDateTime(resolvedDate)}`;
   }
 
+  if (round.status === 'RESOLVED') {
+    const resolvedDate = parseDateValue(round.resolvedAt);
+    if (!resolvedDate) return 'Resolved • awaiting payout redemption';
+    return `Resolved ${formatAbsoluteDateTime(resolvedDate)} • awaiting payout redemption`;
+  }
+
   if (round.status !== 'PENDING' && round.status !== 'COMMITTED') {
     return null;
   }
@@ -89,7 +95,8 @@ function getResolveLabel(round: PredictionRound): string | null {
 function getStatusBadge(round: PredictionRound) {
   const isSettled = round.status === 'SETTLED';
   if (!isSettled) {
-    const open = round.status === 'COMMITTED' || round.status === 'PENDING';
+    const open =
+      round.status === 'COMMITTED' || round.status === 'PENDING' || round.status === 'RESOLVED';
     return <Badge variant={open ? 'default' : 'secondary'}>{round.status}</Badge>;
   }
 

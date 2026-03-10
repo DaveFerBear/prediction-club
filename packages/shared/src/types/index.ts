@@ -84,7 +84,7 @@ export interface ApplicationWithUser extends Application {
 // Prediction Round Types
 // ============================================================================
 
-export type PredictionRoundStatus = 'PENDING' | 'COMMITTED' | 'SETTLED' | 'CANCELLED';
+export type PredictionRoundStatus = 'PENDING' | 'COMMITTED' | 'RESOLVED' | 'SETTLED' | 'CANCELLED';
 
 export interface PredictionRound {
   id: string;
@@ -103,6 +103,7 @@ export interface PredictionRound {
   outcome: string | null;
   resolvedAt: Date | null;
   settledAt: Date | null;
+  redemptionError: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -114,6 +115,7 @@ export interface PredictionRoundMember {
   commitAmount: string;
   payoutAmount: string;
   pnlAmount: string;
+  redeemedAmount: string;
   orderId: string | null;
   orderStatus: string | null;
   orderSide: string | null;
@@ -126,6 +128,9 @@ export interface PredictionRoundMember {
   orderTxHashes: unknown | null;
   orderMakingAmount: string | null;
   orderTakingAmount: string | null;
+  redemptionTxHash: string | null;
+  redemptionError: string | null;
+  redeemedAt: Date | null;
   settledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;

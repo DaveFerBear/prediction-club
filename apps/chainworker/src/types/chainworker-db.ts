@@ -12,6 +12,7 @@ export const pendingRoundSelect = Prisma.validator<Prisma.PredictionRoundSelect>
   outcome: true,
   resolvedAt: true,
   settledAt: true,
+  redemptionError: true,
   createdAt: true,
 });
 
@@ -21,12 +22,16 @@ export const roundMemberSelect = Prisma.validator<Prisma.PredictionRoundMemberSe
   commitAmount: true,
   payoutAmount: true,
   pnlAmount: true,
+  redeemedAmount: true,
   orderId: true,
   orderStatus: true,
   orderSize: true,
   orderSizeMatched: true,
   orderTakingAmount: true,
   orderOutcome: true,
+  redemptionTxHash: true,
+  redemptionError: true,
+  redeemedAt: true,
   settledAt: true,
   user: {
     select: {
@@ -57,6 +62,9 @@ export type RoundMember = Prisma.PredictionRoundMemberGetPayload<{
 
 export type MemberPayout = Pick<PredictionRoundMember, 'userId' | 'payoutAmount'> & {
   pnlAmount?: PredictionRoundMember['pnlAmount'];
+  redeemedAmount?: PredictionRoundMember['redeemedAmount'];
+  redemptionTxHash?: PredictionRoundMember['redemptionTxHash'];
+  redeemedAt?: PredictionRoundMember['redeemedAt'];
 };
 
 export type MemberOrder = Pick<PredictionRoundMember, 'orderId'> &

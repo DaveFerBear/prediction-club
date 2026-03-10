@@ -7,15 +7,18 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "payouts:backfill": "tsx src/scripts/backfill-settled-payouts.ts",
+    "payouts:repair": "tsx src/scripts/redeem-historical-payouts.ts",
     "env:generate": "node scripts/generate-env.js",
     "deploy": "./deploy.sh"
   },
   "dependencies": {
+    "@polymarket/builder-relayer-client": "^0.0.8",
     "@prediction-club/db": "*",
     "@polymarket/clob-client": "^5.2.1",
     "@polymarket/builder-signing-sdk": "^0.0.8",
     "ethers": "^5.8.0",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "viem": "^2.38.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

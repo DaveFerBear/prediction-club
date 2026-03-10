@@ -16,6 +16,7 @@ const requiredEnvVars = [
   'POLY_BUILDER_API_KEY',
   'POLY_BUILDER_SECRET',
   'POLY_BUILDER_PASSPHRASE',
+  'POLYMARKET_RELAYER_URL',
 ] as const;
 
 function assertCriticalEnv() {
@@ -157,18 +158,11 @@ async function runOnce() {
     }
   }
 
-  const rounds = await ChainWorkerDBController.listRoundsToSettle(batchSize);
-  if (rounds.length === 0) {
-    console.log('[chainworker] No committed rounds found.');
-    return;
-  }
-
-  for (const round of rounds) {
+  const roundsToResolve = await ChainWorkerDBController.listRoundsToResolve(batchSize);
+  for (const round of roundsToResolve) {
     if (shutdownState.requested) break;
     try {
-      const resolution = round.resolvedAt
-        ? { isResolved: true, outcome: round.outcome, resolvedAt: round.resolvedAt }
-        : await PolymarketController.fetchMarketResolution(round.conditionId);
+      const resolution = await PolymarketController.fetchMarketResolution(round.conditionId);
 
       if (!resolution.isResolved) {
         console.log(`[chainworker] Round ${round.id} unresolved for ${round.conditionId}`);
@@ -178,25 +172,110 @@ async function runOnce() {
       const resolvedOutcome = resolution.outcome ?? round.outcome ?? null;
       if (!resolvedOutcome) {
         console.warn(
-          `[chainworker] Round ${round.id} resolved without outcome for ${round.conditionId}; skipping settlement until outcome is available.`
+            `[chainworker] Round ${round.id} resolved without outcome for ${round.conditionId}; skipping settlement until outcome is available.`
+        );
+        continue;
+      }
+
+      await ChainWorkerDBController.markRoundResolved(round.id, {
+        outcome: resolvedOutcome,
+        resolvedAt: resolution.resolvedAt ?? null,
+      });
+      console.log(`[chainworker] Round ${round.id} resolved.`);
+    } catch (error) {
+      console.error(`[chainworker] Round ${round.id} failed to resolve:`, error);
+    }
+  }
+
+  const roundsToRedeem = await ChainWorkerDBController.listRoundsToRedeem(batchSize);
+  if (executionRounds.length === 0 && roundsToResolve.length === 0 && roundsToRedeem.length === 0) {
+    console.log('[chainworker] No actionable rounds found.');
+    return;
+  }
+
+  for (const round of roundsToRedeem) {
+    if (shutdownState.requested) break;
+    try {
+      const resolution = await PolymarketController.fetchMarketResolutionDetails(round.conditionId);
+      if (!resolution.isResolved) {
+        console.log(`[chainworker] Round ${round.id} unresolved for ${round.conditionId}`);
+        continue;
+      }
+
+      const resolvedOutcome = resolution.outcome ?? round.outcome ?? null;
+      if (!resolvedOutcome) {
+        console.warn(
+          `[chainworker] Round ${round.id} resolved without outcome for ${round.conditionId}; skipping redemption until outcome is available.`
         );
         continue;
       }
 
       const members = await ChainWorkerDBController.getRoundMembers(round.id);
-      const payouts = PolymarketController.computeMemberPayouts(round, members, resolvedOutcome);
-      if (!payouts) {
-        console.log(`[chainworker] Round ${round.id} missing payout data.`);
+      if (members.length === 0) {
+        console.log(`[chainworker] Round ${round.id} has no members to settle.`);
         continue;
       }
 
-      await ChainWorkerDBController.settleRound(round, members, payouts, {
-        outcome: resolvedOutcome,
-        resolvedAt: resolution.resolvedAt ?? null,
-      });
+      if (!PolymarketController.isWinningResolution(round, resolution)) {
+        const payouts = members.map((member) => ({
+          userId: member.userId,
+          payoutAmount: '0',
+          redeemedAmount: '0',
+          pnlAmount: (0n - BigInt(member.commitAmount)).toString(),
+        }));
+        await ChainWorkerDBController.settleRound(
+          round,
+          members,
+          payouts,
+          {
+            outcome: resolvedOutcome,
+            resolvedAt: resolution.resolvedAt ?? null,
+          },
+          { payoutSource: 'polymarket-zero-payout' }
+        );
+        console.log(`[chainworker] Round ${round.id} settled with zero payout.`);
+        continue;
+      }
+
+      const payouts = [];
+      for (const member of members) {
+        const redemption = await PolymarketController.redeemWinningPosition({
+          round,
+          member,
+          resolution,
+        });
+
+        if (!redemption) {
+          throw new Error(
+            `Winning round ${round.id} has no redeemable position balance for member ${member.userId}`
+          );
+        }
+
+        payouts.push({
+          userId: member.userId,
+          payoutAmount: redemption.payoutAmount,
+          redeemedAmount: redemption.payoutAmount,
+          pnlAmount: (BigInt(redemption.payoutAmount) - BigInt(member.commitAmount)).toString(),
+          redemptionTxHash: redemption.redemptionTxHash,
+          redeemedAt: redemption.redeemedAt,
+        });
+      }
+
+      await ChainWorkerDBController.settleRound(
+        round,
+        members,
+        payouts,
+        {
+          outcome: resolvedOutcome,
+          resolvedAt: resolution.resolvedAt ?? null,
+        },
+        { payoutSource: 'polymarket-redemption' }
+      );
 
       console.log(`[chainworker] Round ${round.id} settled.`);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await ChainWorkerDBController.markRoundRedemptionError(round.id, message);
       console.error(`[chainworker] Round ${round.id} failed to settle:`, error);
     }
   }
