@@ -191,7 +191,14 @@ export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h3 className="break-words text-base font-semibold text-[color:var(--club-text-primary)] md:text-lg">
-              {round.marketTitle || 'Untitled Market'}
+              <a
+                href={`https://polymarket.com/market/${round.marketSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+              >
+                {round.marketTitle || 'Untitled Market'}
+              </a>
             </h3>
             <div className="mt-1 text-xs text-muted-foreground">
               Created {new Date(round.createdAt).toLocaleDateString()}
