@@ -39,6 +39,8 @@ coverage/
 .cache/
 tmp/
 temp/
+__pycache__/
+*.pyc
 
 # Contracts (Foundry)
 contracts/cache/
