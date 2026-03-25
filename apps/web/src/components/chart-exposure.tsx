@@ -3,13 +3,15 @@
 import { useId, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import {
-  Legend,
   ResponsiveContainer,
   Tooltip,
   AreaChart,
   Area,
   CartesianGrid,
   XAxis,
+  LineChart,
+  Line,
+  YAxis,
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@prediction-club/ui';
 import { TrendingUp } from 'lucide-react';
@@ -28,10 +30,29 @@ type Props = {
   seamless?: boolean;
   windowBadgeLabel?: string;
   windowControl?: ReactNode;
+  visualStyle?: 'price-history' | 'stacked-area';
 };
 
 function currency(value: number) {
   return `$${formatUsdAmount(Math.round(value * 1_000_000).toString(), 6, 2)}`;
+}
+
+function axisCurrency(value: number) {
+  const abs = Math.abs(value);
+
+  if (abs >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`;
+  }
+  if (abs >= 1_000) {
+    return `$${(value / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}k`;
+  }
+  if (abs >= 100) {
+    return `$${Math.round(value)}`;
+  }
+  if (abs >= 10) {
+    return `$${value.toFixed(1)}`;
+  }
+  return currency(value);
 }
 
 const colors = {
@@ -52,6 +73,7 @@ export function ChartExposure({
   seamless = false,
   windowBadgeLabel,
   windowControl,
+  visualStyle = 'stacked-area',
 }: Props) {
   const chartId = useId();
   const isHero = compact && seamless && !showHeader && !showFooter;
@@ -63,6 +85,7 @@ export function ChartExposure({
       : undefined;
 
   const contentClass = seamless || compact ? 'p-0' : undefined;
+  const renderPriceHistoryStyle = visualStyle === 'price-history';
 
   return (
     <Card className={rootClass}>
@@ -75,163 +98,199 @@ export function ChartExposure({
       <CardContent className={contentClass}>
         <div
           className={[
+            seamless || compact ? 'mb-2' : 'mb-3',
+            'flex flex-wrap items-center justify-between gap-2',
+          ].join(' ')}
+        >
+          <div className="flex flex-wrap items-center gap-3 text-xs text-[color:var(--club-text-secondary)]">
+            <div className="inline-flex items-center gap-2">
+              <span
+                className="inline-block"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  backgroundColor: colors.market,
+                }}
+              />
+              <span>In markets</span>
+            </div>
+            <div className="inline-flex items-center gap-2">
+              <span
+                className="inline-block"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  backgroundColor: colors.wallet,
+                }}
+              />
+              <span>Wallet</span>
+            </div>
+          </div>
+          {windowControl ? (
+            <div>{windowControl}</div>
+          ) : windowBadgeLabel ? (
+            <div className="inline-flex items-center rounded-md border border-border/70 bg-background/90 px-2.5 py-1 text-xs text-[color:var(--club-text-secondary)]">
+              {windowBadgeLabel}
+            </div>
+          ) : null}
+        </div>
+        <div
+          className={[
             'relative',
             isHero ? 'h-44 md:h-48' : compact ? 'h-56 md:h-64' : 'h-72',
           ].join(' ')}
         >
-          {isHero ? (
-            <div className="absolute left-2 top-2 z-10 flex flex-wrap items-center gap-2">
-              <div className="pointer-events-none inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/45 px-2 py-0.5 text-xs text-[color:var(--club-text-primary)] shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
-                <span
-                  className="inline-block"
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 999,
-                    backgroundColor: colors.market,
-                  }}
-                />
-                <span>In markets</span>
-              </div>
-              <div className="pointer-events-none inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/45 px-2 py-0.5 text-xs text-[color:var(--club-text-primary)] shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
-                <span
-                  className="inline-block"
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 999,
-                    backgroundColor: colors.wallet,
-                  }}
-                />
-                <span>Wallet</span>
-              </div>
-              {windowControl ? (
-                <div className="pointer-events-auto">{windowControl}</div>
-              ) : windowBadgeLabel ? (
-                <div className="pointer-events-none inline-flex items-center rounded-full border border-slate-300/80 bg-white/70 px-2 py-0.5 text-xs font-medium text-slate-700 shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
-                  {windowBadgeLabel}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={data}
-              margin={isHero ? { left: 8, right: 8, top: 6, bottom: 4 } : { left: 8, right: 8, top: 10 }}
-            >
-              <defs>
-                <linearGradient id={`${chartId}-market`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={colors.market} stopOpacity={0.4} />
-                  <stop offset="100%" stopColor={colors.market} stopOpacity={0.12} />
-                </linearGradient>
-                <linearGradient id={`${chartId}-wallet`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={colors.wallet} stopOpacity={0.4} />
-                  <stop offset="100%" stopColor={colors.wallet} stopOpacity={0.12} />
-                </linearGradient>
-              </defs>
-              {isHero ? null : (
+            {renderPriceHistoryStyle ? (
+              <LineChart
+                data={data}
+                margin={{ left: 4, right: 8, top: 8, bottom: 4 }}
+              >
                 <CartesianGrid
                   vertical={false}
                   stroke="hsl(var(--border))"
                   strokeDasharray="3 3"
                 />
-              )}
-              <XAxis
-                dataKey="timestamp"
-                type="number"
-                scale="time"
-                domain={['dataMin', 'dataMax']}
-                hide={isHero}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={isHero ? 10 : 6}
-                minTickGap={28}
-                tickCount={6}
-                tickFormatter={(value: number) => format(new Date(value), 'MMM d')}
-                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <Tooltip
-                cursor={isHero ? { stroke: 'rgba(71, 85, 105, 0.25)', strokeWidth: 1 } : { strokeDasharray: '3 3' }}
-                labelFormatter={(label: number) => format(new Date(label), 'MMM d')}
-                formatter={(value: number, name: string) => [
-                  currency(value),
-                  name === 'wallet' ? 'Wallet' : 'In markets',
-                ]}
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 10,
-                  border: '1px solid rgba(203, 213, 225, 0.8)',
-                  boxShadow: '0 6px 20px rgba(15, 23, 42, 0.08)',
-                }}
-              />
-              <Area
-                dataKey="market"
-                name="In markets"
-                type="monotone"
-                stroke={colors.market}
-                strokeOpacity={isHero ? 0 : 1}
-                fill={`url(#${chartId}-market)`}
-                fillOpacity={1}
-                stackId="a"
-                strokeWidth={isHero ? 0 : 2}
-                activeDot={isHero ? false : { r: 4 }}
-              />
-              <Area
-                dataKey="wallet"
-                name="Wallet"
-                type="monotone"
-                stroke={colors.wallet}
-                strokeOpacity={isHero ? 0 : 1}
-                fill={`url(#${chartId}-wallet)`}
-                fillOpacity={1}
-                stackId="a"
-                strokeWidth={isHero ? 0 : 2}
-                activeDot={isHero ? false : { r: 4 }}
-              />
-              {isHero ? null : (
-                <Legend
-                  iconType="square"
-                  wrapperStyle={{
+                <XAxis
+                  dataKey="timestamp"
+                  type="number"
+                  scale="time"
+                  domain={['dataMin', 'dataMax']}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={6}
+                  minTickGap={40}
+                  tickCount={6}
+                  tickFormatter={(value: number) => format(new Date(value), 'MMM d')}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={4}
+                  width={52}
+                  domain={['auto', 'auto']}
+                  tickFormatter={axisCurrency}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <Tooltip
+                  labelFormatter={(label: number) => format(new Date(label), 'MMM d')}
+                  formatter={(value: number, name: string) => [
+                    currency(value),
+                    name === 'wallet' ? 'Wallet' : 'In markets',
+                  ]}
+                  contentStyle={{
                     fontSize: 12,
-                    lineHeight: '1.2',
-                  }}
-                  iconSize={14}
-                  formatter={(value: string) =>
-                    value === 'Wallet' ? 'Wallet' : 'In markets'
-                  }
-                  payload={undefined}
-                  content={(props) => {
-                    const { payload } = props;
-                    if (!payload) return null;
-                    return (
-                      <div className="flex flex-wrap items-center gap-4 pt-2 text-sm">
-                        {payload.map((entry) => {
-                          const label = entry.dataKey === 'wallet' ? 'Wallet' : 'In markets';
-                          const markerColor = entry.dataKey === 'wallet' ? colors.wallet : colors.market;
-                          return (
-                            <div
-                              key={entry.dataKey as string}
-                              className="inline-flex items-center gap-2 rounded-full bg-white/60 px-2.5 py-1 text-[13px] text-[color:var(--club-text-primary)]"
-                            >
-                              <span
-                                className="inline-block"
-                                style={{
-                                  width: 10,
-                                  height: 10,
-                                  borderRadius: 999,
-                                  backgroundColor: markerColor,
-                                }}
-                              />
-                              <span>{label}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
+                    borderRadius: 10,
+                    border: '1px solid rgba(203, 213, 225, 0.8)',
+                    boxShadow: '0 6px 20px rgba(15, 23, 42, 0.08)',
                   }}
                 />
-              )}
-            </AreaChart>
+                <Line
+                  dataKey="market"
+                  name="In markets"
+                  type="monotone"
+                  stroke={colors.market}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 3 }}
+                />
+                <Line
+                  dataKey="wallet"
+                  name="Wallet"
+                  type="monotone"
+                  stroke={colors.wallet}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 3 }}
+                />
+              </LineChart>
+            ) : (
+              <AreaChart
+                data={data}
+                margin={isHero ? { left: 8, right: 8, top: 6, bottom: 4 } : { left: 8, right: 8, top: 10 }}
+              >
+                <defs>
+                  <linearGradient id={`${chartId}-market`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={colors.market} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={colors.market} stopOpacity={0.12} />
+                  </linearGradient>
+                  <linearGradient id={`${chartId}-wallet`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={colors.wallet} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={colors.wallet} stopOpacity={0.12} />
+                  </linearGradient>
+                </defs>
+                {isHero ? null : (
+                  <CartesianGrid
+                    vertical={false}
+                    stroke="hsl(var(--border))"
+                    strokeDasharray="3 3"
+                  />
+                )}
+                <XAxis
+                  dataKey="timestamp"
+                  type="number"
+                  scale="time"
+                  domain={['dataMin', 'dataMax']}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={6}
+                  minTickGap={40}
+                  tickCount={6}
+                  tickFormatter={(value: number) => format(new Date(value), 'MMM d')}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={4}
+                  width={52}
+                  domain={['auto', 'auto']}
+                  tickFormatter={axisCurrency}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <Tooltip
+                  cursor={{ strokeDasharray: '3 3' }}
+                  labelFormatter={(label: number) => format(new Date(label), 'MMM d')}
+                  formatter={(value: number, name: string) => [
+                    currency(value),
+                    name === 'wallet' ? 'Wallet' : 'In markets',
+                  ]}
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 10,
+                    border: '1px solid rgba(203, 213, 225, 0.8)',
+                    boxShadow: '0 6px 20px rgba(15, 23, 42, 0.08)',
+                  }}
+                />
+                <Area
+                  dataKey="market"
+                  name="In markets"
+                  type="monotone"
+                  stroke={colors.market}
+                  strokeOpacity={1}
+                  fill={`url(#${chartId}-market)`}
+                  fillOpacity={1}
+                  stackId="a"
+                  strokeWidth={3}
+                  activeDot={{ r: 4 }}
+                />
+                <Area
+                  dataKey="wallet"
+                  name="Wallet"
+                  type="monotone"
+                  stroke={colors.wallet}
+                  strokeOpacity={1}
+                  fill={`url(#${chartId}-wallet)`}
+                  fillOpacity={1}
+                  stackId="a"
+                  strokeWidth={3}
+                  activeDot={{ r: 4 }}
+                />
+              </AreaChart>
+            )}
           </ResponsiveContainer>
         </div>
       </CardContent>

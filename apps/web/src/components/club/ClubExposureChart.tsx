@@ -57,7 +57,7 @@ export function ClubExposureChart(props: {
       seamless
       windowControl={
         <Select value={range} onValueChange={(value) => setRange(value as ClubExposureRange)}>
-          <SelectTrigger className="h-7 min-w-[104px] rounded-full border-slate-300/80 bg-white/70 px-2.5 text-xs font-medium text-slate-700 shadow-sm ring-0 supports-[backdrop-filter]:backdrop-blur-md">
+          <SelectTrigger className="h-8 min-w-[112px] rounded-md border-border/70 bg-background/95 px-2.5 text-xs font-medium text-[color:var(--club-text-primary)] shadow-sm ring-0">
             <SelectValue aria-label="Exposure range" />
           </SelectTrigger>
           <SelectContent align="end">
