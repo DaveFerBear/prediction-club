@@ -1,12 +1,66 @@
 import type { Metadata } from 'next';
 import { prisma } from '@prediction-club/db';
+import {
+  computeClubPerformanceFromRounds,
+  type RoundMemberLike,
+  type OpenRoundMemberLike,
+} from '@/lib/performance';
+import { fetchMidpointPrices } from '@/lib/polymarket-prices';
 
-function buildClubMetaDescription(input: { clubName: string; description: string | null }) {
-  const description = input.description?.trim();
-  if (description && description.length > 0) {
-    return description;
+async function getClubReturn(clubId: string): Promise<string | null> {
+  try {
+    const [settled, open] = await Promise.all([
+      prisma.predictionRoundMember.findMany({
+        where: { predictionRound: { clubId, status: 'SETTLED' } },
+        select: {
+          commitAmount: true,
+          payoutAmount: true,
+          pnlAmount: true,
+          predictionRound: { select: { clubId: true, createdAt: true, status: true } },
+        },
+      }),
+      prisma.predictionRoundMember.findMany({
+        where: { predictionRound: { clubId, status: { in: ['COMMITTED', 'RESOLVED'] } } },
+        select: {
+          commitAmount: true,
+          orderPrice: true,
+          predictionRound: {
+            select: {
+              clubId: true,
+              createdAt: true,
+              status: true,
+              targetTokenId: true,
+              outcome: true,
+              targetOutcome: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const tokenIds = [
+      ...new Set(
+        open
+          .filter((m) => m.predictionRound.status === 'COMMITTED')
+          .map((m) => m.predictionRound.targetTokenId)
+      ),
+    ];
+    const prices = await fetchMidpointPrices(tokenIds);
+    const openMembers = open as unknown as OpenRoundMemberLike[];
+
+    const perf = computeClubPerformanceFromRounds(
+      settled as unknown as RoundMemberLike[],
+      30,
+      undefined,
+      openMembers.length > 0 ? { members: openMembers, prices } : undefined
+    );
+
+    if (!perf.hasWindowActivity) return null;
+    const pct = perf.simpleReturn * 100;
+    return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+  } catch {
+    return null;
   }
-  return `Join ${input.clubName} on Prediction Club and trade predictions together on Polymarket.`;
 }
 
 export async function generateMetadata({
@@ -18,6 +72,7 @@ export async function generateMetadata({
     const club = await prisma.club.findUnique({
       where: { slug: params.slug },
       select: {
+        id: true,
         name: true,
         description: true,
       },
@@ -31,10 +86,17 @@ export async function generateMetadata({
     }
 
     const title = `${club.name} | Prediction Club`;
-    const description = buildClubMetaDescription({
-      clubName: club.name,
-      description: club.description,
-    });
+    const returnPct = await getClubReturn(club.id);
+
+    const parts: string[] = [];
+    if (returnPct) parts.push(`30d return: ${returnPct}`);
+    const clubDesc = club.description?.trim();
+    if (clubDesc) {
+      parts.push(clubDesc);
+    } else {
+      parts.push('Trade predictions together on Polymarket.');
+    }
+    const description = parts.join(' · ');
 
     return {
       title,
