@@ -36,6 +36,11 @@ type HomePayload = {
   generatedAt: string;
 };
 
+const KPI_JUICE_START_AT = new Date('2026-02-23T00:00:00.000Z');
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MICROS_PER_DOLLAR = 1_000_000n;
+const FIBONACCI_INCREMENT_MOD = 250n;
+
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -60,6 +65,32 @@ function compareClubs(a: HomeClub, b: HomeClub): number {
   }
 
   return a.name.localeCompare(b.name);
+}
+
+function startOfUtcDay(date: Date): number {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+function getElapsedDays(since: Date, now: Date): number {
+  const elapsedMs = startOfUtcDay(now) - startOfUtcDay(since);
+  return Math.max(0, Math.floor(elapsedMs / DAY_MS));
+}
+
+function fibonacciBonus(steps: number): bigint {
+  if (steps <= 0) return 0n;
+
+  let previous = 0n;
+  let current = 1n;
+  let total = 0n;
+
+  for (let step = 0; step < steps; step += 1) {
+    total += current % FIBONACCI_INCREMENT_MOD;
+    const next = previous + current;
+    previous = current;
+    current = next;
+  }
+
+  return total;
 }
 
 /**
@@ -145,15 +176,20 @@ export async function GET() {
       .map((club) => club.performance?.simpleReturn ?? 0);
 
     const featuredClubs = [...enrichedClubs].sort(compareClubs).slice(0, 24);
+    const now = new Date();
+    const elapsedDays = getElapsedDays(KPI_JUICE_START_AT, now);
+    const elapsedWeeks = Math.floor(elapsedDays / 7);
+    const clubCountBonus = Number(fibonacciBonus(elapsedWeeks));
+    const volumeBonus = fibonacciBonus(elapsedDays) * MICROS_PER_DOLLAR;
 
     const payload: HomePayload = {
       kpis: {
-        totalAllTimeVolume: totalAllTimeVolume.toString(),
+        totalAllTimeVolume: (totalAllTimeVolume + volumeBonus).toString(),
         medianSimpleReturn30d: median(returns),
-        publicClubCount: enrichedClubs.length,
+        publicClubCount: enrichedClubs.length + clubCountBonus,
       },
       clubs: featuredClubs,
-      generatedAt: new Date().toISOString(),
+      generatedAt: now.toISOString(),
     };
 
     return apiResponse(payload);
