@@ -1,4 +1,4 @@
-import { addDays, endOfDay, format, startOfDay, subDays } from 'date-fns';
+import { addDays, differenceInCalendarDays, endOfDay, format, startOfDay, subDays } from 'date-fns';
 import type { LedgerEntryType } from '@prisma/client';
 
 export type LedgerEntryLike = {
@@ -15,6 +15,7 @@ export type ExposurePoint = {
 };
 
 export const DEFAULT_EXPOSURE_WINDOW_DAYS = 7;
+export type ExposureWindow = number | 'all';
 
 type ExposureState = {
   wallet: bigint;
@@ -62,10 +63,18 @@ function toExposurePoint(day: Date, state: ExposureState): ExposurePoint {
   };
 }
 
-// Compute stacked exposure over a fixed trailing N-day window using true calendar spacing.
+function parseStartDay(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return startOfDay(parsed);
+}
+
+// Compute stacked exposure over a trailing N-day window or full history using true calendar spacing.
 export function buildExposureSeries(
   entries: LedgerEntryLike[],
-  windowDays: number = DEFAULT_EXPOSURE_WINDOW_DAYS
+  window: ExposureWindow = DEFAULT_EXPOSURE_WINDOW_DAYS,
+  allTimeStartAt?: string | Date | null
 ): ExposurePoint[] {
   if (!entries || entries.length === 0) return [];
   const sorted = [...entries]
@@ -75,12 +84,20 @@ export function buildExposureSeries(
 
   if (sorted.length === 0) return [];
 
-  const normalizedWindowDays = Number.isFinite(windowDays)
-    ? Math.max(1, Math.floor(windowDays))
-    : DEFAULT_EXPOSURE_WINDOW_DAYS;
-
   const today = startOfDay(new Date());
-  const windowStart = subDays(today, normalizedWindowDays - 1);
+  const earliestDay = startOfDay(sorted[0].date);
+  const requestedAllTimeStartDay = parseStartDay(allTimeStartAt);
+  const allTimeStartDay =
+    requestedAllTimeStartDay && requestedAllTimeStartDay < earliestDay
+      ? requestedAllTimeStartDay
+      : earliestDay;
+  const normalizedWindowDays =
+    window === 'all'
+      ? Math.max(1, differenceInCalendarDays(today, allTimeStartDay) + 1)
+      : Number.isFinite(window)
+        ? Math.max(1, Math.floor(window))
+        : DEFAULT_EXPOSURE_WINDOW_DAYS;
+  const windowStart = window === 'all' ? allTimeStartDay : subDays(today, normalizedWindowDays - 1);
   const windowEnd = endOfDay(today);
 
   let state: ExposureState = { wallet: 0n, market: 0n };

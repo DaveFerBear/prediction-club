@@ -14,8 +14,6 @@ import {
   useClubApplications,
   usePredictionRounds,
 } from '@/hooks';
-import { ChartExposure } from '@/components/chart-exposure';
-import { buildExposureSeries } from '@/lib/exposure';
 import {
   Button,
   Card,
@@ -34,6 +32,7 @@ import { ClubSetupChecklist } from '@/components/club-setup-checklist';
 import { ClubDepositPopover } from '@/components/club-deposit-popover';
 import { CopyableAddress } from '@/components/copyable-address';
 import { ClubActionPanel } from '@/components/club/ClubActionPanel';
+import { ClubExposureChart } from '@/components/club/ClubExposureChart';
 import { AdminConsoleSection } from '@/components/club/AdminConsoleSection';
 import { ClubHeroPanel } from '@/components/club/ClubHeroPanel';
 import { ClubMetricsPanel } from '@/components/club/ClubMetricsPanel';
@@ -76,8 +75,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     (round) =>
       round.status === 'COMMITTED' || round.status === 'PENDING' || round.status === 'RESOLVED'
   );
-
-  const exposureSeries = useMemo(() => buildExposureSeries(clubHistory, 7), [clubHistory]);
 
   const isAdmin = useMemo(() => {
     if (!address) return false;
@@ -227,21 +224,6 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
     );
   }
 
-  const heroExposureContent = balanceLoading ? (
-    <div className="py-8 text-sm text-[color:var(--club-text-secondary)]">Loading exposure...</div>
-  ) : exposureSeries.length === 0 ? (
-    <div className="py-8 text-sm text-[color:var(--club-text-secondary)]">No activity yet to chart.</div>
-  ) : (
-    <ChartExposure
-      data={exposureSeries}
-      showHeader={false}
-      showFooter={false}
-      compact
-      seamless
-      windowBadgeLabel="Past 7 days"
-    />
-  );
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -252,7 +234,13 @@ export default function ClubPublicPage({ params }: { params: { slug: string } })
           description={club.description || 'No description'}
           isPublic={club.isPublic}
           membershipLabel={membershipLabel}
-          descriptionContent={heroExposureContent}
+          descriptionContent={
+            <ClubExposureChart
+              history={clubHistory}
+              isLoading={balanceLoading}
+              createdAt={club.createdAt}
+            />
+          }
           actionPanel={
             isMember ? (
               <ClubActionPanel

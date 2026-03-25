@@ -32,6 +32,7 @@ export interface ClubDetail {
   id: string;
   name: string;
   slug: string;
+  createdAt: string;
   description: string | null;
   isPublic: boolean;
   createdByUserId: string | null;

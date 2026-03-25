@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import {
   Legend,
@@ -27,6 +27,7 @@ type Props = {
   compact?: boolean;
   seamless?: boolean;
   windowBadgeLabel?: string;
+  windowControl?: ReactNode;
 };
 
 function currency(value: number) {
@@ -50,6 +51,7 @@ export function ChartExposure({
   compact = false,
   seamless = false,
   windowBadgeLabel,
+  windowControl,
 }: Props) {
   const chartId = useId();
   const isHero = compact && seamless && !showHeader && !showFooter;
@@ -78,8 +80,8 @@ export function ChartExposure({
           ].join(' ')}
         >
           {isHero ? (
-            <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/45 px-2 py-0.5 text-xs text-[color:var(--club-text-primary)] shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
+            <div className="absolute left-2 top-2 z-10 flex flex-wrap items-center gap-2">
+              <div className="pointer-events-none inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/45 px-2 py-0.5 text-xs text-[color:var(--club-text-primary)] shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
                 <span
                   className="inline-block"
                   style={{
@@ -91,7 +93,7 @@ export function ChartExposure({
                 />
                 <span>In markets</span>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/45 px-2 py-0.5 text-xs text-[color:var(--club-text-primary)] shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
+              <div className="pointer-events-none inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/45 px-2 py-0.5 text-xs text-[color:var(--club-text-primary)] shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
                 <span
                   className="inline-block"
                   style={{
@@ -103,8 +105,10 @@ export function ChartExposure({
                 />
                 <span>Wallet</span>
               </div>
-              {windowBadgeLabel ? (
-                <div className="inline-flex items-center rounded-full border border-slate-300/80 bg-white/70 px-2 py-0.5 text-xs font-medium text-slate-700 shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
+              {windowControl ? (
+                <div className="pointer-events-auto">{windowControl}</div>
+              ) : windowBadgeLabel ? (
+                <div className="pointer-events-none inline-flex items-center rounded-full border border-slate-300/80 bg-white/70 px-2 py-0.5 text-xs font-medium text-slate-700 shadow-sm supports-[backdrop-filter]:backdrop-blur-md">
                   {windowBadgeLabel}
                 </div>
               ) : null}

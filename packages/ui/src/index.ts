@@ -36,6 +36,18 @@ export { Progress } from './components/progress';
 export { Slider } from './components/slider';
 export { Skeleton } from './components/skeleton';
 export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+} from './components/select';
+export {
   Accordion,
   AccordionItem,
   AccordionTrigger,
