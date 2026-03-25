@@ -81,6 +81,9 @@ export interface PredictionRound {
   settledAt: string | null;
   stakeTotal: string;
   createdAt: string;
+  orderPrice: string | null;
+  totalCommit: string;
+  totalPnl: string;
   _count: {
     members: number;
   };
