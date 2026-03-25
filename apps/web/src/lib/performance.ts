@@ -25,6 +25,20 @@ export type ClubPerformance = {
   simpleReturn: number; // decimal, e.g., 0.12 = 12%
   hasWindowActivity: boolean;
   realizedPnl: string;
+  unrealizedPnl: string;
+};
+
+export type OpenRoundMemberLike = {
+  commitAmount: string;
+  orderPrice: string | null;
+  predictionRound: {
+    createdAt: string;
+    clubId: string;
+    status: string;
+    targetTokenId: string;
+    outcome: string | null;
+    targetOutcome: string;
+  };
 };
 
 type ExposureState = {
@@ -73,6 +87,7 @@ export function computeClubPerformance(
       simpleReturn: 0,
       hasWindowActivity: false,
       realizedPnl: '0',
+      unrealizedPnl: '0',
     };
   }
 
@@ -143,56 +158,106 @@ export function computeClubPerformance(
     simpleReturn,
     hasWindowActivity: windowActivity > 0,
     realizedPnl,
+    unrealizedPnl: '0',
   };
 }
 
 /**
+ * Compute the effective current price for an open position.
+ * - COMMITTED: use live midpoint from Polymarket CLOB.
+ * - RESOLVED: use 1.0 (win) or 0.0 (loss) based on outcome vs target.
+ */
+function getEffectivePrice(
+  member: OpenRoundMemberLike,
+  prices: Map<string, string>
+): number | null {
+  const { status, outcome, targetOutcome, targetTokenId } = member.predictionRound;
+
+  if (status === 'RESOLVED' && outcome != null) {
+    return outcome.trim().toLowerCase() === targetOutcome.trim().toLowerCase() ? 1.0 : 0.0;
+  }
+
+  const midpoint = prices.get(targetTokenId);
+  if (midpoint == null) return null;
+  const parsed = Number(midpoint);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
  * Compute performance from prediction round members (payouts vs commits) within window.
+ * Optionally includes unrealized P&L from open (COMMITTED/RESOLVED) positions.
  */
 export function computeClubPerformanceFromRounds(
   members: RoundMemberLike[],
   days = 30,
-  now = new Date()
-): ClubPerformance {
-  if (!members || members.length === 0) {
-    return {
-      days,
-      navStart: '0',
-      navEnd: '0',
-      netFlows: '0',
-      simpleReturn: 0,
-      hasWindowActivity: false,
-      realizedPnl: '0',
-    };
+  now = new Date(),
+  openPositions?: {
+    members: OpenRoundMemberLike[];
+    prices: Map<string, string>;
   }
+): ClubPerformance {
+  const empty: ClubPerformance = {
+    days,
+    navStart: '0',
+    navEnd: '0',
+    netFlows: '0',
+    simpleReturn: 0,
+    hasWindowActivity: false,
+    realizedPnl: '0',
+    unrealizedPnl: '0',
+  };
+
+  const hasSettled = members && members.length > 0;
+  const hasOpen = openPositions && openPositions.members.length > 0;
+
+  if (!hasSettled && !hasOpen) return empty;
 
   const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   let commitTotal = 0n;
   let payoutTotal = 0n;
   let windowActivity = 0;
 
-  for (const m of members) {
-    const ts = new Date(m.predictionRound.createdAt);
-    if (ts < cutoff) continue;
-    windowActivity += 1;
-    commitTotal += BigInt(m.commitAmount);
-    payoutTotal += BigInt(m.payoutAmount);
+  // Realized P&L from settled rounds
+  if (hasSettled) {
+    for (const m of members) {
+      const ts = new Date(m.predictionRound.createdAt);
+      if (ts < cutoff) continue;
+      windowActivity += 1;
+      commitTotal += BigInt(m.commitAmount);
+      payoutTotal += BigInt(m.payoutAmount);
+    }
   }
 
-  if (windowActivity === 0) {
-    return {
-      days,
-      navStart: '0',
-      navEnd: '0',
-      netFlows: '0',
-      simpleReturn: 0,
-      hasWindowActivity: false,
-      realizedPnl: '0',
-    };
+  // Unrealized P&L from open positions
+  let unrealizedPnlFloat = 0;
+  let openCommitTotal = 0n;
+
+  if (hasOpen) {
+    for (const m of openPositions.members) {
+      const ts = new Date(m.predictionRound.createdAt);
+      if (ts < cutoff) continue;
+
+      const orderPrice = m.orderPrice != null ? Number(m.orderPrice) : 0;
+      if (!orderPrice) continue;
+
+      const currentPrice = getEffectivePrice(m, openPositions.prices);
+      if (currentPrice == null) continue;
+
+      const commit = BigInt(m.commitAmount);
+      openCommitTotal += commit;
+      windowActivity += 1;
+
+      // unrealizedPnl = commitAmount * ((currentPrice - orderPrice) / orderPrice)
+      unrealizedPnlFloat += Number(commit) * ((currentPrice - orderPrice) / orderPrice);
+    }
   }
 
-  const pnl = payoutTotal - commitTotal;
-  const simpleReturn = commitTotal === 0n ? 0 : Number(pnl) / Number(commitTotal);
+  if (windowActivity === 0) return empty;
+
+  const realizedPnl = payoutTotal - commitTotal;
+  const totalCommit = commitTotal + openCommitTotal;
+  const totalPnlFloat = Number(realizedPnl) + unrealizedPnlFloat;
+  const simpleReturn = totalCommit === 0n ? 0 : totalPnlFloat / Number(totalCommit);
 
   return {
     days,
@@ -201,6 +266,7 @@ export function computeClubPerformanceFromRounds(
     netFlows: '0',
     simpleReturn,
     hasWindowActivity: true,
-    realizedPnl: pnl.toString(),
+    realizedPnl: realizedPnl.toString(),
+    unrealizedPnl: Math.round(unrealizedPnlFloat).toString(),
   };
 }

@@ -12,7 +12,8 @@ import {
   serverError,
 } from '@/lib/api';
 import { requireAuth, AuthError } from '@/lib/auth';
-import { computeClubPerformanceFromRounds, type RoundMemberLike } from '@/lib/performance';
+import { computeClubPerformanceFromRounds, type RoundMemberLike, type OpenRoundMemberLike } from '@/lib/performance';
+import { fetchMidpointPrices } from '@/lib/polymarket-prices';
 
 const updateClubSchema = z.object({
   name: z.string().min(1).max(100),
@@ -31,18 +32,57 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
       clubId: club.id,
     });
 
-    const roundMembers = await prisma.predictionRoundMember.findMany({
-      where: { predictionRound: { clubId: club.id, status: 'SETTLED' } },
-      select: {
-        commitAmount: true,
-        payoutAmount: true,
-        pnlAmount: true,
-        predictionRound: { select: { clubId: true, createdAt: true, status: true } },
-      },
-    });
+    const [roundMembers, openRoundMembers] = await Promise.all([
+      prisma.predictionRoundMember.findMany({
+        where: { predictionRound: { clubId: club.id, status: 'SETTLED' } },
+        select: {
+          commitAmount: true,
+          payoutAmount: true,
+          pnlAmount: true,
+          predictionRound: { select: { clubId: true, createdAt: true, status: true } },
+        },
+      }),
+      prisma.predictionRoundMember.findMany({
+        where: {
+          predictionRound: {
+            clubId: club.id,
+            status: { in: ['COMMITTED', 'RESOLVED'] },
+          },
+        },
+        select: {
+          commitAmount: true,
+          orderPrice: true,
+          predictionRound: {
+            select: {
+              clubId: true,
+              createdAt: true,
+              status: true,
+              targetTokenId: true,
+              outcome: true,
+              targetOutcome: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const tokenIds = [
+      ...new Set(
+        openRoundMembers
+          .filter((m) => m.predictionRound.status === 'COMMITTED')
+          .map((m) => m.predictionRound.targetTokenId)
+      ),
+    ];
+    const prices = await fetchMidpointPrices(tokenIds);
+
     const performance = computeClubPerformanceFromRounds(
       roundMembers as unknown as RoundMemberLike[],
-      30
+      30,
+      undefined,
+      {
+        members: openRoundMembers as unknown as OpenRoundMemberLike[],
+        prices,
+      }
     );
 
     return apiResponse({ ...club, activeCommittedVolume, performance });

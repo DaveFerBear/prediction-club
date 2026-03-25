@@ -18,6 +18,7 @@ export type HomeClubItem = {
     simpleReturn: number;
     hasWindowActivity: boolean;
     realizedPnl: string;
+    unrealizedPnl: string;
   } | null;
   _count: {
     members: number;

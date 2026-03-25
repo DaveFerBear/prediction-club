@@ -21,6 +21,7 @@ export interface ClubListItem {
     simpleReturn: number;
     hasWindowActivity: boolean;
     realizedPnl: string;
+    unrealizedPnl: string;
   } | null;
   _count: {
     members: number;
@@ -45,6 +46,7 @@ export interface ClubDetail {
     simpleReturn: number;
     hasWindowActivity: boolean;
     realizedPnl: string;
+    unrealizedPnl: string;
   } | null;
   members: Array<{
     role: string;
