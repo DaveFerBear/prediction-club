@@ -160,13 +160,33 @@ export class PredictionRoundController {
           _count: {
             select: { members: true },
           },
+          members: {
+            select: { orderPrice: true, commitAmount: true, pnlAmount: true },
+          },
         },
       }),
       prisma.predictionRound.count({ where }),
     ]);
 
+    const items = predictionRounds.map((round) => {
+      const { members, ...rest } = round;
+      const orderPrice = members.find((m) => m.orderPrice != null)?.orderPrice ?? null;
+      let totalCommit = 0n;
+      let totalPnl = 0n;
+      for (const m of members) {
+        totalCommit += BigInt(m.commitAmount ?? '0');
+        totalPnl += BigInt(m.pnlAmount ?? '0');
+      }
+      return {
+        ...rest,
+        orderPrice: orderPrice?.toString() ?? null,
+        totalCommit: totalCommit.toString(),
+        totalPnl: totalPnl.toString(),
+      };
+    });
+
     return {
-      items: predictionRounds,
+      items,
       total,
       page,
       pageSize,

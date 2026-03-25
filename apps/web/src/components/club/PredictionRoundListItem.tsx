@@ -1,7 +1,12 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { type ReactNode, useState } from 'react';
 import { formatUsdAmount } from '@prediction-club/shared';
 import { Badge, Card, CardContent } from '@prediction-club/ui';
+import { ChevronDown } from 'lucide-react';
 import type { PredictionRound } from '@/hooks';
+import { usePolymarketMarketData } from '@/hooks';
+import { PredictionPriceChart } from './PredictionPriceChart';
 
 type PredictionRoundListItemProps = {
   round: PredictionRound;
@@ -111,6 +116,53 @@ function getStatusBadge(round: PredictionRound) {
   return <Badge variant={hitTarget ? 'success' : 'destructive'}>{`SETTLED · ${hitTarget ? 'HIT' : 'MISS'}`}</Badge>;
 }
 
+function computeReturnPercent(
+  round: PredictionRound,
+  midpoint: string | null | undefined
+): number | null {
+  if (round.status === 'SETTLED') {
+    const commit = Number(round.totalCommit);
+    if (!commit) return null;
+    return (Number(round.totalPnl) / commit) * 100;
+  }
+
+  if (round.status === 'COMMITTED' && round.orderPrice != null && midpoint) {
+    const entry = Number(round.orderPrice);
+    if (!entry) return null;
+    return ((Number(midpoint) - entry) / entry) * 100;
+  }
+
+  return null;
+}
+
+function ReturnBadge({ round }: { round: PredictionRound }) {
+  const shouldFetchLive = round.status === 'COMMITTED' && round.orderPrice != null;
+  const { data: marketData } = usePolymarketMarketData(
+    shouldFetchLive ? round.targetTokenId : undefined
+  );
+
+  const rawMidpoint = marketData?.price?.midpoint;
+  const midpoint =
+    typeof rawMidpoint === 'string'
+      ? rawMidpoint
+      : rawMidpoint && typeof rawMidpoint === 'object' && 'mid' in rawMidpoint
+        ? (rawMidpoint as { mid: string }).mid
+        : null;
+  const returnPct = computeReturnPercent(round, midpoint);
+  if (returnPct == null || !Number.isFinite(returnPct)) return null;
+
+  const isPositive = returnPct >= 0;
+  return (
+    <Badge
+      variant={isPositive ? 'success' : 'destructive'}
+      className="tabular-nums"
+    >
+      {isPositive ? '+' : ''}
+      {returnPct.toFixed(1)}%
+    </Badge>
+  );
+}
+
 function renderCommentary(markdown: string): ReactNode[] {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n');
   const nodes: ReactNode[] = [];
@@ -184,6 +236,8 @@ function renderCommentary(markdown: string): ReactNode[] {
 export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
   const { round } = props;
   const resolveLabel = getResolveLabel(round);
+  const [chartExpanded, setChartExpanded] = useState(false);
+  const hasOrderPrice = round.orderPrice != null;
 
   return (
     <Card className="overflow-hidden border-[color:var(--club-border-soft)] bg-white shadow-sm">
@@ -207,6 +261,7 @@ export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
           </div>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
             {getStatusBadge(round)}
+            <ReturnBadge round={round} />
           </div>
         </div>
 
@@ -227,6 +282,29 @@ export function PredictionRoundListItem(props: PredictionRoundListItemProps) {
         {round.commentary ? (
           <div className="mt-3 rounded-lg border border-[color:var(--club-border-soft)] bg-muted/20 px-3 py-2 text-sm text-[color:var(--club-text-secondary)]">
             {renderCommentary(round.commentary)}
+          </div>
+        ) : null}
+
+        {hasOrderPrice ? (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setChartExpanded((prev) => !prev)}
+              className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-[color:var(--club-text-primary)] transition-colors"
+            >
+              Price history
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${chartExpanded ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {chartExpanded ? (
+              <div className="mt-2">
+                <PredictionPriceChart
+                  tokenId={round.targetTokenId}
+                  orderPrice={Number(round.orderPrice)}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
       </CardContent>

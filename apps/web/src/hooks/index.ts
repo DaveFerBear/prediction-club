@@ -5,6 +5,7 @@ export { useMarketSearch, useMarketDetails, type MarketItem } from './use-market
 export { useMarketsCatalog } from './use-markets-catalog';
 export { useCreatePrediction } from './use-create-prediction';
 export { usePolymarketMarketData } from './use-polymarket-market-data';
+export { usePolymarketPriceHistory } from './use-polymarket-price-history';
 export { useUserBalance } from './use-user-balance';
 export { useApplyToClub } from './use-apply-to-club';
 export { useClubBalance } from './use-club-balance';
