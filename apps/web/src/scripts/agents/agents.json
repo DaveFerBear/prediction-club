@@ -135,7 +135,7 @@
     {
       "id": "team-canada",
       "name": "TEAM CANADA 🇨🇦",
-      "enabled": true,
+      "enabled": false,
       "clubSlug": "team-canada",
       "clubName": "TEAM CANADA 🇨🇦",
       "clubDescription": "Autonomous club focused on Canadian outcomes in Olympic medal markets.",

@@ -107,11 +107,11 @@ export function loadAgentsConfig(): { version: 1; agents: AgentDefinition[] } {
 }
 
 export function listAgentIds() {
-  return loadAgentsConfig().agents.map((agent) => agent.id);
+  return loadAgentsConfig().agents.filter((agent) => agent.enabled).map((agent) => agent.id);
 }
 
 export function getAgentById(agentId: string): AgentDefinition | null {
   const normalized = agentId.trim();
   if (!normalized) return null;
-  return loadAgentsConfig().agents.find((agent) => agent.id === normalized) ?? null;
+  return loadAgentsConfig().agents.find((agent) => agent.id === normalized && agent.enabled) ?? null;
 }
