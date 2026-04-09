@@ -4,6 +4,8 @@ import { apiResponse, serverError } from '@/lib/api';
 import { computeClubPerformanceFromRounds, type RoundMemberLike, type OpenRoundMemberLike } from '@/lib/performance';
 import { fetchMidpointPrices } from '@/lib/polymarket-prices';
 
+export const dynamic = 'force-dynamic';
+
 type HomeClub = {
   id: string;
   name: string;
